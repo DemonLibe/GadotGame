@@ -461,6 +461,10 @@ func start_day(d: int) -> void:
 		await hud.fade_to(0.0, 2.0).finished
 	player.input_locked = false
 	busy = false
+	if debug_flag("flashoff"):
+		player.flashlight_on = false
+	if debug_flag("select2"):
+		player.select(1)
 	if debug_flag("lookup"):
 		player.debug_look(0.9, 0.0)
 	if debug_flag("lookback"):
