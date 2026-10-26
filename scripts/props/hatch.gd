@@ -35,6 +35,8 @@ func get_prompt(player) -> String:
 		return ""
 	if is_open:
 		return "E — спуститься в шахту"
+	if not player.has_radio:
+		return "Сначала забери рацию со стола"
 	return "Удерживай E — открыть люк"
 
 
@@ -43,8 +45,8 @@ func interact(player) -> void:
 		ladder.interact(player)
 
 
-func hold_interact(_player, delta: float) -> float:
-	if is_open:
+func hold_interact(player, delta: float) -> float:
+	if is_open or not player.has_radio:
 		return -1.0
 	_progress += delta / OPEN_TIME
 	if _progress >= 1.0:

@@ -28,6 +28,7 @@ func _ready() -> void:
 func build_tasks(d: int) -> void:
 	tasks.clear()
 	_said.clear()
+	_task("radio", "Забрать рацию со стола", 1)
 	match d:
 		1:
 			_task("charge:station", "Зарядить фонарь на станции", 1)
@@ -180,6 +181,8 @@ func _setup_input() -> void:
 	_bind("slot_2", [KEY_2])
 	_bind("slot_3", [KEY_3])
 	_bind("slot_4", [KEY_4])
+	_bind("slot_5", [KEY_5])
+	_bind("jump", [KEY_SPACE])
 	if not InputMap.has_action("burn"):
 		InputMap.add_action("burn")
 	var mb := InputEventMouseButton.new()

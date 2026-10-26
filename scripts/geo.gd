@@ -74,10 +74,17 @@ static func _add(parent: Node, mesh: Mesh, pos: Vector3, mat: Material, basis: B
 	return mi
 
 
-## Невидимая стена (только столкновения).
-static func solid(parent: Node, pos: Vector3, size: Vector3) -> StaticBody3D:
+## Слой невидимых стен: игрок о них спотыкается, а луч взаимодействия проходит насквозь
+## (иначе не дотянуться до вентблока на изогнутой стене тоннеля).
+const WALL_LAYER := 8
+
+
+## Невидимая стена (только столкновения, слой WALL_LAYER).
+static func solid(parent: Node, pos: Vector3, size: Vector3, basis := Basis.IDENTITY) -> StaticBody3D:
 	var body := StaticBody3D.new()
-	body.position = pos
+	body.collision_layer = WALL_LAYER
+	body.collision_mask = 0
+	body.transform = Transform3D(basis, pos)
 	collider_box(body, size)
 	parent.add_child(body)
 	return body
@@ -94,7 +101,8 @@ static func tube_mesh(radius: float, z_from: float, z_to: float, segments: int, 
 		var a1 := TAU * (i + 1) / segments
 		if sin(a0) < min_sin and sin(a1) < min_sin:
 			continue
-		var quad := [[a0, z_from], [a1, z_from], [a1, z_to], [a0, z_from], [a1, z_to], [a0, z_to]]
+		# Обход по часовой стрелке, если смотреть изнутри трубы, — это лицевая сторона в Godot.
+		var quad := [[a0, z_from], [a1, z_to], [a1, z_from], [a0, z_from], [a0, z_to], [a1, z_to]]
 		for q in quad:
 			var a: float = q[0]
 			var z: float = q[1]
@@ -125,9 +133,15 @@ static func portal_mesh(radius: float, rect: Rect2, segments: int) -> ArrayMesh:
 		var o1 := d1 * _ray_to_rect(d1, rect)
 		var i0 := d0 * minf(radius, _ray_to_rect(d0, rect))
 		var i1 := d1 * minf(radius, _ray_to_rect(d1, rect))
-		for p in [i0, o0, o1, i0, o1, i1]:
+		# Двусторонняя стена: лицевая сторона в +Z и отдельно в -Z, у каждой своя нормаль.
+		for p in [i0, o1, o0, i0, i1, o1]:
 			var v: Vector2 = p
 			st.set_normal(Vector3.BACK)
+			st.set_uv(v)
+			st.add_vertex(Vector3(v.x, v.y, 0.0))
+		for p in [i0, o0, o1, i0, o1, i1]:
+			var v: Vector2 = p
+			st.set_normal(Vector3.FORWARD)
 			st.set_uv(v)
 			st.add_vertex(Vector3(v.x, v.y, 0.0))
 	st.generate_tangents()

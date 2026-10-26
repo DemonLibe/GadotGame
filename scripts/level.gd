@@ -2,7 +2,7 @@ class_name Level
 extends Node3D
 ## Статическая геометрия «Тихой»:
 ## комната с люком наверху → шахта с лестницей (100 м) → станция на одну вагонетку →
-## круглый тоннель из чугунных тюбингов с тремя развилками в служебные штольни → решётка.
+## круглый тоннель из чугунных тюбингов с тремя развилками под острым углом в служебные штольни → решётка.
 
 const FLOOR_Y := -15.0       # пол станции и тоннеля
 const TUN_CX := 1.2          # ось основного тоннеля (по ней идут рельсы)
@@ -16,28 +16,31 @@ const GRATE_Z := -232.0      # решётка
 const CHUNK := 14.0          # длина куска геометрии (лимит ламп на объект в браузере)
 const TUBE_R := 2.1          # радиус трубы тоннеля
 const TUBE_CY := FLOOR_Y + 1.2
-const CHAMBER := 2.6         # полуразмер камеры-развилки
-const CHAMBER_H := 4.4
+const JUNCTION_MAIN := 8.0   # развилка: ± столько метров основного тоннеля строится через CSG
+const JUNCTION_BRANCH := 10.0  # ...и столько метров штольни от оси тоннеля
+const WALL_T := 0.3          # толщина обделки (для CSG-развилок)
 
 const SHAFT_X := -1.6        # центр шахты
 const SHAFT_Z := -32.0
 const SHAFT_HALF := 0.9
 const ROOM_Y := 85.0         # пол комнаты с люком
 
-## Развилки: z камеры, направление штольни по X (-1 — налево, если идти вглубь), длина.
+## Развилки: z точки ответвления на оси, сторона (-1 — налево, если идти вглубь),
+## угол от оси тоннеля (острый — штольня уходит вперёд-вбок), длина.
 const BRANCHES := [
-	{"z": -105.0, "dir": -1, "length": 46.0, "name": "ШТОЛЬНЯ 1"},
-	{"z": -160.0, "dir": 1, "length": 56.0, "name": "ШТОЛЬНЯ 2"},
-	{"z": -200.0, "dir": -1, "length": 40.0, "name": "ШТОЛЬНЯ 3"},
+	{"z": -105.0, "side": -1, "angle": 35.0, "length": 46.0, "name": "ШТОЛЬНЯ 1"},
+	{"z": -160.0, "side": 1, "angle": 40.0, "length": 56.0, "name": "ШТОЛЬНЯ 2"},
+	{"z": -200.0, "side": -1, "angle": 30.0, "length": 40.0, "name": "ШТОЛЬНЯ 3"},
 ]
 
 var lamps: Array[Dictionary] = []
 var tunnel_lights_off := false
 var blackout := false
 var grate: Node3D
-var zones: Array[Rect2] = []  # где можно стоять (XZ) — для событий
+var _segments: Array[Dictionary] = []  # оси проходов {a, b, dir} в XZ — для событий
 
 var m_tubbing: Material
+var m_tubbing_tri: Material
 var m_tiles: Material
 var m_granite: Material
 var m_ballast: Material
@@ -52,6 +55,7 @@ var _time := 0.0
 
 func build() -> void:
 	m_tubbing = ProcTex.tubbing()
+	m_tubbing_tri = ProcTex.tubbing_triplanar()
 	m_tiles = ProcTex.tiles()
 	m_granite = ProcTex.granite()
 	m_ballast = ProcTex.ballast()
@@ -66,6 +70,7 @@ func build() -> void:
 	_build_station()
 	_build_main_tunnel()
 	for i in BRANCHES.size():
+		_build_junction(i)
 		_build_branch(i)
 	_build_rails()
 	_build_grate()
@@ -91,26 +96,44 @@ func _process(delta: float) -> void:
 
 # --- Запросы для других систем ------------------------------------------------
 
-## Есть ли рядом горящая лампа (для счётчика страха).
+## Есть ли рядом хоть какой-то свет: лампа, огонёк зарядки, горящая паутина.
+## Рядом со светом страх не копится.
 func is_lit_near(pos: Vector3) -> bool:
-	for l in lamps:
-		var light: OmniLight3D = l["light"]
-		if not light.visible or light.light_energy < 0.2:
+	for n in get_tree().get_nodes_in_group("fear_light"):
+		var light := n as OmniLight3D
+		if light == null or not light.is_visible_in_tree() or light.light_energy < 0.05:
 			continue
-		if light.global_position.distance_to(pos) < light.omni_range * 0.55:
+		if light.global_position.distance_to(pos) < maxf(light.omni_range * 0.6, 2.2):
 			return true
 	return false
 
 
-## Точка внутри тоннелей / станции (для появления «Другого»).
+## Точка внутри станции или тоннелей (для появления «Другого»).
 func is_walkable(p: Vector3) -> bool:
 	if p.y > FLOOR_Y + 5.0:
 		return false
+	if Rect2(-3.0, -50.0, 6.0, 20.0).has_point(Vector2(p.x, p.z)):
+		return true
+	return _nearest_segment(p).get("dist", INF) < TUN_HW
+
+
+## Направление прохода, в котором стоит точка (основной тоннель или штольня).
+func axis_at(p: Vector3) -> Vector3:
+	return _nearest_segment(p).get("dir", Vector3.FORWARD)
+
+
+func _nearest_segment(p: Vector3) -> Dictionary:
 	var q := Vector2(p.x, p.z)
-	for r in zones:
-		if r.has_point(q):
-			return true
-	return false
+	var best := {}
+	var best_d := INF
+	for seg in _segments:
+		var a: Vector2 = seg["a"]
+		var b: Vector2 = seg["b"]
+		var d := q.distance_to(Geometry2D.get_closest_point_to_segment(q, a, b))
+		if d < best_d:
+			best_d = d
+			best = {"dist": d, "dir": seg["dir"]}
+	return best
 
 
 ## X стенки основной трубы на высоте y. side: -1 левая, +1 правая.
@@ -122,29 +145,54 @@ static func _tube_half(y: float) -> float:
 	return sqrt(maxf(TUBE_R * TUBE_R - pow(y - TUBE_CY, 2.0), 0.0))
 
 
+## Ось штольни: направление (горизонтальное) и правый перпендикуляр.
+static func branch_dir(index: int) -> Vector3:
+	var b: Dictionary = BRANCHES[index]
+	var a := deg_to_rad(float(b["angle"]))
+	return Vector3(float(b["side"]) * sin(a), 0.0, -cos(a))
+
+
+static func branch_origin(index: int) -> Vector3:
+	return Vector3(TUN_CX, FLOOR_Y, float(BRANCHES[index]["z"]))
+
+
+static func _right_of(d: Vector3) -> Vector3:
+	return Vector3(-d.z, 0.0, d.x)
+
+
+## Поворот вокруг Y, переводящий локальную -Z в направление d.
+static func _yaw_to(d: Vector3) -> float:
+	return atan2(-d.x, -d.z)
+
+
 ## Крепление на стене трубы. tunnel: -1 — основной тоннель (along = z),
-## 0..2 — штольня (along = метры от развилки). Узел смотрит (+Z) внутрь тоннеля.
+## 0..2 — штольня (along = метры от точки ответвления). Узел смотрит (+Z) внутрь тоннеля.
 func wall_mount(tunnel: int, side: int, along: float, y: float, inset := 0.03) -> Transform3D:
 	var off := _tube_half(y) - inset
 	if tunnel < 0:
 		return Transform3D(Basis(Vector3.UP, deg_to_rad(-90.0 * side)), Vector3(TUN_CX + side * off, y, along))
-	var b: Dictionary = BRANCHES[tunnel]
-	var x := TUN_CX + float(b["dir"]) * (CHAMBER + along)
-	var yaw := 0.0 if side < 0 else 180.0
-	return Transform3D(Basis(Vector3.UP, deg_to_rad(yaw)), Vector3(x, y, float(b["z"]) + side * off))
+	var d := branch_dir(tunnel)
+	var r := _right_of(d)
+	var pos := branch_origin(tunnel) + d * along + r * (side * off)
+	pos.y = y
+	var inward := -r * side
+	return Transform3D(Basis(Vector3.UP, atan2(inward.x, inward.z)), pos)
 
 
-## Точка на полу. lateral — смещение поперёк тоннеля.
+## Точка на полу. lateral — смещение поперёк тоннеля (вправо, если смотреть вглубь).
 func floor_point(tunnel: int, along: float, lateral := 0.0) -> Vector3:
 	if tunnel < 0:
 		return Vector3(TUN_CX + lateral, FLOOR_Y, along)
-	var b: Dictionary = BRANCHES[tunnel]
-	return Vector3(TUN_CX + float(b["dir"]) * (CHAMBER + along), FLOOR_Y, float(b["z"]) + lateral)
+	var d := branch_dir(tunnel)
+	return branch_origin(tunnel) + d * along + _right_of(d) * lateral
 
 
 ## Поворот поперечной плоскости тоннеля (для паутины во всю ширину).
 func cross_yaw(tunnel: int) -> float:
-	return 0.0 if tunnel < 0 else PI / 2
+	if tunnel < 0:
+		return 0.0
+	var d := branch_dir(tunnel)
+	return atan2(d.x, d.z)
 
 
 func set_grate_open(open: bool) -> void:
@@ -219,7 +267,7 @@ func _build_shaft() -> void:
 			mode = "broken"
 		elif i % 4 == 2:
 			mode = "flicker"
-		_add_lamp(Vector3(SHAFT_X + 0.7, ly, SHAFT_Z + 0.55), Color(1.0, 0.78, 0.5), 0.6, 7.0, mode, false)
+		_add_lamp(Vector3(SHAFT_X + 0.7, ly, SHAFT_Z - 0.55), Color(1.0, 0.78, 0.5), 0.6, 7.0, mode, false)
 		ly += 12.0
 		i += 1
 
@@ -251,7 +299,6 @@ func _build_station() -> void:
 	add_child(portal)
 	Geo.solid(self, Vector3((-3.0 + LEFT_X) / 2, y + 2.0, TUN_Z0 - 0.15), Vector3(LEFT_X + 3.0, 4.0, 0.3))
 	Geo.solid(self, Vector3((RIGHT_X + 3.3) / 2, y + 2.0, TUN_Z0 - 0.15), Vector3(3.3 - RIGHT_X, 4.0, 0.3))
-	zones.append(Rect2(-3.0, -50.0, 6.0, 20.0))
 	# Свет.
 	_add_lamp(Vector3(0, y + h - 0.1, -37), Color(0.8, 0.9, 1.0), 1.5, 10.0, "ok", false)
 	_add_lamp(Vector3(0, y + h - 0.1, -46), Color(0.8, 0.9, 1.0), 1.5, 10.0, "flicker", false)
@@ -272,36 +319,30 @@ func _build_station() -> void:
 # --- Основной тоннель --------------------------------------------------------
 
 func _build_main_tunnel() -> void:
-	# Труба режется на отрезки между камерами развилок.
+	# Прямые куски трубы между развилками; сами развилки строятся через CSG.
 	var cuts: Array[float] = [TUN_Z0]
 	for b in BRANCHES:
-		cuts.append(float(b["z"]) + CHAMBER)
-		cuts.append(float(b["z"]) - CHAMBER)
+		cuts.append(float(b["z"]) + JUNCTION_MAIN)
+		cuts.append(float(b["z"]) - JUNCTION_MAIN)
 	cuts.append(TUN_Z1)
 	for i in range(0, cuts.size(), 2):
 		_main_segment(cuts[i], cuts[i + 1])
-	for b in BRANCHES:
-		_build_chamber(b)
 	Geo.box(self, Vector3(TUN_CX, TUBE_CY, TUN_Z1 - 0.15), Vector3(TUBE_R * 2 + 0.4, TUBE_R * 2 + 0.4, 0.3), m_concrete)
-	zones.append(Rect2(LEFT_X, TUN_Z1, TUN_HW * 2, TUN_Z0 - TUN_Z1))
-	# Лампы на левой стене каждые 14 м (не в камерах): часть разбита, часть мигает.
+	_segments.append({"a": Vector2(TUN_CX, TUN_Z0), "b": Vector2(TUN_CX, TUN_Z1), "dir": Vector3.FORWARD})
+	# Светильники в сетках на стене через 12 м, попеременно слева и справа. Часть разбита.
 	var i := 0
-	var z := TUN_Z0 - 6.0
+	var z := TUN_Z0 - 5.0
 	while z > GRATE_Z + 2.0:
-		var in_chamber := false
-		for b in BRANCHES:
-			if absf(z - float(b["z"])) < CHAMBER + 1.0:
-				in_chamber = true
-		if not in_chamber:
-			var mode := "ok"
-			if i % 4 == 3:
-				mode = "broken"
-			elif i % 5 == 2:
-				mode = "flicker"
-			var ly := FLOOR_Y + 2.5
-			_add_lamp(Vector3(wall_x(-1, ly, 0.2), ly, z), Color(1.0, 0.72, 0.42), 0.9, 7.0, mode, true)
-			i += 1
-		z -= 14.0
+		var mode := "ok"
+		if i % 4 == 3:
+			mode = "broken"
+		elif i % 5 == 2:
+			mode = "flicker"
+		var side := -1 if i % 2 == 0 else 1
+		var ly := FLOOR_Y + 2.45
+		_add_wall_lamp(Vector3(wall_x(side, ly, 0.12), ly, z), Vector3(-side, 0, 0), mode)
+		z -= 12.0
+		i += 1
 	# Пикеты.
 	for k in [1, 3, 4]:
 		var mz: float = TUN_Z0 - 40.0 * k
@@ -309,109 +350,145 @@ func _build_main_tunnel() -> void:
 		Geo.label(self, Vector3(wall_x(1, ly, 0.03), ly, mz), "ПК %d" % k, -90, 48, Color(0.95, 0.95, 0.9), true)
 
 
-func _main_segment(z_a: float, z_b: float) -> void:
-	var cable := ProcTex.flat(Color(0.05, 0.05, 0.05), 0.6)
+## Общая «начинка» прямого куска трубы в локальных координатах (ось по -Z, пол на y = 0).
+## Труба, бетонный лоток с водоотводом, невидимые стены, кабели на кронштейнах, труба на опорах.
+func _tube_piece(parent: Node3D, s0: float, s1: float, lowered := 0.0) -> void:
+	var length := s1 - s0
+	var mid := -(s0 + s1) / 2.0
+	var tube := MeshInstance3D.new()
+	tube.mesh = Geo.tube_mesh(TUBE_R, -s0, -s1, 32, -0.6, TUBE_R * TAU / 8.0, 1.0)
+	tube.material_override = m_tubbing
+	tube.position = Vector3(0, TUBE_CY - FLOOR_Y, 0)
+	parent.add_child(tube)
+	var chord := _tube_half(FLOOR_Y) * 2.0
+	Geo.box(parent, Vector3(0, -0.15 - lowered, mid), Vector3(chord, 0.3, length), m_floor)
+	Geo.box(parent, Vector3(-1.25, 0.003 - lowered, mid), Vector3(0.28, 0.01, length), ProcTex.flat(Color(0.06, 0.06, 0.07), 0.3), false)
+	Geo.solid(parent, Vector3(-TUN_HW - 0.15, 2.0, mid), Vector3(0.3, 4.0, length))
+	Geo.solid(parent, Vector3(TUN_HW + 0.15, 2.0, mid), Vector3(0.3, 4.0, length))
 	var along := Basis(Vector3.RIGHT, PI / 2)
+	# Справа — кабели на кронштейнах (кронштейны частые: глазу есть за что зацепиться).
+	var cable := ProcTex.flat(Color(0.05, 0.05, 0.05), 0.6)
+	for k in 4:
+		var cy := 1.75 + k * 0.17
+		Geo.cylinder(parent, Vector3(_tube_half(FLOOR_Y + cy) - 0.12, cy, mid), 0.028, length, cable, along)
+	var arm := BoxMesh.new()
+	arm.size = Vector3(0.22, 0.03, 0.04)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = arm
+	var count := int(length / 1.2)
+	mm.instance_count = count * 4
+	for i in count:
+		for k in 4:
+			var cy := 1.72 + k * 0.17
+			mm.set_instance_transform(i * 4 + k, Transform3D(Basis.IDENTITY, Vector3(_tube_half(FLOOR_Y + cy) - 0.11, cy, -s0 - 0.6 - i * 1.2)))
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.material_override = m_metal
+	parent.add_child(mmi)
+	# Слева — водопроводная труба.
+	var py := 2.2
+	Geo.cylinder(parent, Vector3(-(_tube_half(FLOOR_Y + py) - 0.16), py, mid), 0.09, length, m_rust, along)
+
+
+func _main_segment(z_a: float, z_b: float) -> void:
 	var z := z_a
 	while z > z_b + 0.01:
 		var z2 := maxf(z - CHUNK, z_b)
-		var length := z - z2
-		var cz := (z + z2) / 2.0
-		var tube := MeshInstance3D.new()
-		tube.mesh = Geo.tube_mesh(TUBE_R, z, z2, 28, -0.6, TUBE_R * TAU / 8.0, 1.0)
-		tube.material_override = m_tubbing
-		tube.position = Vector3(TUN_CX, TUBE_CY, 0)
-		add_child(tube)
-		Geo.box(self, Vector3(TUN_CX, FLOOR_Y - 0.15, cz), Vector3(TUBE_R * 2, 0.3, length), m_ballast)
-		Geo.solid(self, Vector3(LEFT_X - 0.15, FLOOR_Y + 2.0, cz), Vector3(0.3, 4.0, length))
-		Geo.solid(self, Vector3(RIGHT_X + 0.15, FLOOR_Y + 2.0, cz), Vector3(0.3, 4.0, length))
-		# Труба слева, пучок кабелей справа.
-		Geo.cylinder(self, Vector3(wall_x(-1, FLOOR_Y + 2.2, 0.14), FLOOR_Y + 2.2, cz), 0.09, length, m_rust, along)
-		for k in 3:
-			var cy := FLOOR_Y + 1.9 + k * 0.09
-			Geo.cylinder(self, Vector3(wall_x(1, cy, 0.05), cy, cz), 0.025, length, cable, along)
+		var piece := Node3D.new()
+		piece.position = Vector3(TUN_CX, FLOOR_Y, 0)
+		add_child(piece)
+		_tube_piece(piece, -z, -z2)
 		z = z2
 
 
-func _build_chamber(b: Dictionary) -> void:
+# --- Развилки и штольни ------------------------------------------------------
+
+## Развилка: толстостенные трубы (основная + штольня под углом) объединяются,
+## внутренние объёмы вычитаются — получается честное пересечение тоннелей.
+func _build_junction(index: int) -> void:
+	var b: Dictionary = BRANCHES[index]
 	var zj: float = b["z"]
-	var dir: float = b["dir"]
-	var c := CHAMBER
-	Geo.box(self, Vector3(TUN_CX, FLOOR_Y - 0.15, zj), Vector3(c * 2, 0.3, c * 2), m_floor)
-	Geo.box(self, Vector3(TUN_CX, FLOOR_Y + CHAMBER_H + 0.15, zj), Vector3(c * 2 + 0.6, 0.3, c * 2 + 0.6), m_concrete)
-	var rect := Rect2(-c, FLOOR_Y - TUBE_CY, c * 2, CHAMBER_H)
-	# Торцы вдоль основного тоннеля — с круглыми проёмами.
-	for side in [1.0, -1.0]:
-		var p := MeshInstance3D.new()
-		p.mesh = Geo.portal_mesh(TUBE_R, rect, 40)
-		p.material_override = m_concrete
-		p.position = Vector3(TUN_CX, TUBE_CY, zj + side * c)
-		add_child(p)
-		var wz: float = zj + side * (c + 0.15)
-		Geo.solid(self, Vector3((TUN_CX - c + LEFT_X) / 2, FLOOR_Y + 2.0, wz), Vector3(LEFT_X - TUN_CX + c, 4.0, 0.3))
-		Geo.solid(self, Vector3((RIGHT_X + TUN_CX + c) / 2, FLOOR_Y + 2.0, wz), Vector3(TUN_CX + c - RIGHT_X, 4.0, 0.3))
-	# Боковина со входом в штольню.
-	var bp := MeshInstance3D.new()
-	bp.mesh = Geo.portal_mesh(TUBE_R, rect, 40)
-	bp.material_override = m_concrete
-	bp.transform = Transform3D(Basis(Vector3.UP, PI / 2), Vector3(TUN_CX + dir * c, TUBE_CY, zj))
-	add_child(bp)
-	var bx := TUN_CX + dir * (c + 0.15)
-	Geo.solid(self, Vector3(bx, FLOOR_Y + 2.0, (zj - c + zj - TUN_HW) / 2), Vector3(0.3, 4.0, c - TUN_HW))
-	Geo.solid(self, Vector3(bx, FLOOR_Y + 2.0, (zj + c + zj + TUN_HW) / 2), Vector3(0.3, 4.0, c - TUN_HW))
-	# Глухая боковина с указателем.
-	Geo.box(self, Vector3(TUN_CX - dir * (c + 0.15), FLOOR_Y + CHAMBER_H / 2, zj), Vector3(0.3, CHAMBER_H, c * 2), m_concrete)
-	var side_word := "НАЛЕВО" if dir < 0 else "НАПРАВО"
-	Geo.label(self, Vector3(TUN_CX - dir * (c - 0.02), FLOOR_Y + 2.4, zj), "%s — %s\n\nТОННЕЛЬ — ПРЯМО" % [b["name"], side_word],
-		90.0 * dir, 44, Color(0.9, 0.85, 0.6), true)
-	_add_lamp(Vector3(TUN_CX, FLOOR_Y + CHAMBER_H - 0.1, zj), Color(1.0, 0.72, 0.42), 1.0, 8.0, "ok", true)
-	zones.append(Rect2(TUN_CX - c, zj - c, c * 2, c * 2))
+	var d := branch_dir(index)
+	var axis := Vector3(TUN_CX, TUBE_CY, zj)
+	var main_basis := Basis(Vector3.RIGHT, PI / 2)
+	var branch_basis := Basis(Vector3.UP, _yaw_to(d)) * Basis(Vector3.RIGHT, -PI / 2)
+
+	var csg := CSGCombiner3D.new()
+	csg.use_collision = true
+	csg.collision_layer = Geo.WALL_LAYER
+	csg.collision_mask = 0
+	add_child(csg)
+	_csg_tube(csg, TUBE_R + WALL_T, JUNCTION_MAIN * 2.0, Transform3D(main_basis, axis), m_concrete, false)
+	_csg_tube(csg, TUBE_R + WALL_T, JUNCTION_BRANCH, Transform3D(branch_basis, axis + d * (JUNCTION_BRANCH / 2.0)), m_concrete, false)
+	_csg_tube(csg, TUBE_R, JUNCTION_MAIN * 2.0 + 0.04, Transform3D(main_basis, axis), m_tubbing_tri, true)
+	_csg_tube(csg, TUBE_R, JUNCTION_BRANCH + 0.02, Transform3D(branch_basis, axis + d * (JUNCTION_BRANCH / 2.0 + 0.01)), m_tubbing_tri, true)
+
+	# Пол развилки: полоса основного тоннеля и полоса штольни.
+	var chord := _tube_half(FLOOR_Y) * 2.0
+	Geo.box(self, Vector3(TUN_CX, FLOOR_Y - 0.15, zj), Vector3(chord, 0.3, JUNCTION_MAIN * 2.0), m_floor)
+	var floor_b := Geo.box(self, branch_origin(index) + d * (JUNCTION_BRANCH / 2.0) + Vector3(0, -0.155, 0),
+		Vector3(chord, 0.3, JUNCTION_BRANCH), m_floor, true, Basis(Vector3.UP, _yaw_to(d)))
+	floor_b.name = "JunctionFloor%d" % index
+
+	# Указатель на противоположной стене перед развилкой и свет.
+	var side: int = b["side"]
+	var word := "НАЛЕВО" if side < 0 else "НАПРАВО"
+	var ly := FLOOR_Y + 2.0
+	var tr := wall_mount(-1, -side, zj + JUNCTION_MAIN - 1.5, ly, 0.03)
+	var sign_board := Geo.box(self, tr.origin, Vector3(1.4, 0.5, 0.03), ProcTex.flat(Color(0.12, 0.25, 0.45), 0.5), false, tr.basis)
+	sign_board.name = "Sign%d" % index
+	var l := Geo.label(self, tr.origin + tr.basis.z * 0.02, "%s\n%s" % [b["name"], word], 0.0, 30, Color(0.95, 0.95, 0.95), true)
+	l.basis = tr.basis
+	_add_lamp(Vector3(TUN_CX, TUBE_CY + TUBE_R - 0.25, zj - 2.0), Color(1.0, 0.72, 0.42), 1.1, 9.0, "ok", true)
 
 
-# --- Штольни -----------------------------------------------------------------
+func _csg_tube(parent: Node, radius: float, height: float, xf: Transform3D, mat: Material, subtract: bool) -> void:
+	var c := CSGCylinder3D.new()
+	c.radius = radius
+	c.height = height
+	c.sides = 32
+	c.smooth_faces = true
+	c.material = mat
+	c.transform = xf
+	if subtract:
+		c.operation = CSGShape3D.OPERATION_SUBTRACTION
+	parent.add_child(c)
+
 
 func _build_branch(index: int) -> void:
 	var b: Dictionary = BRANCHES[index]
-	var zj: float = b["z"]
-	var dir: float = b["dir"]
 	var length: float = b["length"]
-	var x_start := TUN_CX + dir * CHAMBER
-	# Труба строится вдоль локальной -Z и поворачивается в сторону штольни.
-	var basis := Basis(Vector3.UP, -dir * PI / 2)
-	var along := Basis(Vector3.FORWARD, PI / 2)
-	var d := 0.0
-	while d < length - 0.01:
-		var d2 := minf(d + CHUNK, length)
-		var seg := d2 - d
-		var mid := x_start + dir * (d + d2) / 2.0
-		var tube := MeshInstance3D.new()
-		tube.mesh = Geo.tube_mesh(TUBE_R, -(CHAMBER + d), -(CHAMBER + d2), 28, -0.6, TUBE_R * TAU / 8.0, 1.0)
-		tube.material_override = m_tubbing
-		tube.transform = Transform3D(basis, Vector3(TUN_CX, TUBE_CY, zj))
-		add_child(tube)
-		Geo.box(self, Vector3(mid, FLOOR_Y - 0.15, zj), Vector3(seg, 0.3, TUBE_R * 2), m_floor)
-		Geo.solid(self, Vector3(mid, FLOOR_Y + 2.0, zj - TUN_HW - 0.15), Vector3(seg, 4.0, 0.3))
-		Geo.solid(self, Vector3(mid, FLOOR_Y + 2.0, zj + TUN_HW + 0.15), Vector3(seg, 4.0, 0.3))
-		var py := FLOOR_Y + 2.3
-		Geo.cylinder(self, Vector3(mid, py, zj - _tube_half(py) + 0.14), 0.07, seg, m_rust, along)
-		d = d2
-	var x_end := x_start + dir * length
-	Geo.box(self, Vector3(x_end + dir * 0.15, TUBE_CY, zj), Vector3(0.3, TUBE_R * 2 + 0.4, TUBE_R * 2 + 0.4), m_concrete)
+	var d := branch_dir(index)
+	var origin := branch_origin(index)
+	var yaw := _yaw_to(d)
+	# Прямая часть штольни — те же куски трубы, что и в основном тоннеле, повёрнутые по оси штольни.
+	var s := JUNCTION_BRANCH
+	while s < length - 0.01:
+		var s2 := minf(s + CHUNK, length)
+		var piece := Node3D.new()
+		piece.transform = Transform3D(Basis(Vector3.UP, yaw), origin)
+		add_child(piece)
+		_tube_piece(piece, s, s2, 0.005)
+		s = s2
+	var end := origin + d * length
+	Geo.box(self, end + d * 0.15 + Vector3(0, TUBE_CY - FLOOR_Y, 0), Vector3(TUBE_R * 2 + 0.4, TUBE_R * 2 + 0.4, 0.3), m_concrete, true, Basis(Vector3.UP, yaw))
 	# Завал у тупика.
-	for k in 6:
-		var rx := x_end - dir * randf_range(0.4, 2.0)
-		var rock := Geo.box(self, Vector3(rx, FLOOR_Y + 0.2, zj + randf_range(-1.2, 1.2)), Vector3.ONE * randf_range(0.3, 0.7), m_concrete, false)
+	var r := _right_of(d)
+	for k in 7:
+		var rp := end - d * randf_range(0.4, 2.2) + r * randf_range(-1.2, 1.2) + Vector3(0, 0.2, 0)
+		var rock := Geo.box(self, rp, Vector3.ONE * randf_range(0.3, 0.75), m_concrete, false)
 		rock.rotation = Vector3(randf() * TAU, randf() * TAU, randf() * TAU)
-	# Почти все лампы в штольнях разбиты.
-	var ld := 8.0
+	# В штольнях почти все светильники разбиты.
+	var ld := JUNCTION_BRANCH + 4.0
 	var n := 0
 	while ld < length - 3.0:
-		var ly := FLOOR_Y + 2.5
-		var lx := x_start + dir * ld
-		_add_lamp(Vector3(lx, ly, zj + _tube_half(ly) - 0.2), Color(1.0, 0.7, 0.4), 0.8, 7.0, "flicker" if n == 0 else "broken", true)
-		ld += 16.0
+		var ly := FLOOR_Y + 2.45
+		var tr := wall_mount(index, -1, ld, ly, 0.12)
+		_add_wall_lamp(tr.origin, tr.basis.z, "flicker" if n == 0 else "broken")
+		ld += 14.0
 		n += 1
-	zones.append(Rect2(minf(x_start, x_end), zj - TUN_HW, length, TUN_HW * 2))
+	_segments.append({"a": Vector2(origin.x, origin.z), "b": Vector2(end.x, end.z), "dir": d})
 
 
 # --- Пути --------------------------------------------------------------------
@@ -477,8 +554,19 @@ func _build_nest_decor() -> void:
 	Geo.box(self, Vector3(1.6, FLOOR_Y + 0.1, -249), Vector3(0.15, 0.2, 0.25), m_metal, false)
 
 
-func _add_lamp(pos: Vector3, color: Color, energy: float, light_range: float, mode: String, tunnel: bool) -> void:
-	Geo.box(self, pos + Vector3(0, 0.06, 0), Vector3(0.3, 0.08, 0.3), m_metal, false)
+## Тоннельный светильник в сетке на стене. inward — куда смотрит (внутрь тоннеля).
+func _add_wall_lamp(pos: Vector3, inward: Vector3, mode: String) -> void:
+	var basis := Basis(Vector3.UP, atan2(inward.x, inward.z))
+	Geo.box(self, pos - inward * 0.05, Vector3(0.25, 0.3, 0.06), m_metal, false, basis)
+	var cage := ProcTex.flat(Color(0.15, 0.15, 0.15), 0.5, 0.8)
+	for k in 3:
+		Geo.box(self, pos + inward * 0.06 + Vector3(0, -0.1 + k * 0.1, 0), Vector3(0.2, 0.012, 0.012), cage, false, basis)
+	_add_lamp(pos + inward * 0.04 + Vector3(0, 0.05, 0), Color(1.0, 0.74, 0.45), 1.1, 9.0, mode, true, false)
+
+
+func _add_lamp(pos: Vector3, color: Color, energy: float, light_range: float, mode: String, tunnel: bool, fixture := true) -> void:
+	if fixture:
+		Geo.box(self, pos + Vector3(0, 0.06, 0), Vector3(0.3, 0.08, 0.3), m_metal, false)
 	var bulb_mat := ProcTex.emissive(color, 3.0)
 	Geo.sphere(self, pos - Vector3(0, 0.05, 0), 0.07, bulb_mat)
 	var light := OmniLight3D.new()
@@ -487,6 +575,7 @@ func _add_lamp(pos: Vector3, color: Color, energy: float, light_range: float, mo
 	light.omni_range = light_range
 	light.light_energy = energy
 	light.omni_attenuation = 1.5
+	light.add_to_group("fear_light")
 	add_child(light)
 	if mode == "broken":
 		bulb_mat.emission_enabled = false

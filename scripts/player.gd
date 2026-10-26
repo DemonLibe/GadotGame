@@ -1,7 +1,7 @@
 class_name Player
 extends CharacterBody3D
-## Обходчик: ходьба, подъём по лестнице, инвентарь (в руках всегда один предмет),
-## фонарь с батареей, горелка для паутины, взаимодействие.
+## Обходчик: ходьба, бег с выносливостью, прыжок, подъём по лестнице,
+## инвентарь (в руках всегда один предмет), фонарь с батареей, горелка, рация, взаимодействие.
 
 signal footstep
 
@@ -17,10 +17,18 @@ const REACH := 2.4
 const STEP_LENGTH := 1.25
 const RUNG_STEP := 0.3
 const HAND_POS := Vector3(0.24, -0.25, -0.42)
+const JUMP_VELOCITY := 4.2
+const STAMINA_MAX := 100.0
+const STAMINA_RUN := 22.0      # расход в секунду при беге
+const STAMINA_REGEN := 14.0
+const STAMINA_JUMP := 18.0
+const STAMINA_DELAY := 0.9     # пауза перед восстановлением
 
-## Слоты инвентаря (клавиши 1–4).
-const ITEMS := ["flashlight", "burner", "filter", "battery"]
-const ITEM_NAMES := ["Фонарь", "Горелка", "Фильтр", "Батарейка"]
+## Слоты инвентаря (клавиши 1–5).
+const ITEMS := ["flashlight", "burner", "filter", "battery", "radio"]
+const ITEM_NAMES := ["Фонарь", "Горелка", "Фильтр", "Батарейка", "Рация"]
+## Масштаб модели в иконке инвентаря.
+const ICON_SCALE := {"flashlight": 1.5, "burner": 1.3, "filter": 1.3, "battery": 2.4, "radio": 1.6}
 
 const BEAM_SHADER := """
 shader_type spatial;
@@ -47,6 +55,11 @@ var selected := 0
 var input_locked := false
 var drain_mult := 1.0
 var climbing := false
+var stamina := STAMINA_MAX
+var has_radio := false
+var dispatcher  # Dispatcher — повторить последнее сообщение по рации
+var _exhausted := false
+var _stamina_wait := 0.0
 
 var head: Node3D
 var camera: Camera3D
@@ -76,7 +89,7 @@ var _empty_warned := false
 func _ready() -> void:
 	add_to_group("player")
 	collision_layer = 4
-	collision_mask = 1
+	collision_mask = 1 | Geo.WALL_LAYER
 	floor_snap_length = 0.35
 
 	var shape := CollisionShape3D.new()
@@ -131,19 +144,12 @@ func _ready() -> void:
 # --- Модели в руке -----------------------------------------------------------
 
 func _build_models() -> void:
-	var steel := ProcTex.flat(Color(0.25, 0.25, 0.27), 0.4, 0.8)
-	var along := Basis(Vector3.RIGHT, PI / 2)
-
-	var torch := Node3D.new()
-	Geo.cylinder(torch, Vector3(0, 0, 0.02), 0.025, 0.2, steel, along)
-	Geo.cylinder(torch, Vector3(0, 0, -0.1), 0.038, 0.05, steel, along)
-	_lens_mat = ProcTex.emissive(Color(1.0, 0.95, 0.8), 2.0)
-	Geo.cylinder(torch, Vector3(0, 0, -0.126), 0.032, 0.005, _lens_mat, along)
-	_models["flashlight"] = torch
-
-	var burner := Node3D.new()
-	Geo.cylinder(burner, Vector3(0, 0, -0.02), 0.022, 0.25, ProcTex.flat(Color(0.4, 0.4, 0.42), 0.4, 0.9), along)
-	Geo.cylinder(burner, Vector3(0, -0.05, 0.13), 0.045, 0.16, ProcTex.flat(Color(0.6, 0.1, 0.08), 0.6, 0.3))
+	for item in ITEMS:
+		var m := make_model(item)
+		_models[item] = m
+		_hand.add_child(m)
+	# Огонь и свет горелки — только у модели в руке.
+	var burner: Node3D = _models["burner"]
 	_flame = ProcTex.fire(48, 0.35)
 	_flame.direction = Vector3(0, 0, -1)
 	_flame.spread = 10.0
@@ -159,20 +165,41 @@ func _build_models() -> void:
 	_torch_light.visible = false
 	_torch_light.position = Vector3(0, 0, -0.5)
 	burner.add_child(_torch_light)
-	_models["burner"] = burner
 
-	var filter := Node3D.new()
-	Geo.box(filter, Vector3(-0.05, 0.02, 0), Vector3(0.26, 0.22, 0.05), ProcTex.flat(Color(0.88, 0.88, 0.82), 0.95), false)
-	Geo.box(filter, Vector3(-0.05, 0.02, 0.0), Vector3(0.28, 0.24, 0.03), steel, false)
-	_models["filter"] = filter
 
-	var cell := Node3D.new()
-	Geo.box(cell, Vector3(0, 0, 0), Vector3(0.05, 0.05, 0.12), ProcTex.flat(Color(0.12, 0.12, 0.12), 0.5, 0.3), false)
-	Geo.box(cell, Vector3(0, 0, -0.02), Vector3(0.052, 0.052, 0.03), ProcTex.flat(Color(0.9, 0.5, 0.1), 0.5), false)
-	_models["battery"] = cell
-
-	for key in _models:
-		_hand.add_child(_models[key])
+## Модель предмета — для руки и для иконки в инвентаре.
+func make_model(item: String) -> Node3D:
+	var steel := ProcTex.flat(Color(0.25, 0.25, 0.27), 0.4, 0.8)
+	var along := Basis(Vector3.RIGHT, PI / 2)
+	var root := Node3D.new()
+	match item:
+		"flashlight":
+			Geo.cylinder(root, Vector3(0, 0, 0.02), 0.025, 0.2, steel, along)
+			Geo.cylinder(root, Vector3(0, 0, -0.1), 0.038, 0.05, steel, along)
+			var lens := ProcTex.emissive(Color(1.0, 0.95, 0.8), 2.0)
+			Geo.cylinder(root, Vector3(0, 0, -0.126), 0.032, 0.005, lens, along)
+			if _lens_mat == null:
+				_lens_mat = lens
+		"burner":
+			Geo.cylinder(root, Vector3(0, 0, -0.02), 0.022, 0.25, ProcTex.flat(Color(0.4, 0.4, 0.42), 0.4, 0.9), along)
+			Geo.cylinder(root, Vector3(0, -0.05, 0.13), 0.045, 0.16, ProcTex.flat(Color(0.6, 0.1, 0.08), 0.6, 0.3))
+			Geo.box(root, Vector3(0, -0.02, 0.06), Vector3(0.02, 0.05, 0.03), steel, false)
+		"filter":
+			Geo.box(root, Vector3(-0.05, 0.02, 0.0), Vector3(0.28, 0.24, 0.03), steel, false)
+			Geo.box(root, Vector3(-0.05, 0.02, 0.0), Vector3(0.25, 0.21, 0.05), ProcTex.flat(Color(0.88, 0.88, 0.82), 0.95), false)
+			for k in 4:
+				Geo.box(root, Vector3(-0.05, -0.06 + k * 0.055, 0.027), Vector3(0.24, 0.01, 0.005), ProcTex.flat(Color(0.7, 0.7, 0.65), 0.95), false)
+		"battery":
+			Geo.box(root, Vector3.ZERO, Vector3(0.05, 0.05, 0.12), ProcTex.flat(Color(0.12, 0.12, 0.12), 0.5, 0.3), false)
+			Geo.box(root, Vector3(0, 0, -0.02), Vector3(0.052, 0.052, 0.03), ProcTex.flat(Color(0.9, 0.5, 0.1), 0.5), false)
+			Geo.box(root, Vector3(0, 0, -0.065), Vector3(0.02, 0.02, 0.01), steel, false)
+		"radio":
+			var body := ProcTex.flat(Color(0.16, 0.2, 0.15), 0.7, 0.2)
+			Geo.box(root, Vector3.ZERO, Vector3(0.08, 0.17, 0.04), body, false)
+			Geo.cylinder(root, Vector3(0.025, 0.14, 0.0), 0.006, 0.12, ProcTex.flat(Color(0.05, 0.05, 0.05), 0.5))
+			Geo.box(root, Vector3(0, 0.03, 0.021), Vector3(0.06, 0.06, 0.004), ProcTex.flat(Color(0.05, 0.05, 0.05), 0.9), false)
+			Geo.sphere(root, Vector3(-0.025, 0.075, 0.02), 0.006, ProcTex.emissive(Color(1.0, 0.2, 0.1), 2.0))
+	return root
 
 
 ## Видимый луч для браузерного рендера: прозрачный конус, гаснущий к краям и вдаль.
@@ -220,6 +247,8 @@ func count_of(item: String) -> int:
 			return filters
 		"battery":
 			return batteries
+		"radio":
+			return 1 if has_radio else 0
 	return 1
 
 
@@ -270,6 +299,9 @@ func use_item() -> void:
 		"filter":
 			if filters > 0:
 				Game.say("Фильтр ставится в вентблок: подойди и удерживай E.", Game.SYSTEM, 3.0)
+		"radio":
+			if has_radio and dispatcher:
+				dispatcher.repeat_last()
 
 
 func _show_selected() -> void:
@@ -292,6 +324,9 @@ func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
 	filters = 0
 	batteries = 0
 	selected = 0
+	stamina = STAMINA_MAX
+	_exhausted = false
+	has_radio = false
 	_burning = false
 	_flame.emitting = false
 	_show_selected()
@@ -326,7 +361,25 @@ func _physics_process(delta: float) -> void:
 	if not input_locked:
 		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var dir := (transform.basis * Vector3(input.x, 0, input.y)).normalized()
-	var speed := RUN_SPEED if Input.is_action_pressed("run") else WALK_SPEED
+	# Бег тратит выносливость; выдохся — бежать нельзя, пока не отдышишься.
+	var running := Input.is_action_pressed("run") and input.length() > 0.1 and not _exhausted and not input_locked
+	if running:
+		stamina = maxf(0.0, stamina - STAMINA_RUN * delta)
+		_stamina_wait = STAMINA_DELAY
+		if stamina <= 0.0:
+			_exhausted = true
+			Game.say_once("exhausted", "Дыхание сбилось... Надо отдышаться.")
+	else:
+		_stamina_wait -= delta
+		if _stamina_wait <= 0.0:
+			stamina = minf(STAMINA_MAX, stamina + STAMINA_REGEN * delta)
+	if _exhausted and stamina >= 30.0:
+		_exhausted = false
+	if Input.is_action_just_pressed("jump") and not input_locked and is_on_floor() and stamina >= STAMINA_JUMP:
+		velocity.y = JUMP_VELOCITY
+		stamina -= STAMINA_JUMP
+		_stamina_wait = STAMINA_DELAY
+	var speed := RUN_SPEED if running else WALK_SPEED
 	velocity.x = move_toward(velocity.x, dir.x * speed, 20.0 * delta)
 	velocity.z = move_toward(velocity.z, dir.z * speed, 20.0 * delta)
 	move_and_slide()
@@ -381,7 +434,7 @@ func _climb(delta: float) -> void:
 		stop_climb(_ladder.exit_top)
 		return
 	if up < 0.0 and y <= _ladder.bottom_y:
-		stop_climb(Vector3(global_position.x, _ladder.bottom_y + 0.02, global_position.z + 0.3))
+		stop_climb(Vector3(global_position.x, _ladder.bottom_y + 0.02, global_position.z + _ladder.away * 0.3))
 		return
 	global_position.y = y
 	velocity = Vector3.ZERO
@@ -418,6 +471,7 @@ func _process(delta: float) -> void:
 	if hud:
 		hud.set_battery(battery, flashlight_on and held() == "flashlight")
 		hud.set_hotbar(selected, counts())
+		hud.set_stamina(stamina / STAMINA_MAX, _exhausted)
 
 
 func _update_battery(delta: float) -> void:
@@ -538,6 +592,6 @@ func is_looking_at(point: Vector3, min_dot: float) -> bool:
 
 
 func _clear_line(a: Vector3, b: Vector3) -> bool:
-	var q := PhysicsRayQueryParameters3D.create(a, b, 1)
+	var q := PhysicsRayQueryParameters3D.create(a, b, 1 | Geo.WALL_LAYER)
 	q.exclude = [get_rid()]
 	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()

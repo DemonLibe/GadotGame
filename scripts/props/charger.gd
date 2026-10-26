@@ -24,6 +24,7 @@ func _ready() -> void:
 	_glow.light_color = Color(0.3, 1.0, 0.4)
 	_glow.omni_range = 1.6
 	_glow.light_energy = 0.3
+	_glow.add_to_group("fear_light")
 	add_child(_glow)
 	_hum = AudioStreamPlayer3D.new()
 	_hum.stream = Sfx.hum()

@@ -10,18 +10,22 @@ var climb_x := 0.0
 var climb_z := 0.0
 var facing_yaw := 0.0
 var exit_top := Vector3.ZERO
+var away := 1.0  # куда от стены отступать внизу (+1 / -1 по Z)
 var _x := 0.0
 var _wall_z := 0.0
 
 
-## x — центр лестницы, wall_z — стена, к которой она крепится (лестница со стороны +Z).
-func setup(x: float, wall_z: float, bottom: float, top: float, exit_pos: Vector3) -> void:
+## x — центр лестницы, wall_z — стена, к которой она крепится,
+## side — с какой стороны стены лестница (+1 — со стороны +Z, -1 — со стороны -Z).
+func setup(x: float, wall_z: float, side: float, bottom: float, top: float, exit_pos: Vector3) -> void:
 	_x = x
 	_wall_z = wall_z
+	away = side
 	bottom_y = bottom
 	top_y = top
 	climb_x = x
-	climb_z = wall_z + 0.5
+	climb_z = wall_z + side * 0.5
+	facing_yaw = 0.0 if side > 0.0 else PI  # лицом к стене
 	exit_top = exit_pos
 
 
@@ -29,7 +33,7 @@ func _ready() -> void:
 	collision_layer = 2
 	collision_mask = 0
 	var steel := ProcTex.flat(Color(0.3, 0.3, 0.32), 0.5, 0.8)
-	var rz := _wall_z + 0.15
+	var rz := _wall_z + away * 0.15
 	var rung := BoxMesh.new()
 	rung.size = Vector3(0.5, 0.035, 0.035)
 	var y := bottom_y

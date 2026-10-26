@@ -194,7 +194,19 @@ static func tubbing() -> StandardMaterial3D:
 		img.fill_rect(Rect2i(2, i - 3, 6, 6), bolt)
 		img.fill_rect(Rect2i(s - 8, i - 3, 6, 6), bolt)
 	_streaks(img, 8, Color(0.34, 0.18, 0.07), 110, false)
-	return _textured("tubbing", img, Color(0.52, 0.48, 0.44), 0.6, 0.35, 4.0, 0.0)
+	return _textured("tubbing", img, Color(0.64, 0.6, 0.55), 0.55, 0.3, 4.0, 0.0)
+
+
+## Те же тюбинги, но с проекцией в мировых координатах — для развилок (CSG).
+static func tubbing_triplanar() -> StandardMaterial3D:
+	if _cache.has("tubbing_tri"):
+		return _cache["tubbing_tri"]
+	var m := tubbing().duplicate() as StandardMaterial3D
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.uv1_scale = Vector3.ONE / 1.65
+	_cache["tubbing_tri"] = m
+	return m
 
 
 ## Кафельная плитка станции (кирпичная раскладка, затёртые швы, потёки).

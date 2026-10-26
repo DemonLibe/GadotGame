@@ -70,6 +70,8 @@ var stalker: Stalker
 var director: Director
 var journal: Journal
 var hatch: Hatch
+var radio: RadioSet
+var dispatcher: Dispatcher
 var ladder: Ladder
 var cart: Cart
 var vents: Array[Vent] = []
@@ -95,8 +97,12 @@ func _ready() -> void:
 	add_child(player)
 	hud = Hud.new()
 	add_child(hud)
-	hud.setup_hotbar(Player.ITEM_NAMES)
+	hud.setup_hotbar(player)
 	player.hud = hud
+	dispatcher = Dispatcher.new()
+	add_child(dispatcher)
+	player.dispatcher = dispatcher
+	radio.dispatcher = dispatcher
 
 	stalker = Stalker.new()
 	stalker.player = player
@@ -181,7 +187,7 @@ func _setup_environment() -> void:
 	# Обычный туман работает везде, в том числе в браузере: дальний конец тоннеля тонет в черноте.
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.015, 0.015, 0.02)
-	env.fog_density = 0.045
+	env.fog_density = 0.022
 	if not Main.is_web_renderer():
 		# На ПК с Forward+ — объёмный туман, в нём виден луч фонаря.
 		env.ssao_enabled = true
@@ -267,7 +273,8 @@ func _floor(tunnel: int, along: float, lateral: float) -> Vector3:
 
 func _spawn_props() -> void:
 	ladder = Ladder.new()
-	ladder.setup(Level.SHAFT_X, Level.SHAFT_Z - Level.SHAFT_HALF, Level.FLOOR_Y, Level.ROOM_Y,
+	# Лестница — у стены напротив петель люка (петли на северной кромке).
+	ladder.setup(Level.SHAFT_X, Level.SHAFT_Z + Level.SHAFT_HALF, -1.0, Level.FLOOR_Y, Level.ROOM_Y,
 		Vector3(Level.SHAFT_X, Level.ROOM_Y + 0.05, Level.SHAFT_Z + 1.5))
 	add_child(ladder)
 	hatch = Hatch.new()
@@ -279,6 +286,10 @@ func _spawn_props() -> void:
 	journal.position = Vector3(Level.SHAFT_X + 2.9, Level.ROOM_Y, Level.SHAFT_Z - 1.6)
 	journal.rotation.y = deg_to_rad(90.0)
 	add_child(journal)
+	radio = RadioSet.new()
+	radio.position = Vector3(Level.SHAFT_X + 2.9, Level.ROOM_Y + 0.805, Level.SHAFT_Z - 1.15)
+	radio.rotation.y = deg_to_rad(-70.0)
+	add_child(radio)
 	Geo.label(level, Vector3(Level.SHAFT_X + 3.48, Level.ROOM_Y + 1.9, Level.SHAFT_Z - 1.6), "ЖУРНАЛ СМЕН", -90.0, 36, Color(0.15, 0.15, 0.15), true)
 
 	var fy := Level.FLOOR_Y
@@ -327,6 +338,8 @@ func start_day(d: int) -> void:
 	level.blackout = false
 	stalker.hide_now()
 	hatch.set_open(false)
+	radio.reset()
+	dispatcher.stop()
 
 	player.reset_for_day(SPAWN, SPAWN_YAW, START_BATTERY)
 	player.drain_mult = 1.0 + (d - 1) * 0.1
@@ -340,6 +353,7 @@ func start_day(d: int) -> void:
 	player.input_locked = false
 	busy = false
 	Game.say(DAY_THOUGHTS[d], Game.THOUGHT, 6.0)
+	Game.say("На столе шипит рация. Диспетчер ждёт.", Game.THOUGHT, 3.5)
 
 
 func end_day() -> void:
@@ -502,7 +516,7 @@ func _spawn_spiders(d: int) -> void:
 		var z := randf_range(-220.0, -60.0)
 		# Не в камерах развилок — там стены другие.
 		for b in Level.BRANCHES:
-			if absf(z - float(b["z"])) < Level.CHAMBER + 7.0:
+			if absf(z - float(b["z"])) < Level.JUNCTION_MAIN + 4.0:
 				z += 12.0
 		_add_spider(Level.wall_x(-1 if left else 1, Level.FLOOR_Y + 1.5, 0.02), Vector3.RIGHT if left else Vector3.LEFT, z, 5.0)
 
@@ -540,6 +554,10 @@ func _smoke_test() -> void:
 		start_day(d)
 		await get_tree().create_timer(5.5).timeout
 		hatch.hold_interact(player, 2.0)
+		radio.interact(player)
+		player.select(4)
+		player.use_item()
+		hatch.hold_interact(player, 2.0)
 		hatch.interact(player)
 		await get_tree().create_timer(0.5).timeout
 		player.stop_climb(Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -110.0))
@@ -560,6 +578,11 @@ func _smoke_test() -> void:
 			c.interact(player)
 		player.cycle(1)
 		player.select(0)
+		Input.action_press("jump")
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+		Input.action_release("jump")
+		dispatcher.random_call(d)
 		cart.interact(player)
 		journal.interact(player)
 		await get_tree().create_timer(1.5).timeout

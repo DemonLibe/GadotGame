@@ -16,6 +16,7 @@ func _ready() -> void:
 	lamp.light_color = Color(1.0, 0.85, 0.55)
 	lamp.omni_range = 2.5
 	lamp.light_energy = 0.6
+	lamp.add_to_group("fear_light")
 	add_child(lamp)
 	Geo.collider_box(self, Vector3(1.2, 0.85, 0.6), Vector3(0, 0.42, 0))
 

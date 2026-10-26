@@ -34,10 +34,10 @@ func start_day(d: int) -> void:
 	_cooldown = randf_range(20.0, 35.0)
 	match d:
 		1: _budget = {}
-		2: _budget = {"footsteps": 1, "sighting": 1}
-		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1}
-		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1}
-		_: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1}
+		2: _budget = {"footsteps": 1, "sighting": 1, "radio": 1}
+		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1, "radio": 1}
+		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1, "radio": 1}
+		_: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1}
 
 
 func _process(delta: float) -> void:
@@ -157,25 +157,24 @@ func _run(ev: String) -> bool:
 			return true
 		"regrow":
 			return main.regrow_web_behind(player.global_position.z)
+		"radio":
+			return player.has_radio and main.dispatcher.random_call(Game.day)
 	return false
 
 
 ## Силуэт далеко впереди — на краю луча.
 func _sighting() -> bool:
-	# Работает в основном тоннеле или в штольне — силуэт всегда по взгляду вдоль прохода.
+	# Работает в основном тоннеле и в штольнях — силуэт всегда по взгляду вдоль прохода.
 	var f := player.forward_flat()
 	var p := player.global_position
-	var pos: Vector3
-	if absf(p.x - Level.TUN_CX) < Level.TUN_HW:
-		if absf(f.z) < 0.6:
-			return false
-		pos = Vector3(Level.TUN_CX + randf_range(-0.7, 0.7), Level.FLOOR_Y, p.z + signf(f.z) * randf_range(20.0, 28.0))
-		if pos.z > Level.TUN_Z0 - 2.0 or pos.z < Level.GRATE_Z + 1.0:
-			return false
-	else:
-		if absf(f.x) < 0.6:
-			return false
-		pos = Vector3(p.x + signf(f.x) * randf_range(16.0, 22.0), Level.FLOOR_Y, p.z + randf_range(-0.5, 0.5))
+	var axis := level.axis_at(p)
+	var along := f.dot(axis)
+	if absf(along) < 0.6:
+		return false
+	var pos := p + axis * signf(along) * randf_range(18.0, 26.0)
+	pos.y = Level.FLOOR_Y
+	if pos.z > Level.TUN_Z0 - 2.0 or pos.z < Level.GRATE_Z + 1.0:
+		return false
 	if not level.is_walkable(pos):
 		return false
 	stalker.appear(pos, "sighting", 7.0)

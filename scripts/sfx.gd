@@ -63,6 +63,14 @@ static func rung() -> AudioStreamWAV:
 	return _stream("rung")
 
 
+static func radio() -> AudioStreamWAV:
+	return _stream("radio")
+
+
+static func radio_loop() -> AudioStreamWAV:
+	return _stream("radio_loop")
+
+
 static func _stream(key: String) -> AudioStreamWAV:
 	if _cache.has(key):
 		return _cache[key]
@@ -81,6 +89,8 @@ static func _stream(key: String) -> AudioStreamWAV:
 		"flame": w = _make_flame()
 		"creak": w = _make_creak()
 		"rung": w = _make_rung()
+		"radio": w = _make_radio(0.5, false)
+		"radio_loop": w = _make_radio(2.0, true)
 		_: w = _make_pickup()
 	_cache[key] = w
 	return w
@@ -270,3 +280,22 @@ static func _make_rung() -> AudioStreamWAV:
 		var v := 0.6 * sin(TAU * 880.0 * t) + 0.35 * sin(TAU * 2310.0 * t)
 		s[i] = (v * exp(-t * 28.0) + randf_range(-1.0, 1.0) * exp(-t * 150.0)) * 0.4
 	return _wav(s)
+
+
+# Помехи рации: шипение с треском. Короткий вариант начинается писком.
+static func _make_radio(dur: float, loop: bool) -> AudioStreamWAV:
+	var s := _buf(dur)
+	var lp := 0.0
+	for i in s.size():
+		var t := float(i) / RATE
+		var n := randf_range(-1.0, 1.0)
+		lp += 0.35 * (n - lp)
+		var band := n - lp
+		var crackle := randf_range(-1.0, 1.0) if randf() < 0.002 else 0.0
+		var v := band * (0.25 + 0.15 * sin(TAU * 3.0 * t)) + crackle * 0.8
+		if not loop:
+			v *= minf((dur - t) * 6.0, 1.0)
+			if t < 0.08:
+				v = sin(TAU * 1200.0 * t) * 0.3
+		s[i] = v
+	return _wav(s, loop)

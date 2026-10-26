@@ -1,6 +1,7 @@
 class_name Hud
 extends CanvasLayer
-## Интерфейс: поручения, инвентарь, батарея, подсказки, мысли героя, затемнение, виньетка страха.
+## Интерфейс: поручения, шкала страха, выносливость, инвентарь с моделями предметов,
+## батарея, подсказки, мысли героя, затемнение, виньетка страха.
 
 const VIGNETTE_SHADER := """
 shader_type canvas_item;
@@ -28,8 +29,12 @@ var _battery_label: Label
 var _slots: Array[PanelContainer] = []
 var _slot_styles: Array[StyleBoxFlat] = []
 var _slot_labels: Array[Label] = []
-var _slot_names: Array = []
+var _slot_icons: Array[Node3D] = []
 var _hotbar_state := ""
+var _fear_bar: ProgressBar
+var _fear_fill: StyleBoxFlat
+var _stamina_bar: ProgressBar
+var _stamina_fill: StyleBoxFlat
 var _subtitle: Label
 var _fade: ColorRect
 var _title: Label
@@ -98,6 +103,21 @@ func _ready() -> void:
 	_place(_battery, 1, 1, 1, 1, -224, -48, -24, -36)
 	_ingame.add_child(_battery)
 
+	# Шкала страха — сверху по центру.
+	var fear_label := _make_label(_ingame, 14, HORIZONTAL_ALIGNMENT_CENTER)
+	fear_label.text = "СТРАХ"
+	fear_label.add_theme_color_override("font_color", Color(0.85, 0.6, 0.55))
+	_place(fear_label, 0.5, 0, 0.5, 0, -150, 10, 150, 28)
+	_fear_bar = _bar(Color(0.55, 0.08, 0.06))
+	_fear_fill = _fear_bar.get_theme_stylebox("fill") as StyleBoxFlat
+	_place(_fear_bar, 0.5, 0, 0.5, 0, -150, 32, 150, 42)
+	_ingame.add_child(_fear_bar)
+	# Выносливость — тонкая полоска над инвентарём.
+	_stamina_bar = _bar(Color(0.8, 0.82, 0.75))
+	_stamina_fill = _stamina_bar.get_theme_stylebox("fill") as StyleBoxFlat
+	_place(_stamina_bar, 0.5, 1, 0.5, 1, -160, -112, 160, -106)
+	_ingame.add_child(_stamina_bar)
+
 	_fade = ColorRect.new()
 	_fade.color = Color.BLACK
 	_add_full(_fade)
@@ -119,33 +139,65 @@ func _ready() -> void:
 	Game.message.connect(_on_message)
 
 
-## Панель инвентаря внизу по центру: по слоту на предмет.
-func setup_hotbar(names: Array) -> void:
-	_slot_names = names
+## Панель инвентаря внизу по центру: в каждом слоте — вращающаяся модель предмета.
+func setup_hotbar(player: Player) -> void:
 	var bar := HBoxContainer.new()
 	bar.add_theme_constant_override("separation", 8)
 	bar.alignment = BoxContainer.ALIGNMENT_CENTER
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_place(bar, 0, 1, 1, 1, 0, -92, 0, -24)
+	_place(bar, 0, 1, 1, 1, 0, -100, 0, -20)
 	_ingame.add_child(bar)
-	for i in names.size():
+	for i in Player.ITEMS.size():
+		var item: String = Player.ITEMS[i]
 		var style := StyleBoxFlat.new()
 		style.bg_color = Color(0, 0, 0, 0.5)
 		style.set_border_width_all(2)
 		style.border_color = Color(1, 1, 1, 0.15)
 		style.set_corner_radius_all(4)
-		style.content_margin_left = 10
-		style.content_margin_right = 10
 		var panel := PanelContainer.new()
-		panel.custom_minimum_size = Vector2(124, 60)
+		panel.custom_minimum_size = Vector2(96, 76)
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_theme_stylebox_override("panel", style)
-		var label := Label.new()
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		label.add_theme_font_size_override("font_size", 15)
-		panel.add_child(label)
 		bar.add_child(panel)
+		# Своя маленькая 3D-сцена: камера, свет и модель предмета.
+		var holder := SubViewportContainer.new()
+		holder.stretch = true
+		holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(holder)
+		var vp := SubViewport.new()
+		vp.own_world_3d = true
+		vp.transparent_bg = true
+		vp.size = Vector2i(96, 76)
+		vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		holder.add_child(vp)
+		var cam := Camera3D.new()
+		cam.position = Vector3(0, 0.02, 0.55)
+		cam.fov = 32.0
+		vp.add_child(cam)
+		var sun := DirectionalLight3D.new()
+		sun.rotation = Vector3(-0.6, 0.6, 0)
+		sun.light_energy = 1.6
+		vp.add_child(sun)
+		var env := WorldEnvironment.new()
+		env.environment = Environment.new()
+		env.environment.background_mode = Environment.BG_CLEAR_COLOR
+		env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+		env.environment.ambient_light_color = Color(0.6, 0.6, 0.65)
+		env.environment.ambient_light_energy = 0.6
+		vp.add_child(env)
+		var model := player.make_model(item)
+		model.scale = Vector3.ONE * float(Player.ICON_SCALE[item])
+		model.rotation = Vector3(0.35, 0.9, 0)
+		vp.add_child(model)
+		_slot_icons.append(model)
+		# Номер клавиши и количество поверх картинки.
+		var label := Label.new()
+		label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+		label.add_theme_font_size_override("font_size", 13)
+		label.add_theme_constant_override("outline_size", 4)
+		label.add_theme_color_override("font_outline_color", Color.BLACK)
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(label)
 		_slots.append(panel)
 		_slot_styles.append(style)
 		_slot_labels.append(label)
@@ -159,6 +211,8 @@ func _process(delta: float) -> void:
 		_subtitle.add_theme_color_override("font_color", m[1])
 		_sub_left = m[2]
 	_subtitle.modulate.a = clampf(_sub_left * 2.0, 0.0, 1.0)
+	for m in _slot_icons:
+		m.rotate_y(delta * 0.6)
 
 
 # --- API ---------------------------------------------------------------------
@@ -190,10 +244,11 @@ func set_hotbar(selected: int, counts: Array) -> void:
 	_hotbar_state = state
 	for i in _slots.size():
 		var n: int = counts[i]
-		var text := "%d  %s" % [i + 1, _slot_names[i]]
-		if i >= 2:
-			text += "\n× %d" % n
+		var text := " %d" % (i + 1)
+		if Player.ITEMS[i] == "filter" or Player.ITEMS[i] == "battery":
+			text += "           × %d" % n
 		_slot_labels[i].text = text
+		_slot_icons[i].visible = n > 0
 		_slot_labels[i].modulate.a = 1.0 if n > 0 else 0.35
 		_slot_styles[i].border_color = AMBER if i == selected else Color(1, 1, 1, 0.15)
 		_slot_styles[i].bg_color = Color(0.25, 0.17, 0.05, 0.6) if i == selected else Color(0, 0, 0, 0.5)
@@ -201,6 +256,14 @@ func set_hotbar(selected: int, counts: Array) -> void:
 
 func set_fear(value: float) -> void:
 	_vignette_mat.set_shader_parameter("fear", value)
+	_fear_bar.value = value * 100.0
+	_fear_fill.bg_color = Color(0.45, 0.08, 0.06).lerp(Color(1.0, 0.15, 0.1), value)
+
+
+func set_stamina(value: float, exhausted: bool) -> void:
+	_stamina_bar.value = value * 100.0
+	_stamina_bar.modulate.a = 0.25 if value >= 0.999 else 1.0
+	_stamina_fill.bg_color = Color(0.9, 0.35, 0.2) if exhausted else Color(0.8, 0.82, 0.75)
 
 
 func set_black() -> void:
@@ -239,7 +302,7 @@ func hide_title() -> void:
 
 func _on_message(text: String, color: Color, duration: float) -> void:
 	_queue.append([text, color, duration])
-	while _queue.size() > 3:
+	while _queue.size() > 8:
 		_queue.pop_front()
 
 
@@ -254,6 +317,20 @@ func _refresh_tasks() -> void:
 		else:
 			lines.append("• " + text)
 	_tasks.text = "\n".join(lines)
+
+
+func _bar(color: Color) -> ProgressBar:
+	var bar := ProgressBar.new()
+	bar.show_percentage = false
+	bar.max_value = 100.0
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0, 0, 0, 0.55)
+	bar.add_theme_stylebox_override("background", bg)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = color
+	bar.add_theme_stylebox_override("fill", fill)
+	return bar
 
 
 func _make_label(parent: Control, size: int, align: HorizontalAlignment) -> Label:
