@@ -444,7 +444,8 @@ func start_day(d: int) -> void:
 		hatch.set_open(false)
 	if not debug_flag("noradio"):
 		radio.reset()
-	dispatcher.stop()
+	if not debug_flag("s_disp"):
+		dispatcher.stop()
 
 	if not debug_flag("s_reset"):
 		player.reset_for_day(SPAWN, SPAWN_YAW, START_BATTERY)
@@ -466,8 +467,9 @@ func start_day(d: int) -> void:
 		player.debug_look(0.0, PI)
 	if debug_flag("lookleft"):
 		player.debug_look(0.0, PI / 2)
-	Game.say(DAY_THOUGHTS[d], Game.THOUGHT, 6.0)
-	Game.say("На столе шипит рация. Диспетчер ждёт.", Game.THOUGHT, 3.5)
+	if not debug_flag("s_say"):
+		Game.say(DAY_THOUGHTS[d], Game.THOUGHT, 6.0)
+		Game.say("На столе шипит рация. Диспетчер ждёт.", Game.THOUGHT, 3.5)
 
 
 func end_day() -> void:
