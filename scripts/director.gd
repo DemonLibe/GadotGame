@@ -35,9 +35,9 @@ func start_day(d: int) -> void:
 	match d:
 		1: _budget = {}
 		2: _budget = {"footsteps": 1, "sighting": 1, "radio": 1}
-		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1, "radio": 1, "crawler": 1}
-		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1, "radio": 1, "crawler": 2}
-		_: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1, "crawler": 3}
+		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1, "radio": 1, "crawler": 1, "interfere": 1}
+		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1, "radio": 1, "crawler": 2, "interfere": 2}
+		_: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1, "crawler": 3, "interfere": 1}
 
 
 func _process(delta: float) -> void:
@@ -166,6 +166,8 @@ func _run(ev: String) -> bool:
 			return player.has_radio and main.dispatcher.random_call(Game.day)
 		"crawler":
 			return _crawler()
+		"interfere":
+			return _interfere()
 	return false
 
 
@@ -198,9 +200,70 @@ func _crawler() -> bool:
 	pos.y = Level.FLOOR_Y
 	if not level.is_walkable(pos) or level.is_lit_near(pos) or pos.z > Level.TUN_Z0 - 10.0 or pos.z < main.day_limit() + 2.0:
 		return false
-	main.spawn_crawler(pos)
-	Game.play_at(Sfx.hiss(), pos + Vector3(0, 0.5, 0), 2.0)
+	# Сначала разбегаются пауки — предупреждение. Через три секунды из темноты выползает оно.
+	var near_spider := false
+	for n in get_tree().get_nodes_in_group("spiders"):
+		var sp := n as Spider
+		if sp and sp.global_position.distance_to(p) < 18.0:
+			sp.alarm(pos)
+			near_spider = true
+	Game.play_at(Sfx.scuttle(), p + (pos - p).normalized() * 5.0 + Vector3(0, 2.0, 0), -2.0)
+	if near_spider:
+		Game.say_once("spiders_run", "Пауки... разбегаются. Все разом. Что-то идёт.", Game.THOUGHT, 3.5)
+	get_tree().create_timer(3.0).timeout.connect(func(): _crawler_arrive(pos))
 	return true
+
+
+func _crawler_arrive(pos: Vector3) -> void:
+	if main.busy or main.collapsing:
+		return
+	var c: Crawler = main.spawn_crawler(pos)
+	c.state = "investigate"
+	c._goal = player.global_position
+	Game.play_at(Sfx.hiss(), pos + Vector3(0, 0.5, 0), 2.0)
+
+
+## «Он» вмешивается в работу: выдёргивает зарядку, двигает ящик, захлопывает дверь, глушит генератор.
+func _interfere() -> bool:
+	var p := player.global_position
+	var opts: Array = ["charger", "crate", "door"]
+	if Game.day >= 4:
+		opts.append("generator")
+	opts.shuffle()
+	for o in opts:
+		match o:
+			"charger":
+				for c in main.chargers:
+					var ch := c as Charger
+					if not ch.unplugged and ch.global_position.distance_to(p) > 15.0:
+						ch.unplug()
+						Game.play_at(Sfx.click(), p + Vector3(0, 2.0, 12.0), -6.0)
+						return true
+			"crate":
+				for c in main.crates:
+					var cr := c as FilterCrate
+					if cr.global_position.distance_to(p) > 12.0 and cr.global_position.distance_to(p) < 30.0 and not player.is_looking_at(cr.global_position, 0.5):
+						var axis := level.axis_at(cr.global_position)
+						cr.global_position += axis * randf_range(-2.0, 2.0)
+						cr.rotation.y += randf_range(-0.8, 0.8)
+						Game.play_at(Sfx.creak(), cr.global_position + Vector3(0, 0.3, 0), -2.0)
+						Game.say_once("crate_moved", "Скрежет... Будто волокли что-то тяжёлое по бетону.", Game.THOUGHT, 3.5)
+						return true
+			"door":
+				for d in main.doors:
+					var door := d as RoomDoor
+					if door.is_open and door.global_position.distance_to(p) > 6.0 and door.global_position.distance_to(p) < 35.0:
+						door.slam()
+						Game.say_once("door_slam", "Дверь хлопнула. Сквозняка здесь нет.", Game.THOUGHT, 3.5)
+						return true
+			"generator":
+				var g: Generator = main.generator
+				if g.running and g.global_position.distance_to(p) > 25.0:
+					g.stall()
+					player.flicker(0.6)
+					Game.say_once("gen_stalled", "Свет погас... Генератор? Топлива же было полно.", Game.THOUGHT, 4.0)
+					return true
+	return false
 
 
 ## Он стоит прямо за спиной. Сначала — дыхание.

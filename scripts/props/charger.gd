@@ -6,6 +6,7 @@ const CHARGE_PER_SEC := 12.0
 
 var charger_id := "station"
 var _active := 0.0
+var unplugged := false  # «кто-то» выдернул вилку
 var _lamp_mat: StandardMaterial3D
 var _glow: OmniLight3D
 var _hum: AudioStreamPlayer3D
@@ -33,13 +34,38 @@ func _ready() -> void:
 	add_child(_hum)
 
 
+## Выдернуть вилку: зарядка гаснет, пока обходчик не вставит её обратно.
+func unplug() -> void:
+	unplugged = true
+	_glow.light_energy = 0.0
+	_lamp_mat.emission_energy_multiplier = 0.0
+
+
+func reset() -> void:
+	unplugged = false
+	_glow.light_energy = 0.3
+	_lamp_mat.emission_energy_multiplier = 2.0
+
+
 func get_prompt(player) -> String:
+	if unplugged:
+		return "Зарядка не работает — вилка выдернута из розетки. E — вставить"
 	if player.battery >= 99.5:
 		return "Зарядная станция — фонарь заряжен"
 	return "Удерживай E — зарядить фонарь (%d%%)" % int(player.battery)
 
 
+func interact(_player) -> void:
+	if not unplugged:
+		return
+	reset()
+	Game.play_at(Sfx.click(), global_position)
+	Game.say_once("unplugged", "Вилка лежала в метре от розетки. Сама она так не выпадет.", Game.THOUGHT, 3.5)
+
+
 func hold_interact(player, delta: float) -> float:
+	if unplugged:
+		return -1.0
 	if player.battery >= 100.0:
 		Game.report("charge:" + charger_id)
 		return -1.0
@@ -56,6 +82,8 @@ func hold_cancel() -> void:
 
 
 func _process(delta: float) -> void:
+	if unplugged:
+		return
 	_active -= delta
 	var on := _active > 0.0
 	if on and not _hum.playing:

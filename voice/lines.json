@@ -159,6 +159,98 @@
   "p_report": {
    "speaker": "player",
    "text": "Диспетчер, приём. Все поручения выполнены."
+  },
+  "h_generator": {
+   "speaker": "dispatcher",
+   "text": "Генератор — на платформе, у западной стены. Дёрни стартер, без него в тоннеле темно."
+  },
+  "h_filters": {
+   "speaker": "dispatcher",
+   "text": "Забитый фильтр горит красной лампой. Запасные — в ящиках вдоль тоннеля."
+  },
+  "h_webs": {
+   "speaker": "dispatcher",
+   "text": "Паутина висит поперёк прохода. Горелку держи у самой сети, газ береги."
+  },
+  "h_charge_station": {
+   "speaker": "dispatcher",
+   "text": "Зарядка на станции, возле шахты. Ищи зелёный огонёк."
+  },
+  "h_charge_far": {
+   "speaker": "dispatcher",
+   "text": "Дальний щиток — в конце второй штольни. Держись правой стены."
+  },
+  "h_end": {
+   "speaker": "dispatcher",
+   "text": "Ограждение дальше по основному тоннелю. Иди по рельсам."
+  },
+  "h_cart": {
+   "speaker": "dispatcher",
+   "text": "Вагонетка укатилась по рельсам вглубь основного тоннеля."
+  },
+  "h_grate": {
+   "speaker": "dispatcher",
+   "text": "Решётка — в самом конце основного тоннеля. Дальше — нельзя."
+  },
+  "h_sensor": {
+   "speaker": "dispatcher",
+   "text": "Датчик на третьем пикете, на правой стене основного тоннеля."
+  },
+  "h_cable": {
+   "speaker": "dispatcher",
+   "text": "Замыкание в основном тоннеле, на стене искрит. Перед работой заглуши генератор, иначе убьёт."
+  },
+  "h_water": {
+   "speaker": "dispatcher",
+   "text": "Насос у входа в третью штольню. Запусти — вода уйдёт. Он громкий, учти."
+  },
+  "h_token": {
+   "speaker": "dispatcher",
+   "text": "Седьмой пропал в комнате в конце третьей штольни. Жетон должен быть там."
+  },
+  "h_unknown": {
+   "speaker": "dispatcher",
+   "text": "Не понял тебя, обходчик. Сверься со списком дел."
+  },
+  "h_lie_0": {
+   "speaker": "dispatcher",
+   "text": "Обходчик, иди к решётке. Всё, что тебе нужно, — там."
+  },
+  "h_lie_1": {
+   "speaker": "dispatcher",
+   "text": "Выключи фонарь. Береги батарею. Там светло, я вижу по камере."
+  },
+  "h_lie_2": {
+   "speaker": "dispatcher",
+   "text": "Не возвращайся на станцию. Там кто-то стоит. Иди глубже."
+  },
+  "c3_2_0": {
+   "speaker": "dispatcher",
+   "text": "Обходчик, вижу тебя на камере у вагонетки. Помаши рукой."
+  },
+  "c3_2_1": {
+   "speaker": "dispatcher",
+   "text": "...Почему ты не машешь? Он же машет."
+  },
+  "c4_2_0": {
+   "speaker": "dispatcher",
+   "text": "Обходчик. Камера в тоннеле включилась сама. Кто-то стоит и смотрит прямо в неё. Это ты?"
+  },
+  "x5_0": {
+   "speaker": "dispatcher",
+   "text": "Обходчик! Доложи обстановку! Немедленно доложи, где ты!"
+  },
+  "x5_1": {
+   "speaker": "dispatcher",
+   "text": "Обходчик, ответь! Просто скажи, где ты! Мы тебя вытащим!"
+  },
+  "x5_2": {
+   "speaker": "dispatcher",
+   "text": "...Принял. Стой у станции. Мы идём."
+  },
+  "p_where": {
+   "speaker": "player",
+   "text": "Диспетчер! Тоннель рушится! Я бегу к станции!"
   }
  },
  "briefings": {
@@ -210,6 +302,10 @@
    ],
    [
     "c3_1_0"
+   ],
+   [
+    "c3_2_0",
+    "c3_2_1"
    ]
   ],
   "4": [
@@ -219,6 +315,9 @@
    ],
    [
     "c4_1_0"
+   ],
+   [
+    "c4_2_0"
    ]
   ],
   "5": [
@@ -246,5 +345,34 @@
    "e5_0"
   ]
  },
- "report": "p_report"
+ "report": "p_report",
+ "hints": {
+  "generator": "h_generator",
+  "filters": "h_filters",
+  "webs": "h_webs",
+  "charge:station": "h_charge_station",
+  "charge:far": "h_charge_far",
+  "inspect:end": "h_end",
+  "inspect:cart": "h_cart",
+  "inspect:grate": "h_grate",
+  "inspect:nest": "h_grate",
+  "sensor": "h_sensor",
+  "cable": "h_cable",
+  "water": "h_water",
+  "token": "h_token",
+  "unknown": "h_unknown",
+  "lie": [
+   "h_lie_0",
+   "h_lie_1",
+   "h_lie_2"
+  ]
+ },
+ "collapse": [
+  "x5_0",
+  "x5_1"
+ ],
+ "collapse_reply": [
+  "p_where",
+  "x5_2"
+ ]
 }

@@ -4,6 +4,10 @@ extends Node
 signal tasks_changed
 signal message(text: String, color: Color, duration: float)
 signal end_day_requested
+## Шум: существа слышат его в радиусе radius.
+signal noise_made(pos: Vector3, radius: float)
+## Собраны все записки и выбрана тайная концовка (запереть решётку изнутри).
+signal seal_requested
 
 const FINAL_DAY := 5
 const THOUGHT := Color(0.93, 0.91, 0.84)
@@ -31,20 +35,25 @@ func build_tasks(d: int) -> void:
 	tasks.clear()
 	_said.clear()
 	_task("radio", "Забрать рацию со стола", 1)
+	_task("generator", "Запустить генератор на станции", 1)
 	match d:
 		1:
 			_task("charge:station", "Зарядить фонарь на станции", 1)
 			_task("filters", "Заменить забитый фильтр в вентиляции", 1)
 			_task("webs", "Сжечь паутину в тоннеле", 2)
 		2:
+			_task("sensor", "Перезагрузить датчик движения на 3-м пикете", 1)
 			_task("inspect:end", "Осмотреть завал у ограждения", 1)
 			_task("filters", "Заменить забитые фильтры", 2)
 			_task("webs", "Сжечь паутину в тоннеле", 3)
 		3:
+			_task("cable", "Устранить замыкание кабеля в тоннеле", 1)
 			_task("inspect:cart", "Проверить вагонетку", 1)
 			_task("filters", "Заменить забитые фильтры", 2)
 			_task("webs", "Сжечь паутину в тоннеле", 4)
 		4:
+			_task("water", "Откачать воду в третьей штольне", 1)
+			_task("token", "Найти жетон Седьмого", 1)
 			_task("charge:far", "Зарядить фонарь у дальнего щитка", 1)
 			_task("filters", "Заменить забитые фильтры", 3)
 			_task("webs", "Сжечь паутину в тоннеле", 5)
@@ -93,6 +102,23 @@ func has_open_task(kind: String) -> bool:
 	return false
 
 
+## Первое невыполненное поручение (для подсказки по рации).
+func first_open_task() -> String:
+	for t in tasks:
+		if t["kind"] != "return" and t["kind"] != "radio" and not t["done"]:
+			return str(t["kind"])
+	return ""
+
+
+## Сколько записок прежних обходчиков прочитано (письмо дочери не в счёт).
+func notes_count() -> int:
+	var n := 0
+	for k in notes_read:
+		if str(k).begins_with("n"):
+			n += 1
+	return n
+
+
 ## Всё, кроме «отметиться в журнале», выполнено.
 func all_done() -> bool:
 	for t in tasks:
@@ -114,6 +140,7 @@ func remaining_text() -> String:
 func save_day(d: int) -> void:
 	var cf := ConfigFile.new()
 	cf.set_value("progress", "day", d)
+	cf.set_value("progress", "notes", notes_read.keys())
 	cf.save(SAVE_PATH)
 
 
@@ -121,6 +148,8 @@ func load_day() -> int:
 	var cf := ConfigFile.new()
 	if cf.load(SAVE_PATH) != OK:
 		return 1
+	for k in cf.get_value("progress", "notes", []):
+		notes_read[str(k)] = true
 	return clampi(int(cf.get_value("progress", "day", 1)), 1, FINAL_DAY)
 
 
@@ -136,6 +165,10 @@ func say_once(key: String, text: String, color := THOUGHT, duration := 4.0) -> v
 		return
 	_said[key] = true
 	say(text, color, duration)
+
+
+func make_noise(pos: Vector3, radius: float) -> void:
+	noise_made.emit(pos, radius)
 
 
 func add_fear(amount: float) -> void:
@@ -187,6 +220,8 @@ func _setup_input() -> void:
 	_bind("slot_6", [KEY_6])
 	_bind("slot_7", [KEY_7])
 	_bind("jump", [KEY_SPACE])
+	_bind("crouch", [KEY_C, KEY_CTRL])
+	_bind("slot_8", [KEY_8])
 	if not InputMap.has_action("burn"):
 		InputMap.add_action("burn")
 	var mb := InputEventMouseButton.new()

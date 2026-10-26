@@ -4,6 +4,7 @@ extends Node3D
 ## Узел стоит в дверном проёме на полу, +Z смотрит в тоннель.
 
 var is_open := false
+var jammed := false  # сегодня была открыта, но её захлопнули — можно открыть снова
 var _leaf: StaticBody3D
 
 
@@ -25,6 +26,8 @@ func _ready() -> void:
 
 func set_open(value: bool) -> void:
 	is_open = value
+	if value:
+		jammed = false
 	if not is_node_ready():
 		await ready
 	# Открытая створка уходит внутрь комнаты (в сторону -Z).
@@ -32,12 +35,27 @@ func set_open(value: bool) -> void:
 	_leaf.collision_layer = 0 if value else 1
 
 
+## Дверь захлопнулась сама.
+func slam() -> void:
+	if not is_open:
+		return
+	set_open(false)
+	jammed = true
+	Game.play_at(Sfx.clank(), global_position + Vector3(0, 1.1, 0), 2.0)
+
+
 func get_prompt(_player) -> String:
-	return "" if is_open else "Дверь заперта"
+	if is_open:
+		return ""
+	return "E — открыть дверь" if jammed else "Дверь заперта"
 
 
 func interact(_player) -> void:
 	if is_open:
+		return
+	if jammed:
+		set_open(true)
+		Game.play_at(Sfx.creak(), global_position + Vector3(0, 1.1, 0), -6.0)
 		return
 	Game.play_at(Sfx.clank(), global_position + Vector3(0, 1.1, 0), -8.0)
 	Game.say_once("door_locked_%d" % get_index(), "Заперто. Вчера здесь двери не было... или была?", Game.THOUGHT, 3.0)

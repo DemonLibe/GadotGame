@@ -7,6 +7,17 @@ signal footstep
 signal died
 
 const WALK_SPEED := 2.6
+const CROUCH_SPEED := 1.3
+const HEAD_STAND := 1.62
+const HEAD_CROUCH := 1.0
+## Насколько далеко слышно (м): шаг, бег, шаг вприсядку, приземление, выстрел, ступенька.
+const NOISE_WALK := 7.0
+const NOISE_RUN := 18.0
+const NOISE_CROUCH := 2.0
+const NOISE_LAND := 10.0
+const NOISE_SHOT := 45.0
+const NOISE_RUNG := 6.0
+const BREATH_DRAIN := 18.0
 const RUN_SPEED := 4.2
 const CLIMB_SPEED := 0.85               # 100 м лестницы — около двух минут
 const GRAVITY := 12.0
@@ -29,10 +40,10 @@ const HEALTH_MAX := 100.0
 const SHOT_RANGE := 40.0
 
 ## Слоты инвентаря (клавиши 1–7).
-const ITEMS := ["flashlight", "burner", "filter", "battery", "radio", "map", "pistol"]
-const ITEM_NAMES := ["Фонарь", "Горелка", "Фильтр", "Батарейка", "Рация", "Карта", "Пистолет"]
+const ITEMS := ["flashlight", "burner", "filter", "battery", "radio", "map", "pistol", "canister"]
+const ITEM_NAMES := ["Фонарь", "Горелка", "Фильтр", "Батарейка", "Рация", "Карта", "Пистолет", "Канистра"]
 ## Масштаб модели в иконке инвентаря.
-const ICON_SCALE := {"flashlight": 1.5, "burner": 1.3, "filter": 1.3, "battery": 2.4, "radio": 1.6, "map": 1.3, "pistol": 1.9}
+const ICON_SCALE := {"flashlight": 1.5, "burner": 1.3, "filter": 1.3, "battery": 2.4, "radio": 1.6, "map": 1.3, "pistol": 1.9, "canister": 1.1}
 
 const BEAM_SHADER := """
 shader_type spatial;
@@ -59,6 +70,16 @@ var selected := 0
 var input_locked := false
 var drain_mult := 1.0
 var climbing := false
+var crouching := false
+var hiding := false          # сидит в шкафу
+var holding_breath := false
+var canisters := 0
+var speed_mult := 1.0        # вода в штольне замедляет
+var climb_mult := 1.0        # в финале по лестнице лезут быстрее
+var _hideout = null
+var _breath_block := 0.0
+var _was_on_floor := true
+var _fall_speed := 0.0
 var extra_shake := 0.0  # тряска камеры от обвала и скримера
 var stamina := STAMINA_MAX
 var has_radio := false
@@ -229,6 +250,11 @@ func make_model(item: String) -> Node3D:
 			var grip := Geo.box(root, Vector3(0, -0.04, 0.03), Vector3(0.028, 0.09, 0.04), ProcTex.flat(Color(0.2, 0.12, 0.08), 0.7), false)
 			grip.rotation.x = 0.25
 			Geo.box(root, Vector3(0, -0.005, 0.0), Vector3(0.01, 0.02, 0.03), gun, false)
+		"canister":
+			var red := ProcTex.flat(Color(0.6, 0.08, 0.06), 0.5, 0.3)
+			Geo.box(root, Vector3(0, 0, 0), Vector3(0.12, 0.2, 0.2), red, false)
+			Geo.box(root, Vector3(0, 0.12, 0.04), Vector3(0.03, 0.04, 0.1), red, false)
+			Geo.cylinder(root, Vector3(0, 0.12, -0.07), 0.02, 0.05, steel)
 		"radio":
 			var body := ProcTex.flat(Color(0.16, 0.2, 0.15), 0.7, 0.2)
 			Geo.box(root, Vector3.ZERO, Vector3(0.08, 0.17, 0.04), body, false)
@@ -287,6 +313,8 @@ func count_of(item: String) -> int:
 			return 1 if has_radio else 0
 		"pistol":
 			return 1 if has_pistol else 0
+		"canister":
+			return canisters
 	return 1
 
 
@@ -338,14 +366,9 @@ func use_item() -> void:
 			if filters > 0:
 				Game.say("Фильтр ставится в вентблок: подойди и удерживай E.", Game.SYSTEM, 3.0)
 		"radio":
+			# Всё сделано — доклад и конец смены; иначе диспетчер подскажет, куда идти.
 			if has_radio and dispatcher:
-				# Всё сделано — докладываем, смена закрывается. Иначе — повтор последнего сообщения.
-				if Game.all_done() and Game.has_open_task("return"):
-					dispatcher.report_shift(Game.day)
-				else:
-					if not Game.all_done():
-						Game.say("Докладывать пока рано. Осталось: " + Game.remaining_text() + ".", Game.SYSTEM, 4.0)
-					dispatcher.repeat_last()
+				dispatcher.radio_pressed(Game.day)
 		"pistol":
 			_shoot()
 
@@ -376,6 +399,14 @@ func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
 	has_pistol = false
 	ammo = 0
 	health = HEALTH_MAX
+	crouching = false
+	hiding = false
+	holding_breath = false
+	_hideout = null
+	canisters = 0
+	speed_mult = 1.0
+	climb_mult = 1.0
+	head.position.y = HEAD_STAND
 	_burning = false
 	_flame.emitting = false
 	_show_selected()
@@ -404,6 +435,9 @@ func _physics_process(delta: float) -> void:
 	if climbing:
 		_climb(delta)
 		return
+	if hiding:
+		_hide_update(delta)
+		return
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	var input := Vector2.ZERO
@@ -411,7 +445,9 @@ func _physics_process(delta: float) -> void:
 		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var dir := (transform.basis * Vector3(input.x, 0, input.y)).normalized()
 	# Бег тратит выносливость; выдохся — бежать нельзя, пока не отдышишься.
-	var running := Input.is_action_pressed("run") and input.length() > 0.1 and not _exhausted and not input_locked
+	crouching = Input.is_action_pressed("crouch") and not input_locked
+	head.position.y = move_toward(head.position.y, HEAD_CROUCH if crouching else HEAD_STAND, delta * 4.0)
+	var running := Input.is_action_pressed("run") and input.length() > 0.1 and not _exhausted and not input_locked and not crouching
 	if running:
 		stamina = maxf(0.0, stamina - STAMINA_RUN * delta)
 		_stamina_wait = STAMINA_DELAY
@@ -424,14 +460,22 @@ func _physics_process(delta: float) -> void:
 			stamina = minf(STAMINA_MAX, stamina + STAMINA_REGEN * delta)
 	if _exhausted and stamina >= 30.0:
 		_exhausted = false
-	if Input.is_action_just_pressed("jump") and not input_locked and is_on_floor() and stamina >= STAMINA_JUMP:
+	if Input.is_action_just_pressed("jump") and not input_locked and not crouching and is_on_floor() and stamina >= STAMINA_JUMP:
 		velocity.y = JUMP_VELOCITY
 		stamina -= STAMINA_JUMP
 		_stamina_wait = STAMINA_DELAY
-	var speed := RUN_SPEED if running else WALK_SPEED
+	var speed := (RUN_SPEED if running else (CROUCH_SPEED if crouching else WALK_SPEED)) * speed_mult
 	velocity.x = move_toward(velocity.x, dir.x * speed, 20.0 * delta)
 	velocity.z = move_toward(velocity.z, dir.z * speed, 20.0 * delta)
+	if not is_on_floor():
+		_fall_speed = maxf(_fall_speed, -velocity.y)
 	move_and_slide()
+	# Приземление слышно.
+	if is_on_floor() and not _was_on_floor and _fall_speed > 3.0:
+		Game.make_noise(global_position, NOISE_LAND)
+	if is_on_floor():
+		_fall_speed = 0.0
+	_was_on_floor = is_on_floor()
 
 	# Покачивание головы и шаги.
 	var hspeed := Vector2(velocity.x, velocity.z).length()
@@ -442,13 +486,68 @@ func _physics_process(delta: float) -> void:
 		if _step_acc >= STEP_LENGTH:
 			_step_acc = 0.0
 			_step_sound.pitch_scale = randf_range(0.85, 1.1)
+			_step_sound.volume_db = -22.0 if crouching else -14.0
 			_step_sound.play()
 			footstep.emit()
+			var noise := NOISE_CROUCH if crouching else (NOISE_RUN if running else NOISE_WALK)
+			if speed_mult < 0.9:
+				noise *= 2.0  # по воде хлюпает
+			Game.make_noise(global_position, noise)
 	else:
 		_bob_amp = move_toward(_bob_amp, 0.0, delta * 4.0)
 	var shake := pow(Game.fear / 100.0, 2.0) * 0.02 + extra_shake
 	camera.position = Vector3(cos(_bob) * 0.025, absf(sin(_bob)) * 0.04, 0) * _bob_amp \
 		+ Vector3(randf_range(-shake, shake), randf_range(-shake, shake), 0)
+
+
+# --- Укрытие -----------------------------------------------------------------
+
+func enter_hide(hideout) -> void:
+	if hiding or climbing:
+		return
+	hiding = true
+	_hideout = hideout
+	crouching = false
+	velocity = Vector3.ZERO
+	global_position = hideout.inside_pos()
+	rotation.y = hideout.facing_yaw()
+	_pitch = 0.0
+	head.rotation.x = 0.0
+	head.position.y = HEAD_STAND
+	Game.play_at(Sfx.clank(), global_position + Vector3(0, 1, 0), -14.0)
+	Game.say_once("hide", "Тихо. Если оно рядом — задержать дыхание (Space).", Game.THOUGHT, 3.5)
+
+
+func exit_hide() -> void:
+	if not hiding:
+		return
+	hiding = false
+	holding_breath = false
+	global_position = _hideout.exit_pos()
+	_hideout = null
+	Game.play_at(Sfx.clank(), global_position + Vector3(0, 1, 0), -14.0)
+
+
+func _hide_update(delta: float) -> void:
+	velocity = Vector3.ZERO
+	_breath_block -= delta
+	var want := Input.is_action_pressed("jump") and not input_locked and _breath_block <= 0.0
+	holding_breath = want and stamina > 0.0
+	if holding_breath:
+		stamina = maxf(0.0, stamina - BREATH_DRAIN * delta)
+		_stamina_wait = STAMINA_DELAY
+		if stamina <= 0.0:
+			# Не выдержал — шумный вдох.
+			holding_breath = false
+			_breath_block = 2.5
+			Game.play_at(Sfx.gasp(), global_position + Vector3(0, 1.5, 0), 0.0)
+			Game.make_noise(global_position, 7.0)
+			Game.say_once("gasp", "Не могу... воздуха...", Game.THOUGHT, 2.0)
+	else:
+		_stamina_wait -= delta
+		if _stamina_wait <= 0.0:
+			stamina = minf(STAMINA_MAX, stamina + STAMINA_REGEN * delta)
+	camera.position = Vector3.ZERO
 
 
 # --- Лестница ----------------------------------------------------------------
@@ -478,7 +577,7 @@ func _climb(delta: float) -> void:
 	var up := 0.0
 	if not input_locked:
 		up = Input.get_axis("move_back", "move_forward")
-	var y := global_position.y + up * CLIMB_SPEED * delta
+	var y := global_position.y + up * CLIMB_SPEED * climb_mult * delta
 	if up > 0.0 and y >= _ladder.top_y - 1.2:
 		stop_climb(_ladder.exit_top)
 		return
@@ -488,12 +587,13 @@ func _climb(delta: float) -> void:
 	global_position.y = y
 	velocity = Vector3.ZERO
 	if up != 0.0:
-		_step_acc += absf(up) * CLIMB_SPEED * delta
+		_step_acc += absf(up) * CLIMB_SPEED * climb_mult * delta
 		_bob += delta * PI * 1.5
 		if _step_acc >= RUNG_STEP:
 			_step_acc = 0.0
 			_rung_sound.pitch_scale = randf_range(0.9, 1.1)
 			_rung_sound.play()
+			Game.make_noise(global_position, NOISE_RUNG)
 			footstep.emit()
 	camera.position = Vector3(sin(_bob) * 0.02, absf(cos(_bob)) * 0.03, 0)
 
@@ -529,6 +629,14 @@ func _process(delta: float) -> void:
 		hud.set_health(health / HEALTH_MAX)
 		hud.set_map_visible(held() == "map" and not input_locked)
 		hud.set_stamina(stamina / STAMINA_MAX, _exhausted)
+		var st := ""
+		if hiding:
+			st = "В ШКАФУ · ДЫХАНИЕ ЗАДЕРЖАНО" if holding_breath else "В ШКАФУ · держи Space — не дышать"
+		elif crouching:
+			st = "ПРИСЕЛ · шаги почти не слышны"
+		if canisters > 0:
+			st += ("   " if st != "" else "") + "канистр: %d" % canisters
+		hud.set_status(st)
 
 
 func _update_battery(delta: float) -> void:
@@ -579,7 +687,9 @@ func _update_burner(delta: float) -> void:
 
 func _update_interaction(delta: float) -> void:
 	var t = null
-	if _ray.is_colliding():
+	if hiding:
+		t = _hideout  # изнутри шкафа луч его не видит — выход по E всегда
+	elif _ray.is_colliding():
 		t = _find_interactable(_ray.get_collider())
 	if _target != null and not is_instance_valid(_target):
 		_target = null
@@ -624,6 +734,7 @@ func _shoot() -> void:
 		return
 	ammo -= 1
 	Game.play_ui(Sfx.gunshot(), -2.0)
+	Game.make_noise(global_position, NOISE_SHOT)
 	_muzzle.visible = true
 	_pitch = clampf(_pitch + 0.04, -1.45, 1.45)
 	head.rotation.x = _pitch

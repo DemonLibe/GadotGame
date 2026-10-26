@@ -7,6 +7,8 @@ extends Node
 
 ## Смена закрыта после доклада.
 signal shift_closed
+## В финале обходчик всё-таки доложил, где он.
+signal collapse_reported
 
 const COLOR := Color(0.65, 0.85, 1.0)
 const LINES_PATH := "res://voice/lines.json"
@@ -16,6 +18,11 @@ var _briefings := {}  # "день" → [id]
 var _calls := {}      # "день" → [[id]]
 var _closings := {}   # "день" → [id]
 var _report_id := ""
+var _hints := {}      # поручение → id подсказки; "lie" → [id] (с четвёртой смены голос иногда врёт)
+var _collapse: Array = []
+var _collapse_reply: Array = []
+var _collapse_i := 0
+var collapse_mode := false  # тоннель рушится: диспетчер требует доклада
 var _voice := ""
 var _closing := false
 var _last: Array = []
@@ -45,6 +52,48 @@ func _load_lines() -> void:
 	_calls = data["calls"]
 	_closings = data["closings"]
 	_report_id = data["report"]
+	_hints = data.get("hints", {})
+	_collapse = data.get("collapse", [])
+	_collapse_reply = data.get("collapse_reply", [])
+
+
+## ЛКМ с рацией в руке: доклад, если всё сделано, иначе — подсказка диспетчера.
+func radio_pressed(day: int) -> void:
+	if collapse_mode:
+		collapse_mode = false
+		await speak(_collapse_reply)
+		collapse_reported.emit()
+		return
+	if Game.has_open_task("escape"):
+		repeat_last()
+		return
+	if Game.all_done() and Game.has_open_task("return"):
+		report_shift(day)
+		return
+	hint(day)
+
+
+## Подсказка по ближайшему невыполненному поручению. С четвёртой смены отвечает иногда не он.
+func hint(day: int) -> void:
+	var lies: Array = _hints.get("lie", [])
+	if day >= 4 and not lies.is_empty() and randf() < 0.35:
+		var token := _token + 1
+		await speak([lies.pick_random()])
+		if token == _token:
+			Game.say("...Это был не его голос. Похож — но не его.", Game.THOUGHT, 3.5)
+		return
+	var kind := Game.first_open_task()
+	var id: String = _hints.get(kind, _hints.get("unknown", ""))
+	if id != "":
+		speak([id])
+
+
+## В финале: «Доложи, где ты!» — по очереди.
+func collapse_call() -> void:
+	if _collapse.is_empty():
+		return
+	speak([_collapse[_collapse_i % _collapse.size()]])
+	_collapse_i += 1
 
 
 func briefing(day: int) -> void:

@@ -38,6 +38,21 @@ const WEB_SPOTS := [
 	[-1, -145.0], [2, 15.0], [-1, -180.0], [-1, -215.0],
 ]
 const WEBS_PER_DAY := [0, 2, 4, 5, 7, 9]
+# Шкафы-укрытия: [tunnel, side, along]. tunnel -2 — станция.
+const HIDEOUT_SPOTS := [
+	[-2, 1, -34.0], [-1, 1, -64.0], [-1, 1, -90.0], [-1, -1, -142.0], [-1, -1, -174.0],
+	[-1, 1, -220.0], [0, -1, 22.0], [1, 1, 32.0], [2, -1, 22.0],
+]
+## Генератор: сколько топлива в баке в начале смены и сколько канистр спрятано в тоннелях.
+const GEN_FUEL := [0.0, 100.0, 70.0, 60.0, 50.0, 50.0]
+const CANISTERS_PER_DAY := [0, 0, 1, 2, 2, 2]
+## Затопленная штольня (четвёртая смена): номер штольни и участок воды.
+const FLOOD_BRANCH := 2
+const FLOOD_FROM := 13.0
+# Где искрит кабель на третьей смене: [side, z].
+const CABLE_SPOTS := [[-1, -84.0], [1, -118.0], [1, -140.0]]
+const LETTER := ["Письмо от Маши",
+	"Папа! Мама говорит, ты теперь работаешь под землёй, как гном из сказки.\n\nВрач сказал, после операции я смогу бегать. Я нарисовала тебе фонарик, чтобы тебе там не было темно.\n\nВозвращайся скорее. Маша, 7 лет."]
 
 # Надписи мелом: [tunnel, side, along, высота над полом, текст]. tunnel -3 — стена шахты (along = y).
 # Копятся день за днём.
@@ -94,11 +109,11 @@ const NOTE_TEXTS := {
 const DAY_SUBTITLES := ["", "Станция «Тихая». Первая смена.", "Вторая смена.", "Третья смена.", "Четвёртая смена.", "Последняя смена."]
 const DAY_THOUGHTS := [
 	"",
-	"Первая смена. Открыть люк, спуститься на станцию, зарядить фонарь, поменять фильтр, сжечь паутину. Ничего сложного.",
-	"Вчера внизу что-то обрушилось. Сегодня открыли участок дальше — надо осмотреть завал у ограждения.",
-	"Плохо спал. Всю ночь казалось, что под полом кто-то ходит.",
-	"Мой предшественник продержался неделю. Никто не говорит, куда он делся.",
-	"В журнале одно поручение. Почерк не мой. И не начальника.",
+	"Первая смена. Платят втрое — Маше нужна операция. Спуститься, завести генератор, зарядить фонарь, поменять фильтр, сжечь паутину. Ничего сложного.",
+	"Вчера внизу что-то обрушилось. Маша спросила по телефону, страшно ли под землёй. Сказал — нет.",
+	"Плохо спал. Всю ночь казалось, что под полом кто-то ходит. Ещё три смены — и хватит на операцию.",
+	"Мой предшественник продержался неделю. Никто не говорит, куда он делся. У него тоже кто-то ждал дома?",
+	"В журнале одно поручение. Почерк не мой. И не начальника. Последняя смена, Маша. Последняя.",
 ]
 
 var level: Level
@@ -117,6 +132,11 @@ var vents: Array[Vent] = []
 var chargers: Array[Charger] = []
 var crates: Array[FilterCrate] = []
 var doors: Array[RoomDoor] = []
+var generator: Generator
+var pump: TaskDevice
+var _reported := false   # в финале доложил диспетчеру, где он
+var _station_t := 0.0
+var _call_t := 0.0
 var busy := false
 var collapsing := false
 var _rumble_t := 0.0
@@ -161,6 +181,8 @@ func _ready() -> void:
 	player.dispatcher = dispatcher
 	radio.dispatcher = dispatcher
 	dispatcher.shift_closed.connect(end_day)
+	dispatcher.collapse_reported.connect(func(): _reported = true)
+	Game.seal_requested.connect(_ending_seal)
 
 	stalker = Stalker.new()
 	stalker.player = player
@@ -236,6 +258,7 @@ func _process(delta: float) -> void:
 		Game.play_at(Sfx.drip(), pos, -6.0)
 	if collapsing and not busy:
 		_update_collapse(delta)
+	_update_water()
 	if busy or _smoke:
 		return
 	# Сорвался в шахту.
@@ -401,6 +424,24 @@ func _spawn_props() -> void:
 		crates.append(crate)
 	cart = Cart.new()
 	add_child(cart)
+	generator = Generator.new()
+	generator.level = level
+	generator.position = Vector3(-2.4, Level.FLOOR_Y, -44.6)
+	generator.rotation.y = deg_to_rad(90.0)
+	add_child(generator)
+	for h in HIDEOUT_SPOTS:
+		var cab := Hideout.new()
+		var t: int = h[0]
+		if t == -2:
+			cab.position = Vector3(2.55, Level.FLOOR_Y, h[2])
+			cab.rotation.y = deg_to_rad(-90.0)
+		else:
+			var axis := Vector3.FORWARD if t < 0 else Level.branch_dir(t)
+			var right := Vector3(-axis.z, 0.0, axis.x)
+			cab.position = level.floor_point(t, h[2], float(h[1]) * 1.05)
+			var front := -right * float(h[1])
+			cab.rotation.y = atan2(front.x, front.z)
+		add_child(cab)
 	for room in level.rooms:
 		var door := RoomDoor.new()
 		door.transform = room["door"]
@@ -436,6 +477,11 @@ func start_day(d: int) -> void:
 	if not debug_flag("norooms"):
 		_setup_rooms(d)
 	_spawn_threats(d)
+	_setup_power(d)
+	_spawn_task_devices(d)
+	_reported = false
+	_station_t = 0.0
+	dispatcher.collapse_mode = false
 	# На третий день вагонетка уезжает в тоннель сама.
 	if not debug_flag("s_misc"):
 		cart.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, -120.0 if d == 3 else -40.0)
@@ -452,6 +498,8 @@ func start_day(d: int) -> void:
 	if not debug_flag("s_reset"):
 		player.reset_for_day(SPAWN, SPAWN_YAW, START_BATTERY)
 	player.drain_mult = 1.0 + (d - 1) * 0.15
+	for c in chargers:
+		c.reset()
 	player.input_locked = true
 
 	if not debug_flag("s_dir"):
@@ -476,6 +524,8 @@ func start_day(d: int) -> void:
 	if not debug_flag("s_say"):
 		Game.say(DAY_THOUGHTS[d], Game.THOUGHT, 6.0)
 		Game.say("На столе шипит рация. Диспетчер ждёт.", Game.THOUGHT, 3.5)
+		if d == 1:
+			Game.say("Рация в руке (5) и ЛКМ — спросить диспетчера, куда идти. Шуметь внизу не стоит: приседай (C).", Game.SYSTEM, 6.0)
 
 
 func end_day() -> void:
@@ -506,38 +556,67 @@ func panic() -> void:
 	fail_day("Страх оказался сильнее. Ты очнулся наверху и не помнишь, как поднялся.")
 
 
-## Финал пятого дня, часть 1: за решёткой тоннель начинает рушиться — бежать к станции.
+## Финал пятого дня, часть 1: за решёткой тоннель начинает рушиться — бежать.
+## Дальше — одна из трёх концовок:
+##   1. доложил диспетчеру, где он, — у станции его уже ждут;
+##   2. не доложил и поднялся по лестнице — выбрался... но не один;
+##   3. прочитал все записки и запер решётку изнутри.
 func ending() -> void:
 	if collapsing or busy:
 		return
 	collapsing = true
 	Game.tasks.clear()
-	Game.add_task("escape", "БЕЖАТЬ К СТАНЦИИ", 1)
+	Game.add_task("escape", "БЕЖАТЬ К ЛЕСТНИЦЕ", 1)
 	stalker.hide_now()
 	Game.play_ui(Sfx.rumble(), 0.0)
 	player.flicker(0.8)
 	Game.say("Тоннель рушится! Бежать! К станции, к лестнице — быстрее!", Game.THOUGHT, 5.0)
 	_rumble_t = 0.0
 	_rock_t = 0.0
+	_call_t = 5.0
+	_station_t = 0.0
+	dispatcher.collapse_mode = true
+	if Game.notes_count() >= Game.NOTES_TOTAL:
+		get_tree().create_timer(6.0).timeout.connect(func(): Game.say("…Решётку можно запереть изнутри. Как Седьмой. «Изнутри было тише».", Game.WHISPER, 5.0))
 
 
-## Обвал во время бегства: камни с потолка, тряска, гул.
+## Обвал во время бегства: камни с потолка, тряска, гул, диспетчер требует доклада.
 func _update_collapse(delta: float) -> void:
-	player.extra_shake = 0.03
+	var p := player.global_position
+	var below := p.y < Level.FLOOR_Y + 5.0
+	player.extra_shake = 0.03 if below else 0.012
 	Game.fear = minf(Game.fear, 85.0)
 	_rumble_t -= delta
 	if _rumble_t <= 0.0:
 		_rumble_t = randf_range(2.0, 3.5)
-		Game.play_ui(Sfx.rumble(), -4.0)
+		Game.play_ui(Sfx.rumble(), -4.0 if below else -12.0)
 		if randf() < 0.4:
 			player.flicker(0.3)
-	_rock_t -= delta
-	if _rock_t <= 0.0:
-		_rock_t = randf_range(0.25, 0.7)
-		_drop_rock(player.global_position + Vector3(randf_range(-1.4, 1.4), 0, randf_range(-6.0, 4.0)))
-	# Добежал до станции — там его уже ждут.
-	var p := player.global_position
-	if p.y < Level.FLOOR_Y + 5.0 and p.z > -47.0:
+	if not _reported and dispatcher.collapse_mode:
+		_call_t -= delta
+		if _call_t <= 0.0:
+			_call_t = 13.0
+			dispatcher.collapse_call()
+	if below and p.z < Level.TUN_Z0:
+		_rock_t -= delta
+		if _rock_t <= 0.0:
+			_rock_t = randf_range(0.25, 0.7)
+			_drop_rock(p + Vector3(randf_range(-1.4, 1.4), 0, randf_range(-6.0, 4.0)))
+	# Наверху — выбрался.
+	if p.y > Level.ROOM_Y - 1.0 and not player.climbing:
+		_ending_climb()
+		return
+	if not below or p.z < -47.0:
+		return
+	# У станции: кто доложил — того уже ждут. Кто промолчал — у того есть минута на лестницу.
+	if _reported:
+		_final_scene()
+		return
+	if _station_t == 0.0:
+		player.climb_mult = 5.0
+		Game.say("Здесь никого... Наверх! По лестнице — пока оно не пришло!", Game.THOUGHT, 4.0)
+	_station_t += delta
+	if _station_t > 20.0 and not player.climbing:
 		_final_scene()
 
 
@@ -549,12 +628,17 @@ func _drop_rock(pos: Vector3) -> void:
 	tw.tween_property(rock, "position:y", Level.FLOOR_Y + 0.15, 0.45).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 
 
-## Часть 2: у станции существо съедает героя. Потом газета и скример.
+## Концовка 1: у станции существо съедает героя. Потом газета и скример.
 func _final_scene() -> void:
 	collapsing = false
 	busy = true
+	dispatcher.collapse_mode = false
 	player.extra_shake = 0.0
 	player.input_locked = true
+	if player.climbing:
+		player.stop_climb(Vector3(Level.SHAFT_X + 0.5, Level.FLOOR_Y + 0.05, Level.SHAFT_Z - 2.0))
+	if player.hiding:
+		player.exit_hide()
 	# Он стоит у подножия лестницы.
 	var pos := Vector3(Level.SHAFT_X, Level.FLOOR_Y, Level.SHAFT_Z + 0.2)
 	var to := pos - player.global_position
@@ -577,16 +661,69 @@ func _final_scene() -> void:
 	hud.set_ingame(false)
 	stalker.hide_now()
 	await get_tree().create_timer(2.5).timeout
-	# Газета.
+	await _newspaper("A")
+	await _screamer()
+	_finish("Концовка 1 из 3 — «Доклад принят»")
+
+
+## Концовка 2: не доложил и выбрался наверх. В журнале — запись его почерком.
+func _ending_climb() -> void:
+	collapsing = false
+	busy = true
+	dispatcher.collapse_mode = false
+	dispatcher.stop()
+	player.extra_shake = 0.0
+	player.input_locked = true
+	var to := journal.global_position - player.global_position
+	player.rotation.y = atan2(-to.x, -to.z)
+	Game.say("Выбрался... Живой. В журнале смен — свежая запись. Моим почерком: «Смена сдана. Восьмой».", Game.THOUGHT, 5.0)
+	await get_tree().create_timer(3.0).timeout
+	Game.say("Я этого не писал.", Game.THOUGHT, 3.0)
+	Game.play_at(Sfx.rung(), Vector3(Level.SHAFT_X, Level.ROOM_Y - 4.0, Level.SHAFT_Z), 0.0)
+	await get_tree().create_timer(1.2).timeout
+	Game.play_at(Sfx.rung(), Vector3(Level.SHAFT_X, Level.ROOM_Y - 3.0, Level.SHAFT_Z), 2.0)
+	await hud.fade_to(1.0, 2.0).finished
+	hud.set_ingame(false)
+	await get_tree().create_timer(1.5).timeout
+	await _newspaper("B")
+	await _screamer()
+	_finish("Концовка 2 из 3 — «Поднялся»")
+
+
+## Концовка 3: все записки прочитаны — решётка заперта изнутри. Скримера нет.
+func _ending_seal() -> void:
+	if busy or not collapsing:
+		return
+	collapsing = false
+	busy = true
+	dispatcher.collapse_mode = false
+	dispatcher.stop()
+	player.extra_shake = 0.0
+	player.input_locked = true
+	level.set_grate_open(false)
+	Game.play_at(Sfx.clank(), Vector3(Level.TUN_CX, Level.FLOOR_Y + 1.2, Level.GRATE_Z), 4.0)
+	Game.say("Щёлкнул засов. Грохот стих. Стало тихо... впервые за пять ночей — тихо.", Game.THOUGHT, 5.0)
+	await get_tree().create_timer(4.0).timeout
+	await hud.fade_to(1.0, 4.0).finished
+	hud.set_ingame(false)
+	hud.show_title("ИЗНУТРИ БЫЛО ТИШЕ", "", 3.0)
+	await get_tree().create_timer(4.5).timeout
+	await _newspaper("C")
+	_finish("Концовка 3 из 3 — «Изнутри»")
+
+
+func _newspaper(variant: String) -> void:
 	Game.play_ui(Sfx.pickup(), -6.0)
-	hud.show_newspaper()
+	hud.show_newspaper(variant)
 	await hud.newspaper_closed
 	await get_tree().create_timer(1.0).timeout
-	# Скример.
-	await _screamer()
+
+
+func _finish(which: String) -> void:
 	Game.ended = true
 	Game.save_day(1)
-	hud.show_title("HOPE LIGHT", "Спасибо за игру.\n\nНажми R, чтобы начать заново.", 0.0)
+	hud.set_black()
+	hud.show_title("HOPE LIGHT", which + "\n\nСпасибо за игру.\nНажми R, чтобы начать заново.", 0.0)
 
 
 func _screamer() -> void:
@@ -862,11 +999,91 @@ func _spawn_threats(d: int) -> void:
 func spawn_crawler(pos: Vector3) -> Crawler:
 	var c := Crawler.new()
 	c.player = player
+	c.level = level
 	c.speed = 2.1 + (Game.day - 3) * 0.3
 	c.hp = 2 if Game.day < 5 else 3
 	c.position = pos + Vector3(0, 0.1, 0)
 	add_child(c)
 	return c
+
+
+## Генератор: заглушен, в баке — сколько осталось. Канистры спрятаны в тоннелях.
+func _setup_power(d: int) -> void:
+	generator.reset(GEN_FUEL[d])
+	for i in CANISTERS_PER_DAY[d]:
+		var can := Pickup.new()
+		can.kind = "fuel"
+		can.position = _random_floor_spot(25.0)
+		can.rotation.y = randf() * TAU
+		add_child(can)
+
+
+## Устройства для поручений смены, письмо дочери, засов решётки.
+func _spawn_task_devices(d: int) -> void:
+	pump = null
+	var letter := Note.new()
+	letter.note_id = "masha"
+	letter.title = LETTER[0]
+	letter.text = LETTER[1]
+	letter.hud = hud
+	letter.position = Vector3(Level.SHAFT_X - 3.1, Level.ROOM_Y + 0.745, Level.SHAFT_Z + 0.35)
+	add_child(letter)
+	if Game.has_open_task("sensor"):
+		var sensor := TaskDevice.new()
+		sensor.kind = "sensor"
+		sensor.transform = level.wall_mount(-1, 1, -85.0, Level.FLOOR_Y + 1.5)
+		add_child(sensor)
+	if Game.has_open_task("cable"):
+		var spot: Array = CABLE_SPOTS.pick_random()
+		var cable := TaskDevice.new()
+		cable.kind = "cable"
+		cable.generator = generator
+		cable.transform = level.wall_mount(-1, spot[0], spot[1], Level.FLOOR_Y + 1.7)
+		add_child(cable)
+	if Game.has_open_task("water"):
+		var axis := Level.branch_dir(FLOOD_BRANCH)
+		var right := Vector3(-axis.z, 0.0, axis.x)
+		pump = TaskDevice.new()
+		pump.kind = "pump"
+		pump.position = level.floor_point(FLOOD_BRANCH, FLOOD_FROM - 2.0, 1.1)
+		pump.rotation.y = atan2(-right.x, -right.z)
+		add_child(pump)
+		var flood_len: float = float(Level.BRANCHES[FLOOD_BRANCH]["length"]) - FLOOD_FROM
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.08, 0.1, 0.07, 0.82)
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.roughness = 0.05
+		mat.metallic = 0.4
+		var water := Geo.box(self, level.floor_point(FLOOD_BRANCH, FLOOD_FROM + flood_len / 2.0) + Vector3(0, 0.35, 0),
+			Vector3(3.6, 0.02, flood_len), mat, false, Basis(Vector3.UP, atan2(axis.x, axis.z)))
+		water.add_to_group("day_objects")
+		pump.water = water
+	if Game.has_open_task("token"):
+		var room: Dictionary = level.rooms[5]
+		var token := Pickup.new()
+		token.kind = "token"
+		token.position = room["center"] + (room["basis"] as Basis) * Vector3(0.2, 0.0, -0.3)
+		add_child(token)
+	if d == Game.FINAL_DAY:
+		var lock := GrateLock.new()
+		lock.main = self
+		lock.transform = level.wall_mount(-1, 1, Level.GRATE_Z - 0.5, Level.FLOOR_Y + 1.1)
+		add_child(lock)
+
+
+## Вода в затопленной штольне замедляет и хлюпает.
+func _update_water() -> void:
+	var slow := 1.0
+	if pump != null and is_instance_valid(pump) and pump.water_level > 0.05:
+		var o := Level.branch_origin(FLOOD_BRANCH)
+		var axis := Level.branch_dir(FLOOD_BRANCH)
+		var rel := player.global_position - o
+		var along := rel.dot(axis)
+		var lateral := absf(rel.dot(Vector3(-axis.z, 0.0, axis.x)))
+		if along > FLOOD_FROM and lateral < 2.2 and player.global_position.y < Level.FLOOR_Y + 2.0:
+			slow = lerpf(1.0, 0.5, pump.water_level)
+			Game.say_once("water", "Вода по колено. Ледяная. И каждый шаг — на весь тоннель.", Game.THOUGHT, 3.5)
+	player.speed_mult = slow
 
 
 ## Случайная точка в открытом сегодня проходе, не ближе min_depth метров от станции.
@@ -948,8 +1165,40 @@ func _smoke_test() -> void:
 		hatch.interact(player)
 		await get_tree().create_timer(0.5).timeout
 		player.stop_climb(Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -110.0))
-		for ev in ["footsteps", "sighting", "behind", "lamps", "whisper", "regrow"]:
+		for ev in ["footsteps", "sighting", "behind", "lamps", "whisper", "regrow", "interfere", "crawler"]:
 			director._run(ev)
+		# Генератор: запуск (со второй попытки, если чихнул), заправка, остановка.
+		generator.hold_interact(player, 2.0)
+		generator.hold_interact(player, 2.0)
+		player.canisters = 1
+		generator.hold_interact(player, 2.5)
+		# Шкаф: спрятаться, задержать дыхание, выйти.
+		var cab: Hideout = get_tree().get_nodes_in_group("hideouts")[1]
+		cab.interact(player)
+		Input.action_press("jump")
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+		Input.action_release("jump")
+		cab.interact(player)
+		Input.action_press("crouch")
+		await get_tree().physics_frame
+		Input.action_release("crouch")
+		Game.make_noise(player.global_position, 50.0)
+		for n in get_tree().get_nodes_in_group("day_objects"):
+			var dev := n as TaskDevice
+			if dev:
+				dev.hold_interact(player, 1.0)
+				generator.stall()
+				dev.hold_interact(player, 5.0)
+		await get_tree().create_timer(0.3).timeout
+		generator.hold_interact(player, 2.0)
+		chargers[0].unplug()
+		chargers[0].interact(player)
+		doors[0].set_open(true)
+		doors[0].slam()
+		doors[0].interact(player)
+		player.select(4)
+		dispatcher.radio_pressed(d)
 		player.batteries = 1
 		player.select(3)
 		player.use_item()
@@ -979,6 +1228,8 @@ func _smoke_test() -> void:
 			var pickup := n as Pickup
 			if pickup:
 				pickup.interact(player)
+		for i in 30:
+			_update_water()
 		player.select(5)
 		await get_tree().process_frame
 		player.select(6)
@@ -1001,10 +1252,41 @@ func _smoke_test() -> void:
 	await get_tree().create_timer(1.0).timeout
 	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -252.0)
 	await get_tree().create_timer(1.5).timeout
-	# Бегство к станции → съеден → газета → скример.
+	# Концовка 1: доложил → у станции съеден → газета → скример.
+	dispatcher.radio_pressed(5)
+	_reported = true
 	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -45.0)
 	await get_tree().create_timer(6.0).timeout
 	hud.close_newspaper()
 	await get_tree().create_timer(7.0).timeout
+	var ok := Game.ended
+	# Концовка 3: все записки, засов решётки изнутри.
+	start_day(5)
+	await get_tree().create_timer(5.5).timeout
+	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -252.0)
+	await get_tree().create_timer(1.0).timeout
+	for i in 9:
+		Game.notes_read["n%d" % (i + 1)] = true
+	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -234.0)
+	await get_tree().physics_frame
+	for n in get_tree().get_nodes_in_group("day_objects"):
+		var lock := n as GrateLock
+		if lock:
+			lock.get_prompt(player)
+			lock.interact(player)
+	await get_tree().create_timer(14.0).timeout
+	hud.close_newspaper()
+	await get_tree().create_timer(1.5).timeout
+	ok = ok and Game.ended
+	# Концовка 2: не доложил, поднялся наверх.
+	start_day(5)
+	await get_tree().create_timer(5.5).timeout
+	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -252.0)
+	await get_tree().create_timer(1.0).timeout
+	player.global_position = SPAWN
+	await get_tree().create_timer(10.0).timeout
+	hud.close_newspaper()
+	await get_tree().create_timer(6.0).timeout
+	Game.ended = ok and Game.ended
 	print("SMOKE ", "OK" if Game.ended else "FAIL: финал не сработал")
 	get_tree().quit(0 if Game.ended else 1)

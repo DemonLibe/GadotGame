@@ -1,20 +1,29 @@
 class_name Crawler
 extends CharacterBody3D
-## Ползун — бледное существо из темноты (с третьей ночи). Ползёт к обходчику,
-## в луче фонаря замедляется и шипит. Два попадания из пистолета — и он рассыпается.
+## Ползун — бледное существо из темноты (с третьей ночи). Почти слепое: видит вблизи
+## и видит свет фонаря, зато слышит шаги, бег, выстрелы. Бродит, идёт на шум, гонится.
+## От того, кто сидит в шкафу и не дышит, уходит ни с чем.
+## Два попадания из пистолета — и он рассыпается.
 
 const ATTACK_RANGE := 1.4
 const DAMAGE := 25.0
-const NOTICE_RANGE := 22.0
+const SIGHT_DARK := 4.0     # видит обходчика без фонаря
+const SIGHT_LIT := 16.0     # видит фонарь
+const LOSE_TIME := 6.0
 const LAYER := 16  # слой для пуль
 
 var player: Player
+var level: Level
 var speed := 2.2
 var hp := 2
+var state := "wander"  # wander / investigate / chase
 var _dead := false
-var _chasing := false
 var _cooldown := 0.0
 var _t := 0.0
+var _think := 0.0
+var _goal := Vector3.ZERO
+var _wait := 0.0
+var _unseen := 0.0
 var _legs: Array[Node3D] = []
 var _body: Node3D
 var _hiss: AudioStreamPlayer3D
@@ -59,6 +68,22 @@ func _ready() -> void:
 	_hiss.stream = Sfx.hiss()
 	_hiss.unit_size = 4.0
 	add_child(_hiss)
+	Game.noise_made.connect(_on_noise)
+	_goal = global_position
+	_wait = randf_range(0.5, 2.0)
+
+
+## Слух: шаги, бег, выстрел, вдох в шкафу.
+func _on_noise(pos: Vector3, radius: float) -> void:
+	if _dead or state == "chase":
+		return
+	if global_position.distance_to(pos) > radius:
+		return
+	state = "investigate"
+	_goal = pos
+	_wait = 0.0
+	if randf() < 0.5:
+		_hiss.play()
 
 
 func _physics_process(delta: float) -> void:
@@ -68,24 +93,35 @@ func _physics_process(delta: float) -> void:
 	_cooldown -= delta
 	if not is_on_floor():
 		velocity.y -= 12.0 * delta
+	_think -= delta
+	if _think <= 0.0:
+		_think = 0.2
+		_perceive()
 	var to := player.global_position - global_position
 	to.y = 0.0
 	var dist := to.length()
-	if not _chasing and dist < NOTICE_RANGE and player.global_position.y < Level.FLOOR_Y + 5.0:
-		_chasing = true
-		_hiss.play()
-		Game.add_fear(10.0)
-		Game.say_once("crawler_first", "Что это?! Оно ползёт ко мне!")
-	var v := Vector3.ZERO
-	if _chasing and dist > ATTACK_RANGE * 0.8:
-		var s := speed
-		# Свет его не убивает, но заставляет ползти медленнее.
-		if player.is_lighting(global_position + Vector3(0, 0.5, 0)):
+	var target := player.global_position if state == "chase" else _goal
+	var s := speed
+	match state:
+		"wander":
 			s *= 0.45
-			if randf() < 0.01:
-				_hiss.play()
-		v = to / dist * s
-		look_at(global_position + to, Vector3.UP)
+		"investigate":
+			s *= 0.8
+	# Свет его не убивает, но заставляет ползти медленнее.
+	if player.is_lighting(global_position + Vector3(0, 0.5, 0)):
+		s *= 0.45
+		if randf() < 0.01:
+			_hiss.play()
+	var v := Vector3.ZERO
+	var go := target - global_position
+	go.y = 0.0
+	if _wait > 0.0:
+		_wait -= delta
+	elif go.length() > (ATTACK_RANGE * 0.8 if state == "chase" else 0.6):
+		v = go.normalized() * s
+		look_at(global_position + go, Vector3.UP)
+	else:
+		_arrived()
 	velocity.x = v.x
 	velocity.z = v.z
 	move_and_slide()
@@ -94,11 +130,81 @@ func _physics_process(delta: float) -> void:
 	for i in _legs.size():
 		_legs[i].rotation.x = sin(_t * 12.0 + i * 1.6) * 0.5 if moving else 0.0
 	_body.position.y = absf(sin(_t * 12.0)) * 0.04 if moving else 0.0
-	if _chasing and dist < ATTACK_RANGE and _cooldown <= 0.0:
+	if state == "chase" and dist < ATTACK_RANGE and _cooldown <= 0.0:
 		_cooldown = 1.3
+		if player.hiding:
+			player.exit_hide()  # вытащил из шкафа
 		player.take_damage(DAMAGE)
 		Game.add_fear(15.0)
 		Game.play_ui(Sfx.sting(), -6.0)
+
+
+## Видит ли он обходчика.
+func _perceive() -> void:
+	if player.global_position.y > Level.FLOOR_Y + 5.0:
+		if state == "chase":
+			_lose()
+		return
+	var eye := global_position + Vector3(0, 0.5, 0)
+	var dist := eye.distance_to(player.global_position + Vector3(0, 1.0, 0))
+	var sees := false
+	if player.hiding:
+		# В шкафу выдаёт только фонарь сквозь щели или дыхание вплотную.
+		if player.has_light() and dist < 8.0:
+			sees = true
+		elif dist < 2.5 and not player.holding_breath and randf() < 0.25:
+			sees = true
+	else:
+		var r := SIGHT_LIT if player.has_light() else SIGHT_DARK
+		if player.crouching and not player.has_light():
+			r *= 0.6
+		sees = dist < r and _clear(eye, player.camera.global_position)
+	if sees:
+		if state != "chase":
+			_hiss.play()
+			Game.add_fear(10.0)
+			Game.say_once("crawler_first", "Что это?! Оно ползёт ко мне!")
+		state = "chase"
+		_unseen = 0.0
+		_goal = player.global_position
+	elif state == "chase":
+		_unseen += 0.2
+		if not player.hiding:
+			_goal = player.global_position
+		if _unseen > LOSE_TIME or (player.hiding and _unseen > 1.0):
+			_lose()
+
+
+func _lose() -> void:
+	state = "investigate"
+	_wait = 0.0
+	Game.say_once("crawler_lost", "Оно... потеряло меня? Не шевелиться.", Game.THOUGHT, 3.0)
+
+
+func _arrived() -> void:
+	# Пришёл на шум или к точке обхода — постоять, принюхаться, выбрать новую цель.
+	_wait = randf_range(2.0, 4.5)
+	state = "wander"
+	_goal = _wander_point()
+
+
+func _wander_point() -> Vector3:
+	var p := global_position
+	if level == null:
+		return p
+	var axis := level.axis_at(p)
+	for i in 6:
+		var q := p + axis * randf_range(-10.0, 10.0)
+		q.y = p.y
+		if level.is_walkable(q):
+			return q
+	return p
+
+
+func _clear(a: Vector3, b: Vector3) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(a, b, 1 | Geo.WALL_LAYER)
+	q.exclude = [get_rid()]
+	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
 
 ## Попадание пули.
@@ -106,7 +212,8 @@ func hit() -> void:
 	if _dead:
 		return
 	hp -= 1
-	_chasing = true
+	state = "chase"
+	_unseen = 0.0
 	_hiss.play()
 	velocity = -global_transform.basis.z * -3.0
 	if hp <= 0:

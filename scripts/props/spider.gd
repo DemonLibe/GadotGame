@@ -1,6 +1,7 @@
 class_name Spider
 extends Node3D
 ## Безобидный паук. Ползает по стене, удирает от огня и время от времени плетёт новую паутину.
+## Существо пауки чуют раньше человека: разбегаются — значит, оно рядом.
 
 var main  # Main — для spawn_small_web()
 var player: Player
@@ -16,10 +17,14 @@ var _weave := 40.0
 var _webs_made := 0
 var _legs: Array[Node3D] = []
 var _t := 0.0
+var _scan := 0.0
+var _alarm := 0.0       # чует существо — удирает
+var _flee_from := Vector3.ZERO
 
 
 func _ready() -> void:
 	add_to_group("day_objects")
+	add_to_group("spiders")
 	global_position = Vector3(wall_x, floor_y + randf_range(0.6, 2.6), home_z)
 	var skin := ProcTex.flat(Color(0.08, 0.06, 0.05), 0.55)
 	var abdomen := Geo.sphere(self, Vector3(0, 0.06, 0.09), 0.08, skin)
@@ -67,9 +72,35 @@ func _orient(dir: Vector3) -> void:
 	global_transform.basis = Basis.looking_at(d.normalized(), normal)
 
 
+## Разбежаться: что-то идёт со стороны from.
+func alarm(from: Vector3) -> void:
+	if _alarm <= 0.0 and randf() < 0.5:
+		Game.play_at(Sfx.scuttle(), global_position, -8.0)
+	_alarm = 4.0
+	_flee_from = from
+
+
 func _process(delta: float) -> void:
 	_t += delta
 	var speed := 0.35
+	_scan -= delta
+	if _scan <= 0.0:
+		_scan = 0.5
+		for n in get_tree().get_nodes_in_group("creatures"):
+			var c := n as Node3D
+			if c and c.global_position.distance_to(global_position) < 15.0:
+				alarm(c.global_position)
+				if player and player.global_position.distance_to(global_position) < 10.0:
+					Game.say_once("spiders_run", "Пауки... разбегаются. Все разом. Что-то идёт.", Game.THOUGHT, 3.5)
+				break
+	if _alarm > 0.0:
+		_alarm -= delta
+		var dir := signf(global_position.z - _flee_from.z)
+		if dir == 0.0:
+			dir = 1.0
+		_target = Vector3(wall_x, clampf(global_position.y + 0.3, floor_y + 0.4, floor_y + 2.9), global_position.z + dir * 2.0)
+		_wait = 0.0
+		speed = 2.0
 	if player and player.is_burning() and player.global_position.distance_to(global_position) < 3.5:
 		var away := signf(global_position.z - player.global_position.z)
 		if away == 0.0:

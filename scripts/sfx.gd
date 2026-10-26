@@ -79,6 +79,26 @@ static func hiss() -> AudioStreamWAV:
 	return _stream("hiss")
 
 
+static func gasp() -> AudioStreamWAV:
+	return _stream("gasp")
+
+
+static func engine() -> AudioStreamWAV:
+	return _stream("engine")
+
+
+static func sparks() -> AudioStreamWAV:
+	return _stream("sparks")
+
+
+static func scuttle() -> AudioStreamWAV:
+	return _stream("scuttle")
+
+
+static func pump() -> AudioStreamWAV:
+	return _stream("pump")
+
+
 static func radio() -> AudioStreamWAV:
 	return _stream("radio")
 
@@ -111,6 +131,11 @@ static func _stream(key: String) -> AudioStreamWAV:
 		"tick": w = _make_tick()
 		"hiss": w = _make_hiss()
 		"radio_loop": w = _make_radio(2.0, true)
+		"gasp": w = _make_gasp()
+		"engine": w = _make_engine()
+		"sparks": w = _make_sparks()
+		"scuttle": w = _make_scuttle()
+		"pump": w = _make_pump()
 		_: w = _make_pickup()
 	_cache[key] = w
 	return w
@@ -375,4 +400,70 @@ static func _make_tick() -> AudioStreamWAV:
 		var a := fmod(t, 1.0)
 		var f := 3200.0 if t < 1.0 else 2700.0
 		s[i] = sin(TAU * f * a) * exp(-a * 160.0) * 0.35 + randf_range(-1.0, 1.0) * exp(-a * 400.0) * 0.2
+	return _wav(s, true)
+
+
+# Судорожный вдох после задержки дыхания.
+static func _make_gasp() -> AudioStreamWAV:
+	var dur := 0.9
+	var s := _buf(dur)
+	var lp := 0.0
+	for i in s.size():
+		var t := float(i) / RATE
+		var n := randf_range(-1.0, 1.0)
+		lp += 0.3 * (n - lp)
+		var env := minf(t * 12.0, 1.0) * exp(-t * 3.0)
+		s[i] = (n - lp * 0.6) * env * 0.7 * (0.8 + 0.2 * sin(TAU * 9.0 * t))
+	return _wav(s)
+
+
+# Дизель-генератор: тарахтящий низкий цикл (петля 1 с).
+static func _make_engine() -> AudioStreamWAV:
+	var s := _buf(1.0)
+	var lp := 0.0
+	for i in s.size():
+		var t := float(i) / RATE
+		var cyc := fmod(t * 25.0, 1.0)
+		lp += 0.1 * (randf_range(-1.0, 1.0) - lp)
+		var pulse := exp(-cyc * 9.0)
+		s[i] = clampf((sin(TAU * 50.0 * t) * 0.3 + lp * 2.0) * (0.3 + pulse) * 0.6, -1.0, 1.0)
+	return _wav(s, true)
+
+
+# Искрящий кабель: треск разрядов (петля 1 с).
+static func _make_sparks() -> AudioStreamWAV:
+	var s := _buf(1.0)
+	var burst := 0.0
+	for i in s.size():
+		if randf() < 0.0015:
+			burst = 1.0
+		burst *= 0.995
+		s[i] = randf_range(-1.0, 1.0) * burst * 0.6 + 0.05 * sin(TAU * 100.0 * float(i) / RATE)
+	return _wav(s, true)
+
+
+# Топот сотни лапок.
+static func _make_scuttle() -> AudioStreamWAV:
+	var dur := 1.6
+	var s := _buf(dur)
+	var tick := 0.0
+	for i in s.size():
+		var t := float(i) / RATE
+		if randf() < 0.012:
+			tick = randf_range(0.3, 1.0)
+		tick *= 0.9
+		s[i] = randf_range(-1.0, 1.0) * tick * 0.5 * sin(PI * t / dur)
+	return _wav(s)
+
+
+# Насос: хлюпающее чавканье (петля 2 с).
+static func _make_pump() -> AudioStreamWAV:
+	var s := _buf(2.0)
+	var lp := 0.0
+	for i in s.size():
+		var t := float(i) / RATE
+		lp += 0.05 * (randf_range(-1.0, 1.0) - lp)
+		var cyc := fmod(t, 1.0)
+		var stroke := sin(PI * cyc) * (0.6 + 0.4 * sin(TAU * 3.0 * t))
+		s[i] = clampf(lp * 4.0 * stroke + 0.15 * sin(TAU * 70.0 * t) * stroke, -1.0, 1.0)
 	return _wav(s, true)

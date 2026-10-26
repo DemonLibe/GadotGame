@@ -44,6 +44,10 @@ var _note_title: Label
 var _note_text: Label
 var _reading := false
 var _paper: PanelContainer
+var _paper_head: Label
+var _paper_body: Label
+var _paper_cap: Label
+var _status: Label
 var _scream: Label
 var _paper_open := false
 var player: Player
@@ -124,6 +128,10 @@ func _ready() -> void:
 	_tasks.add_theme_font_size_override("bold_font_size", 15)
 	_tasks.add_theme_color_override("default_color", Color(0.15, 0.13, 0.12))
 	sheet.add_child(_tasks)
+
+	# Состояние: присел, в шкафу, задержал дыхание.
+	_status = _make_label(_ingame, 16, HORIZONTAL_ALIGNMENT_LEFT)
+	_place(_status, 0, 1, 0, 1, 24, -80, 420, -56)
 
 	_battery_label = _make_label(_ingame, 18, HORIZONTAL_ALIGNMENT_RIGHT)
 	_place(_battery_label, 1, 1, 1, 1, -300, -80, -24, -56)
@@ -409,24 +417,21 @@ func _build_newspaper() -> void:
 	rule.color = ink
 	rule.custom_minimum_size = Vector2(0, 3)
 	box.add_child(rule)
-	box.add_child(_paper_label("НА ЗАКРЫТОЙ СТАНЦИИ «ТИХАЯ» ПОГИБ ЕЩЁ ОДИН ОБХОДЧИК", 26, ink, HORIZONTAL_ALIGNMENT_LEFT))
+	_paper_head = _paper_label("", 26, ink, HORIZONTAL_ALIGNMENT_LEFT)
+	box.add_child(_paper_head)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 18)
 	box.add_child(row)
 	var photo := ColorRect.new()
 	photo.color = Color(0.16, 0.15, 0.14)
 	photo.custom_minimum_size = Vector2(230, 230)
-	var cap := _paper_label("фото: вход в шахту № 3", 12, Color(0.75, 0.73, 0.68), HORIZONTAL_ALIGNMENT_CENTER)
-	cap.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	cap.position = Vector2(30, 200)
-	photo.add_child(cap)
+	_paper_cap = _paper_label("", 12, Color(0.75, 0.73, 0.68), HORIZONTAL_ALIGNMENT_CENTER)
+	_paper_cap.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_paper_cap.position = Vector2(30, 200)
+	photo.add_child(_paper_cap)
 	row.add_child(photo)
-	var body := _paper_label("Вчера ночью на законсервированной станции «Тихая» погиб обходчик — восьмой за сорок лет. "
-		+ "По словам диспетчера, последний доклад по рации поступил в 03:12: «Все поручения выполнены». "
-		+ "Через несколько минут в тоннеле произошёл обвал.\n\n"
-		+ "Тело не найдено. Спасатели обнаружили за решёткой в конце тоннеля шесть старых касок и девять записок, написанных разными почерками.\n\n"
-		+ "Руководство метрополитена заявило, что станция будет закрыта окончательно. "
-		+ "Объявление о наборе нового обходчика — на странице 6.", 15, ink, HORIZONTAL_ALIGNMENT_LEFT)
+	var body := _paper_label("", 15, ink, HORIZONTAL_ALIGNMENT_LEFT)
+	_paper_body = body
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.custom_minimum_size = Vector2(450, 0)
 	row.add_child(body)
@@ -444,7 +449,31 @@ func _paper_label(text: String, size: int, color: Color, align: HorizontalAlignm
 	return l
 
 
-func show_newspaper() -> void:
+## Три концовки — три разные заметки.
+var _newspapers := {
+	"A": ["НА ЗАКРЫТОЙ СТАНЦИИ «ТИХАЯ» ПОГИБ ЕЩЁ ОДИН ОБХОДЧИК", "фото: вход в шахту № 3",
+		"Вчера ночью на законсервированной станции «Тихая» погиб обходчик — восьмой за сорок лет. "
+		+ "Последний доклад по рации поступил в 03:12: «Тоннель рушится, бегу к станции». На записи есть и ответ: «Принял. Стой у станции. Мы идём».\n\n"
+		+ "Однако пульт диспетчерской станции «Тихая» отключён от сети с 2001 года. Кто отвечал обходчику пять ночей подряд, установить не удалось.\n\n"
+		+ "Тело не найдено. У погибшего осталась дочь семи лет. Объявление о наборе нового обходчика — на странице 6."],
+	"B": ["ОБХОДЧИК СТАНЦИИ «ТИХАЯ» ВЫБРАЛСЯ ИЗ-ПОД ЗАВАЛА — И ПРОПАЛ", "фото: журнал смен",
+		"Под утро обходчик поднялся по шахте № 3 на поверхность, весь в бетонной пыли. Домой он не вернулся. "
+		+ "В журнале смен его рукой сделана последняя запись: «Смена сдана. Восьмой».\n\n"
+		+ "Соседи рассказывают, что ночью у его подъезда слышали скрежет — будто по асфальту ползло что-то тяжёлое.\n\n"
+		+ "Дочь пропавшего, Маша, каждый вечер ждёт отца у окна. Пульт диспетчерской станции отключён с 2001 года."],
+	"C": ["ТОННЕЛЬ ЗА СТАНЦИЕЙ «ТИХАЯ» ЗАМУРОВАН ИЗНУТРИ", "фото: решётка, 232-й метр",
+		"Спасатели не смогли открыть решётку в конце тоннеля: она заперта изнутри, на замок обходчика. "
+		+ "За решёткой тишина. Обвал прекратился сам.\n\n"
+		+ "Впервые за сорок лет датчики станции не фиксируют никакого движения. Набор обходчиков прекращён.\n\n"
+		+ "Семье обходчика выплачено жалованье за год вперёд. Говорят, его дочь Маша успешно перенесла операцию и уже начала бегать."],
+}
+
+
+func show_newspaper(variant := "A") -> void:
+	var paper: Array = _newspapers.get(variant, _newspapers["A"])
+	_paper_head.text = paper[0]
+	_paper_cap.text = paper[1]
+	_paper_body.text = paper[2]
 	_paper.visible = true
 	_paper_open = true
 
@@ -498,6 +527,10 @@ func close_note() -> void:
 	_reading = false
 	if player:
 		player.input_locked = false
+
+
+func set_status(text: String) -> void:
+	_status.text = text
 
 
 func set_stamina(value: float, exhausted: bool) -> void:
@@ -567,7 +600,7 @@ func _refresh_tasks() -> void:
 		else:
 			lines.append("— " + text)
 	lines.append("")
-	lines.append("[color=#6b5a48]записки: %d из %d[/color]" % [Game.notes_read.size(), Game.NOTES_TOTAL])
+	lines.append("[color=#6b5a48]записки: %d из %d[/color]" % [Game.notes_count(), Game.NOTES_TOTAL])
 	_tasks.text = "\n".join(lines)
 
 

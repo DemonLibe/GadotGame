@@ -45,6 +45,7 @@ const BRANCHES := [
 
 var lamps: Array[Dictionary] = []
 var tunnel_lights_off := false
+var power_on := true  # генератор на станции: без него лампы в тоннелях не горят
 var blackout := false
 var grate: Node3D
 var rooms: Array[Dictionary] = []  # {center, basis, door}: basis +Z смотрит из комнаты к двери
@@ -103,7 +104,7 @@ func _process(delta: float) -> void:
 		var light: OmniLight3D = l["light"]
 		var mat: StandardMaterial3D = l["mat"]
 		var mode: String = l["mode"]
-		var on: bool = mode != "broken" and not blackout and not (l["tunnel"] and tunnel_lights_off)
+		var on: bool = mode != "broken" and not blackout and not (l["tunnel"] and (tunnel_lights_off or not power_on))
 		var f := 1.0 if on else 0.0
 		if on and mode == "flicker":
 			var phase: float = l["t"]
@@ -394,6 +395,12 @@ func _build_room() -> void:
 	Geo.box(self, Vector3(SHAFT_X - 2.0, y + 0.006, z1 - 0.5), Vector3(0.9, 0.012, 0.6), ProcTex.flat(Color(0.25, 0.15, 0.1), 1.0), false)
 	Geo.box(self, Vector3(x0 + 0.3, y + 0.95, SHAFT_Z + 1.6), Vector3(0.5, 1.9, 0.6), m_metal)
 	Geo.box(self, Vector3(x0 + 0.3, y + 0.95, SHAFT_Z + 2.25), Vector3(0.5, 1.9, 0.6), m_metal)
+	# На дверце шкафчика — фотография дочери.
+	Geo.box(self, Vector3(x0 + 0.56, y + 1.45, SHAFT_Z + 1.6), Vector3(0.01, 0.17, 0.13), ProcTex.flat(Color(0.92, 0.9, 0.84), 0.9), false)
+	Geo.box(self, Vector3(x0 + 0.566, y + 1.47, SHAFT_Z + 1.6), Vector3(0.004, 0.12, 0.11), ProcTex.flat(Color(0.55, 0.45, 0.35), 0.9), false)
+	Geo.sphere(self, Vector3(x0 + 0.57, y + 1.49, SHAFT_Z + 1.6), 0.025, ProcTex.flat(Color(0.85, 0.7, 0.55), 0.9))
+	Geo.label(self, Vector3(x0 + 0.57, y + 1.385, SHAFT_Z + 1.6), "Маша, 7 лет", 90, 14, Color(0.2, 0.15, 0.4), true, 0.0016)
+	Geo.box(self, Vector3(x0 + 0.57, y + 1.54, SHAFT_Z + 1.6), Vector3(0.006, 0.015, 0.015), ProcTex.flat(Color(0.8, 0.1, 0.1), 0.6), false)
 	# Стул у стола с журналом.
 	var chx := SHAFT_X + 2.2
 	var chz := SHAFT_Z - 1.6
