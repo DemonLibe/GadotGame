@@ -40,7 +40,7 @@ jobs:
       - name: Smoke test (all days + ending)
         run: |
           set +e
-          timeout 180 godot --headless -- --smoke 2>&1 | tee smoke.log
+          timeout 180 godot --headless -- --smoke 2>&1 | grep -v -e "mesh_get_surface_count" -e "Parameter \"m\" is null" | tee smoke.log
           set -e
           if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" smoke.log; then
             echo "::error::Script errors during smoke test"

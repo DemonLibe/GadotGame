@@ -304,7 +304,7 @@ func _build_main_tunnel() -> void:
 		z -= 14.0
 	# Пикеты.
 	for k in [1, 3, 4]:
-		var mz := TUN_Z0 - 40.0 * k
+		var mz: float = TUN_Z0 - 40.0 * k
 		var ly := FLOOR_Y + 1.6
 		Geo.label(self, Vector3(wall_x(1, ly, 0.03), ly, mz), "ПК %d" % k, -90, 48, Color(0.95, 0.95, 0.9), true)
 
@@ -347,7 +347,7 @@ func _build_chamber(b: Dictionary) -> void:
 		p.material_override = m_concrete
 		p.position = Vector3(TUN_CX, TUBE_CY, zj + side * c)
 		add_child(p)
-		var wz := zj + side * (c + 0.15)
+		var wz: float = zj + side * (c + 0.15)
 		Geo.solid(self, Vector3((TUN_CX - c + LEFT_X) / 2, FLOOR_Y + 2.0, wz), Vector3(LEFT_X - TUN_CX + c, 4.0, 0.3))
 		Geo.solid(self, Vector3((RIGHT_X + TUN_CX + c) / 2, FLOOR_Y + 2.0, wz), Vector3(TUN_CX + c - RIGHT_X, 4.0, 0.3))
 	# Боковина со входом в штольню.
