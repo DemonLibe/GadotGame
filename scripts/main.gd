@@ -126,6 +126,8 @@ var _drip_t := 5.0
 var _uncaptured := 0.0
 var _grace := 0.0
 var _smoke := false
+var _debug_log := false
+var _debug_t := 0.0
 
 
 func _ready() -> void:
@@ -145,6 +147,7 @@ func _ready() -> void:
 	hud.player = player
 	player.hud = hud
 	player.died.connect(func(): fail_day("Тебя утащили во тьму."))
+	_debug_log = debug_flag("debug")
 	if not debug_flag("nofx"):
 		_setup_postfx()
 	dispatcher = Dispatcher.new()
@@ -201,6 +204,14 @@ static func is_web_renderer() -> bool:
 
 func _process(delta: float) -> void:
 	_grace -= delta
+	if _debug_log:
+		_debug_t -= delta
+		if _debug_t <= 0.0:
+			_debug_t = 1.0
+			var cam := get_viewport().get_camera_3d()
+			print("DBG state=%s busy=%s player=%s rot=%s cam=%s campos=%s fade=%s fps=%d" % [state, busy,
+				player.global_position, player.rotation, cam.get_path() if cam else "none",
+				cam.global_position if cam else Vector3.ZERO, hud.fade_alpha(), Engine.get_frames_per_second()])
 	if state != "playing":
 		return
 	# Капли где-то в темноте.

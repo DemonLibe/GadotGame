@@ -506,6 +506,10 @@ func set_stamina(value: float, exhausted: bool) -> void:
 	_stamina_fill.bg_color = Color(0.9, 0.35, 0.2) if exhausted else Color(0.8, 0.82, 0.75)
 
 
+func fade_alpha() -> float:
+	return _fade.color.a
+
+
 func set_black() -> void:
 	_fade.color.a = 1.0
 
