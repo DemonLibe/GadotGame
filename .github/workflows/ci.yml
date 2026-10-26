@@ -1,0 +1,43 @@
+# Проверка на каждый пуш: игра прогоняется в headless-режиме — все дни, события и финал.
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: "4.3"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot
+        run: |
+          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q "Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          rm -f *.zip
+
+      - name: Import project
+        run: timeout 300 godot --headless --editor --quit || true
+
+      - name: Smoke test (all days + ending)
+        run: |
+          set +e
+          timeout 180 godot --headless -- --smoke 2>&1 | grep -v -e "mesh_get_surface_count" -e "Parameter \"m\" is null" | tee smoke.log
+          set -e
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" smoke.log; then
+            echo "::error::Script errors during smoke test"
+            exit 1
+          fi
+          grep -q "SMOKE OK" smoke.log || { echo "::error::Smoke test did not finish"; exit 1; }

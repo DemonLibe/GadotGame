@@ -1,6 +1,6 @@
 # Озвучка диспетчера: нейросетевой голос Piper (русский) + эффект рации.
 # Запускается при изменении реплик (voice/lines.json) или вручную. Готовые .ogg
-# коммитятся в voice/, после чего пересобирается браузерная версия.
+# коммитятся в voice/, после чего игра прогоняется автотестом (CI).
 name: Voice
 
 on:
@@ -63,9 +63,9 @@ jobs:
           git push -q origin "HEAD:${GITHUB_REF_NAME}"
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
-      # Коммит от GITHUB_TOKEN не запускает другие workflow — запускаем сборку сайта явно.
-      - name: Rebuild web version
+      # Коммит от GITHUB_TOKEN не запускает другие workflow — запускаем автотест явно.
+      - name: Run CI
         if: steps.commit.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run web.yml --ref "${GITHUB_REF_NAME}"
+        run: gh workflow run ci.yml --ref "${GITHUB_REF_NAME}"
