@@ -1,0 +1,225 @@
+class_name Director
+extends Node
+## Режиссёр хоррора: по дням дозирует события (шаги за спиной, силуэт в луче,
+## шёпот, отключение света), ведёт счётчик страха и сюжетные точки.
+
+const WHISPERS := [
+	"…ещё одна смена…",
+	"…не свети на меня…",
+	"…ты тоже считаешь шаги?…",
+	"…он ушёл наверх. Ты — нет…",
+	"…тише. Пауки слушают…",
+]
+
+var main  # Main
+var player: Player
+var stalker: Stalker
+var level: Level
+
+var _budget := {}
+var _cooldown := 30.0
+var _echo_left := 0
+var _hb := 0.0
+var _flags := {}
+
+
+func _ready() -> void:
+	player.footstep.connect(_on_step)
+	stalker.vanished.connect(_on_vanished)
+
+
+func start_day(d: int) -> void:
+	_flags = {}
+	_echo_left = 0
+	_cooldown = randf_range(20.0, 35.0)
+	match d:
+		1: _budget = {}
+		2: _budget = {"footsteps": 1, "sighting": 1}
+		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1}
+		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1}
+		_: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1}
+
+
+func _process(delta: float) -> void:
+	if main.busy:
+		return
+	main.hud.set_fear(Game.fear / 100.0)
+	_update_fear(delta)
+	_heartbeat(delta)
+	_story()
+	if main.busy:
+		return
+	if Game.fear >= 100.0:
+		main.panic()
+		return
+	if player.global_position.z > Level.TUN_Z0 - 4.0:
+		return  # события только в тоннеле
+	_cooldown -= delta
+	if _cooldown > 0.0 or stalker.visible:
+		return
+	var options: Array = []
+	for k in _budget:
+		if _budget[k] > 0:
+			options.append(k)
+	if options.is_empty():
+		return
+	var ev: String = options.pick_random()
+	if _run(ev):
+		_budget[ev] -= 1
+		_cooldown = randf_range(35.0, 60.0) - Game.day * 4.0
+	else:
+		_cooldown = 4.0
+
+
+# --- Страх -------------------------------------------------------------------
+
+func _update_fear(delta: float) -> void:
+	var pos := player.global_position
+	var lit := player.has_light() or level.is_lit_near(pos) or pos.z > -28.0
+	if lit:
+		Game.add_fear(-delta * (6.0 if pos.z > Level.TUN_Z0 else 2.5))
+	else:
+		Game.add_fear(delta * (3.5 + Game.day * 1.2))
+		Game.say_once("dark", "Темно... Слишком темно. Нужен свет.")
+	if stalker.visible and stalker.global_position.distance_to(pos) < 12.0:
+		Game.add_fear(delta * 4.0)
+
+
+func _heartbeat(delta: float) -> void:
+	if Game.fear < 45.0:
+		return
+	_hb -= delta
+	if _hb <= 0.0:
+		var k := (Game.fear - 45.0) / 55.0
+		_hb = lerpf(1.1, 0.45, k)
+		Game.play_ui(Sfx.heartbeat(), lerpf(-20.0, -3.0, k))
+
+
+# --- Сюжетные точки ----------------------------------------------------------
+
+func _story() -> void:
+	var z := player.global_position.z
+	var d := Game.day
+	if d == 1 and Game.all_done() and z < -30.0 and z > -50.0 and _once("rumble"):
+		Game.play_ui(Sfx.rumble(), -6.0)
+		Game.say("Что-то обрушилось в глубине тоннеля... Завтра проверю.", Game.THOUGHT, 5.0)
+	if d == 3 and z < -33.0 and _once("cart"):
+		Game.say("Где вагонетка?.. Она всегда стоит здесь. Всегда.", Game.THOUGHT, 5.0)
+	if d == 4 and Game.all_done() and z > -49.0 and z < -36.0 and _once("watch"):
+		var pos := Vector3(Level.TUN_CX, Level.FLOOR_Y, -60.0)
+		stalker.appear(pos, "watch", 15.0)
+		Game.play_at(Sfx.step(), pos, 2.0)
+	if z < Level.GRATE_Z + 4.0 and Game.has_open_task("inspect:grate"):
+		Game.report("inspect:grate")
+		if d == Game.FINAL_DAY:
+			Game.say("Решётка открыта. Замок сорван... изнутри.", Game.THOUGHT, 5.0)
+			Game.add_task("inspect:nest", "Узнать, что за решёткой", 1)
+		else:
+			Game.say("Решётка заперта. За ней... каски? Чьи это каски?", Game.THOUGHT, 5.0)
+	if d == Game.FINAL_DAY and z < -249.0:
+		main.ending()
+
+
+func _once(key: String) -> bool:
+	if _flags.has(key):
+		return false
+	_flags[key] = true
+	return true
+
+
+# --- События -----------------------------------------------------------------
+
+func _run(ev: String) -> bool:
+	match ev:
+		"footsteps":
+			_echo_left = randi_range(6, 9)
+			return true
+		"sighting":
+			return _sighting()
+		"behind":
+			return _behind()
+		"lamps":
+			_lamps_out()
+			return true
+		"whisper":
+			_whisper()
+			return true
+		"regrow":
+			return main.regrow_web_behind(player.global_position.z)
+	return false
+
+
+## Силуэт далеко впереди — на краю луча.
+func _sighting() -> bool:
+	var f := player.forward_flat()
+	if absf(f.z) < 0.6:
+		return false
+	var z := player.global_position.z + signf(f.z) * randf_range(20.0, 28.0)
+	if z > Level.TUN_Z0 - 2.0 or z < Level.GRATE_Z + 1.0:
+		return false
+	stalker.appear(Vector3(Level.TUN_CX + randf_range(-0.7, 0.7), Level.FLOOR_Y, z), "sighting", 7.0)
+	return true
+
+
+## Он стоит прямо за спиной. Сначала — дыхание.
+func _behind() -> bool:
+	var pos := player.global_position - player.forward_flat() * 3.2
+	pos.y = Level.FLOOR_Y
+	pos.x = clampf(pos.x, Level.LEFT_X + 0.4, Level.RIGHT_X - 0.4)
+	if pos.z > Level.TUN_Z0 - 2.0 or pos.z < Level.GRATE_Z + 1.0:
+		return false
+	stalker.appear(pos, "behind", 9.0)
+	Game.play_at(Sfx.whisper(), pos + Vector3(0, 1.7, 0), -4.0)
+	return true
+
+
+func _lamps_out() -> void:
+	level.tunnel_lights_off = true
+	player.flicker(0.8)
+	Game.play_at(Sfx.clank(), player.global_position + Vector3(0, 3, -8), -2.0)
+	Game.say_once("lamps", "Свет погас... весь сразу. Будто кто-то дёрнул рубильник.")
+	get_tree().create_timer(20.0).timeout.connect(func(): level.tunnel_lights_off = false)
+
+
+func _whisper() -> void:
+	var side := -1.0 if randf() < 0.5 else 1.0
+	var pos := player.global_position + Vector3(side * 1.5, 1.6, randf_range(-2.0, 2.0))
+	Game.play_at(Sfx.whisper(), pos, -2.0)
+	Game.say(WHISPERS.pick_random(), Game.WHISPER, 3.0)
+	get_tree().create_timer(3.5).timeout.connect(func(): Game.say_once("whisper_after", "Показалось. Мне просто показалось."))
+
+
+## Эхо шагов: кто-то идёт следом в такт и делает пару шагов после остановки.
+func _on_step() -> void:
+	if _echo_left <= 0:
+		return
+	_echo_left -= 1
+	get_tree().create_timer(0.18).timeout.connect(_echo_step)
+	if _echo_left == 0:
+		get_tree().create_timer(0.8).timeout.connect(_echo_step)
+		get_tree().create_timer(1.4).timeout.connect(_echo_step)
+		get_tree().create_timer(3.0).timeout.connect(func(): Game.say_once("echo", "...Это не эхо."))
+
+
+func _echo_step() -> void:
+	var pos := player.global_position - player.forward_flat() * 7.0
+	pos.y = Level.FLOOR_Y + 0.1
+	Game.play_at(Sfx.step(), pos, 0.0)
+
+
+func _on_vanished(m: String, seen: bool) -> void:
+	match m:
+		"sighting", "watch":
+			if seen:
+				Game.add_fear(20.0)
+				player.flicker(0.5)
+				Game.play_ui(Sfx.sting(), -10.0)
+				Game.say_once("saw", "Там... кто-то стоял. В самом конце луча.")
+		"behind":
+			if seen:
+				Game.add_fear(35.0)
+				player.flicker(1.0)
+				Game.play_ui(Sfx.sting(), -2.0)
+				Game.say_once("behind", "Он стоял прямо за мной. Прямо. За. Мной.")
+			else:
+				Game.say_once("behind_unseen", "…кажется, кто-то дышал мне в затылок.", Game.WHISPER)
