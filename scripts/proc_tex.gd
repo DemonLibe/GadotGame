@@ -64,6 +64,17 @@ static func emissive(color: Color, energy := 2.0) -> StandardMaterial3D:
 	return m
 
 
+## Материал для модели: её текстура (уменьшенная, без сглаживания) под тон tint.
+static func model_skin(path: String, tint: Color, roughness := 0.85, metallic := 0.0) -> StandardMaterial3D:
+	var key := "model_%s_%s" % [path, tint.to_html()]
+	if _cache.has(key):
+		return _cache[key]
+	var m := flat(tint, roughness, metallic)
+	m.albedo_texture = load(path)
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
+	_cache[key] = m
+	return m
+
 ## Текстура паутины: радиальные нити + спираль. Несколько вариантов кешируются.
 static func web_texture(variant := 0) -> ImageTexture:
 	var key := "web_%d" % variant

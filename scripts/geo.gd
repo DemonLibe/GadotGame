@@ -1,6 +1,6 @@
 class_name Geo
 extends RefCounted
-## Сборка геометрии из примитивов (пока нет моделей — всё строится кодом).
+## Сборка геометрии из примитивов и готовых моделей из models/.
 
 
 static func box(parent: Node, pos: Vector3, size: Vector3, mat: Material, collide := true, basis := Basis.IDENTITY) -> MeshInstance3D:
@@ -73,6 +73,27 @@ static func _add(parent: Node, mesh: Mesh, pos: Vector3, mat: Material, basis: B
 	parent.add_child(mi)
 	return mi
 
+
+## Модель из models/ (FBX или glTF, Godot импортирует их сам). Материалы модели заменяются на mat,
+## чтобы она не выбивалась из урезанной палитры. Возвращает корень модели.
+static func model(parent: Node, path: String, mat: Material, pos := Vector3.ZERO, basis := Basis.IDENTITY) -> Node3D:
+	var m := (load(path) as PackedScene).instantiate() as Node3D
+	m.transform = Transform3D(basis, pos)
+	parent.add_child(m)
+	if mat:
+		for mi in m.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).material_override = mat
+	return m
+
+
+## AnimationPlayer модели; циклы (ходьба, бег, ожидание) зацикливаются.
+static func model_anim(m: Node, loops: Array) -> AnimationPlayer:
+	var ap := m.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if ap:
+		for a in loops:
+			if ap.has_animation(a):
+				ap.get_animation(a).loop_mode = Animation.LOOP_LINEAR
+	return ap
 
 ## Слой невидимых стен: игрок о них спотыкается, а луч взаимодействия проходит насквозь
 ## (иначе не дотянуться до вентблока на изогнутой стене тоннеля).
