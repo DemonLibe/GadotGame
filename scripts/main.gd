@@ -148,6 +148,8 @@ func _ready() -> void:
 	player.hud = hud
 	player.died.connect(func(): fail_day("Тебя утащили во тьму."))
 	_debug_log = debug_flag("debug")
+	if debug_flag("nomsaa"):
+		get_viewport().msaa_3d = Viewport.MSAA_DISABLED
 	if debug_flag("novig"):
 		hud.hide_vignette()
 	if debug_flag("nodirector"):
@@ -265,7 +267,7 @@ func _setup_environment() -> void:
 	env.ambient_light_color = Color(0.25, 0.28, 0.35)
 	env.ambient_light_energy = 0.04
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.glow_enabled = true
+	env.glow_enabled = not debug_flag("noglow")
 	# Обычный туман работает везде, в том числе в браузере: дальний конец тоннеля тонет в черноте.
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.015, 0.015, 0.02)
