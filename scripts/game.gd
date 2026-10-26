@@ -15,6 +15,8 @@ var day := 1
 var tasks: Array[Dictionary] = []
 var fear := 0.0
 var ended := false
+var notes_read := {}  # прочитанные записки (id → true), копятся за всю игру
+const NOTES_TOTAL := 9
 var _said := {}
 
 
@@ -35,7 +37,7 @@ func build_tasks(d: int) -> void:
 			_task("filters", "Заменить забитый фильтр в вентиляции", 1)
 			_task("webs", "Сжечь паутину в тоннеле", 2)
 		2:
-			_task("inspect:grate", "Дойти до решётки в конце тоннеля", 1)
+			_task("inspect:end", "Осмотреть завал у ограждения", 1)
 			_task("filters", "Заменить забитые фильтры", 2)
 			_task("webs", "Сжечь паутину в тоннеле", 3)
 		3:
@@ -48,7 +50,7 @@ func build_tasks(d: int) -> void:
 			_task("webs", "Сжечь паутину в тоннеле", 5)
 		_:
 			_task("inspect:grate", "Проверить решётку в конце тоннеля", 1)
-	_task("return", "Подняться наверх и отметиться в журнале", 1)
+	_task("return", "Доложить диспетчеру по рации", 1)
 	tasks_changed.emit()
 
 
@@ -182,6 +184,8 @@ func _setup_input() -> void:
 	_bind("slot_3", [KEY_3])
 	_bind("slot_4", [KEY_4])
 	_bind("slot_5", [KEY_5])
+	_bind("slot_6", [KEY_6])
+	_bind("slot_7", [KEY_7])
 	_bind("jump", [KEY_SPACE])
 	if not InputMap.has_action("burn"):
 		InputMap.add_action("burn")

@@ -52,11 +52,50 @@ const NOTES := {
 		[-1, 1, -95.0, 1.7, "ОН УЖЕ ЗДЕСЬ"]],
 }
 
+## Карта растёт: докуда по основному тоннелю открыто в каждую смену (z ограждения)
+## и с какой смены открыта каждая штольня.
+const DAY_LIMIT_Z := [0.0, -95.0, -148.0, -176.0, -231.0, -1000.0]
+const BRANCH_OPEN_DAY := [2, 3, 4]
+## Сложность растёт: существа, коробки патронов, патроны в оружейном ящике.
+const CREATURES_PER_DAY := [0, 0, 0, 2, 4, 6]
+const AMMO_BOXES_PER_DAY := [0, 0, 0, 3, 3, 4]
+const PISTOL_ROUNDS := [0, 0, 0, 6, 4, 6]
+
+## Комнаты, открытые в каждую смену: [индекс комнаты (0–2 — у тоннеля, 3–5 — в конце штолен), записка].
+const ROOM_SCHEDULE := {
+	1: [[0, "n1"]],
+	2: [[3, "n2"], [1, "n3"]],
+	3: [[4, "n4"], [0, "n5"]],
+	4: [[5, "n6"], [2, "n7"]],
+	5: [[1, "n8"]],
+}
+## Записки прежних обходчиков: из них складывается история тоннеля.
+const NOTE_TEXTS := {
+	"n1": ["Журнал бригады Гусева, 1979",
+		"Пробили стенку на двести двенадцатом метре. За ней — пустота, тёплый воздух и звук, будто кто-то дышит.\n\nНачальство велело замуровать и забыть. Мы замуровали. Забыть не получается."],
+	"n2": ["Обходчик № 2, 1986",
+		"Пишу, пока светит фонарь. Свет его не убивает — он просто не любит, когда на него смотрят.\n\nПауки чувствуют его раньше нас. Если паутина свежая — он рядом."],
+	"n3": ["Без подписи",
+		"Не верь голосу в рации, если он зовёт тебя к решётке. Наверху так не говорят.\n\nНаверху вообще не знают, что здесь."],
+	"n4": ["Обходчик № 4, 1993",
+		"Вагонетку двигал не я. Он учится.\n\nСначала шаги. Потом голоса. Потом вещи. Потом — мы."],
+	"n5": ["Обходчик № 4, последняя запись",
+		"С ним пришли другие. Бледные, ползают на четвереньках. В луче фонаря они медленнее.\n\nПистолет диспетчер выдал на третью ночь. Значит, наверху знают."],
+	"n6": ["Обходчик № 6",
+		"Седьмой — это не номер смены. Нас было семеро.\n\nКаждый следующий — его новая пара глаз. Вчера я видел Пятого. Он полз."],
+	"n7": ["Акт обследования, 2001",
+		"Обнаружено: шесть касок, личные вещи, фонари. Тел нет.\n\nСтанцию закрыть. Набор обходчиков продолжить. Сведения засекретить."],
+	"n8": ["Обходчик № 7",
+		"Решётку открыл не он. Решётку открыл я.\n\nИзнутри было тише. Изнутри было не страшно."],
+	"n9": ["Без подписи. Чернила ещё свежие",
+		"Если ты читаешь это — ты восьмой.\n\nНе выключай фонарь. Не докладывай. Поднимайся."],
+}
+
 const DAY_SUBTITLES := ["", "Станция «Тихая». Первая смена.", "Вторая смена.", "Третья смена.", "Четвёртая смена.", "Последняя смена."]
 const DAY_THOUGHTS := [
 	"",
 	"Первая смена. Открыть люк, спуститься на станцию, зарядить фонарь, поменять фильтр, сжечь паутину. Ничего сложного.",
-	"Вчера внизу что-то обрушилось. Надо дойти до решётки в конце тоннеля и посмотреть.",
+	"Вчера внизу что-то обрушилось. Сегодня открыли участок дальше — надо осмотреть завал у ограждения.",
 	"Плохо спал. Всю ночь казалось, что под полом кто-то ходит.",
 	"Мой предшественник продержался неделю. Никто не говорит, куда он делся.",
 	"В журнале одно поручение. Почерк не мой. И не начальника.",
@@ -77,6 +116,7 @@ var cart: Cart
 var vents: Array[Vent] = []
 var chargers: Array[Charger] = []
 var crates: Array[FilterCrate] = []
+var doors: Array[RoomDoor] = []
 var busy := false
 var state := "menu"  # menu / playing / paused
 var _drip_t := 5.0
@@ -98,11 +138,16 @@ func _ready() -> void:
 	hud = Hud.new()
 	add_child(hud)
 	hud.setup_hotbar(player)
+	hud.setup_map(level, player)
+	hud.player = player
 	player.hud = hud
+	player.died.connect(func(): fail_day("Тебя утащили во тьму."))
+	_setup_postfx()
 	dispatcher = Dispatcher.new()
 	add_child(dispatcher)
 	player.dispatcher = dispatcher
 	radio.dispatcher = dispatcher
+	dispatcher.shift_closed.connect(end_day)
 
 	stalker = Stalker.new()
 	stalker.player = player
@@ -313,6 +358,11 @@ func _spawn_props() -> void:
 		crates.append(crate)
 	cart = Cart.new()
 	add_child(cart)
+	for room in level.rooms:
+		var door := RoomDoor.new()
+		door.transform = room["door"]
+		add_child(door)
+		doors.append(door)
 
 
 # --- Смена дня ---------------------------------------------------------------
@@ -331,6 +381,9 @@ func start_day(d: int) -> void:
 	_spawn_webs(d)
 	_spawn_spiders(d)
 	_spawn_notes(d)
+	_setup_access(d)
+	_setup_rooms(d)
+	_spawn_threats(d)
 	# На третий день вагонетка уезжает в тоннель сама.
 	cart.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, -120.0 if d == 3 else -40.0)
 	level.set_grate_open(d == Game.FINAL_DAY)
@@ -342,7 +395,7 @@ func start_day(d: int) -> void:
 	dispatcher.stop()
 
 	player.reset_for_day(SPAWN, SPAWN_YAW, START_BATTERY)
-	player.drain_mult = 1.0 + (d - 1) * 0.1
+	player.drain_mult = 1.0 + (d - 1) * 0.15
 	player.input_locked = true
 
 	director.start_day(d)
@@ -424,13 +477,18 @@ func _setup_vents_and_crates(d: int) -> void:
 	var need := Game.task_target("filters")
 	if need > 0:
 		# Чем дальше смена, тем глубже забитые фильтры (в том числе в штольнях).
-		var depth := mini(2 + d, vents.size() - 1)
-		var candidates: Array = vents.slice(1, depth + 1)
+		var candidates: Array = []
+		for i in range(1, vents.size()):
+			if _reachable(VENT_SPOTS[i][0], VENT_SPOTS[i][2]):
+				candidates.append(vents[i])
 		candidates.shuffle()
 		for i in mini(need, candidates.size()):
 			candidates[i].set_dirty(true)
 	# Запасные фильтры и батарейки разложены по ящикам — их надо искать.
-	var pool: Array = crates.slice(1, mini(2 + d, crates.size()))
+	var pool: Array = []
+	for i in range(1, crates.size()):
+		if _reachable(CRATE_SPOTS[i][0], CRATE_SPOTS[i][1]):
+			pool.append(crates[i])
 	var spare_f := need + 1 if need > 0 else 0
 	var spare_b := 1
 	if d == 1:
@@ -450,14 +508,16 @@ func _setup_vents_and_crates(d: int) -> void:
 
 
 func _spawn_webs(d: int) -> void:
-	for i in WEBS_PER_DAY[mini(d, WEBS_PER_DAY.size() - 1)]:
-		var spot: Array = WEB_SPOTS[i]
-		spawn_block_web(spot[0], spot[1])
+	var left_to_place: int = WEBS_PER_DAY[mini(d, WEBS_PER_DAY.size() - 1)]
+	for spot in WEB_SPOTS:
+		if left_to_place > 0 and _reachable(spot[0], spot[1]):
+			spawn_block_web(spot[0], spot[1])
+			left_to_place -= 1
 	for i in 3 + d * 2:
 		var left := randf() < 0.5
 		var y := Level.FLOOR_Y + randf_range(2.0, 2.6)
 		var x := Level.wall_x(-1 if left else 1, y, 0.5)
-		spawn_small_web(Vector3(x, y, randf_range(-56.0, Level.GRATE_Z + 3.0)), randf_range(0.9, 1.4))
+		spawn_small_web(Vector3(x, y, randf_range(-56.0, maxf(day_limit() + 3.0, Level.GRATE_Z + 3.0))), randf_range(0.9, 1.4))
 	spawn_small_web(Vector3(-2.6, Level.FLOOR_Y + 3.4, -36.0), 1.2)
 	if d == Game.FINAL_DAY:
 		# Гнездо за решёткой.
@@ -513,7 +573,7 @@ func _spawn_spiders(d: int) -> void:
 		_add_spider(-3.0, Vector3.RIGHT, -40.0, 3.0)
 	for i in d + 1:
 		var left := randf() < 0.5
-		var z := randf_range(-220.0, -60.0)
+		var z := randf_range(maxf(day_limit() + 6.0, -220.0), -60.0)
 		# Не в камерах развилок — там стены другие.
 		for b in Level.BRANCHES:
 			if absf(z - float(b["z"])) < Level.JUNCTION_MAIN + 4.0:
@@ -543,6 +603,186 @@ func _spawn_notes(d: int) -> void:
 			l.basis = tr.basis
 			l.rotate_object_local(Vector3.FORWARD, randf_range(-0.06, 0.06))
 			l.add_to_group("day_objects")
+
+
+# --- Доступ, комнаты, угрозы -------------------------------------------------
+
+func day_limit() -> float:
+	return DAY_LIMIT_Z[clampi(Game.day, 0, DAY_LIMIT_Z.size() - 1)]
+
+
+## Открыт ли сегодня этот участок.
+func _reachable(tunnel: int, along: float) -> bool:
+	if tunnel == -2:
+		return true
+	if tunnel == -1:
+		return along > day_limit() + 1.0
+	return Game.day >= BRANCH_OPEN_DAY[tunnel] and float(Level.BRANCHES[tunnel]["z"]) > day_limit()
+
+
+## Ограждения на закрытых участках и схема на карте.
+func _setup_access(d: int) -> void:
+	var limit := day_limit()
+	if limit > Level.GRATE_Z + 2.0:
+		var f := Fence.new()
+		f.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, limit)
+		add_child(f)
+	var open: Array = []
+	for i in Level.BRANCHES.size():
+		if _reachable(i, 0.0):
+			open.append(i)
+		elif float(Level.BRANCHES[i]["z"]) > limit:
+			var f := Fence.new()
+			f.position = level.floor_point(i, Level.JUNCTION_BRANCH + 1.0)
+			f.rotation.y = level.cross_yaw(i)
+			add_child(f)
+	var charger_spots: Array[Vector3] = []
+	for i in chargers.size():
+		if _reachable(CHARGER_SPOTS[i][0], CHARGER_SPOTS[i][2]):
+			charger_spots.append(chargers[i].global_position)
+	var rooms_open: Array = []
+	for r in ROOM_SCHEDULE.get(d, []):
+		rooms_open.append(r[0])
+	hud.update_map(limit, open, rooms_open, charger_spots)
+
+
+## Каждую смену открыты другие комнаты: в них останки и записки прежних обходчиков.
+func _setup_rooms(d: int) -> void:
+	for door in doors:
+		door.set_open(false)
+	var k := 0
+	for entry in ROOM_SCHEDULE.get(d, []):
+		var ri: int = entry[0]
+		doors[ri].set_open(true)
+		var room: Dictionary = level.rooms[ri]
+		var c: Vector3 = room["center"]
+		var b: Basis = room["basis"]
+		var bones := Remains.new()
+		bones.pose = "sitting" if k % 2 == 0 else "lying"
+		bones.position = c + b * Vector3(0.6, 0, -1.0)
+		bones.basis = b * Basis(Vector3.UP, PI * 0.5 if bones.pose == "sitting" else 0.3)
+		add_child(bones)
+		_spawn_note(entry[1], c + b * Vector3(-0.7, 0, 0.3))
+		# Догорающий фонарь — единственный свет в комнате.
+		var lamp := OmniLight3D.new()
+		lamp.position = c + b * Vector3(-1.2, 0.3, -1.2)
+		lamp.light_color = Color(1.0, 0.6, 0.3)
+		lamp.omni_range = 3.5
+		lamp.light_energy = 0.5
+		lamp.add_to_group("fear_light")
+		lamp.add_to_group("day_objects")
+		add_child(lamp)
+		k += 1
+	if d == Game.FINAL_DAY:
+		var nest := Remains.new()
+		nest.position = Vector3(Level.TUN_CX - 0.6, Level.FLOOR_Y, -244.0)
+		nest.rotation.y = 0.7
+		add_child(nest)
+		_spawn_note("n9", Vector3(Level.TUN_CX + 0.4, Level.FLOOR_Y, -242.5))
+
+
+func _spawn_note(id: String, pos: Vector3) -> void:
+	var n := Note.new()
+	n.note_id = id
+	n.title = NOTE_TEXTS[id][0]
+	n.text = NOTE_TEXTS[id][1]
+	n.hud = hud
+	n.position = pos
+	add_child(n)
+
+
+## С третьей ночи: оружейный ящик на столе, патроны в тоннелях, существа в темноте.
+func _spawn_threats(d: int) -> void:
+	if PISTOL_ROUNDS[d] > 0:
+		var gun := Pickup.new()
+		gun.kind = "pistol"
+		gun.amount = PISTOL_ROUNDS[d]
+		gun.position = Vector3(Level.SHAFT_X + 2.75, Level.ROOM_Y + 0.81, Level.SHAFT_Z - 1.8)
+		gun.rotation.y = deg_to_rad(80.0)
+		add_child(gun)
+	for i in AMMO_BOXES_PER_DAY[d]:
+		var box := Pickup.new()
+		box.kind = "ammo"
+		box.amount = 3
+		box.position = _random_floor_spot(30.0)
+		box.rotation.y = randf() * TAU
+		add_child(box)
+	for i in CREATURES_PER_DAY[d]:
+		spawn_crawler(_random_floor_spot(60.0))
+
+
+func spawn_crawler(pos: Vector3) -> Crawler:
+	var c := Crawler.new()
+	c.player = player
+	c.speed = 2.1 + (Game.day - 3) * 0.3
+	c.hp = 2 if Game.day < 5 else 3
+	c.position = pos + Vector3(0, 0.1, 0)
+	add_child(c)
+	return c
+
+
+## Случайная точка в открытом сегодня проходе, не ближе min_depth метров от станции.
+func _random_floor_spot(min_depth: float) -> Vector3:
+	for attempt in 20:
+		var t := randi_range(-1, Level.BRANCHES.size() - 1)
+		var along: float
+		if t == -1:
+			var deep := maxf(day_limit() + 3.0, Level.GRATE_Z + 3.0)
+			var near := Level.TUN_Z0 - min_depth
+			if deep >= near:
+				continue
+			along = randf_range(deep, near)
+		else:
+			along = randf_range(Level.JUNCTION_BRANCH + 2.0, float(Level.BRANCHES[t]["length"]) - 1.0)
+		if not _reachable(t, along):
+			continue
+		return level.floor_point(t, along, randf_range(-1.2, 1.2))
+	return Vector3(Level.TUN_CX + 1.0, Level.FLOOR_Y, -80.0)
+
+
+func _setup_postfx() -> void:
+	# Визуальный стиль: низкое разрешение, дизеринг, урезанная палитра, зерно (под интерфейсом).
+	var layer := CanvasLayer.new()
+	layer.layer = 1
+	add_child(layer)
+	var rect := ColorRect.new()
+	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var shader := Shader.new()
+	shader.code = POSTFX_SHADER
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	rect.material = mat
+	layer.add_child(rect)
+
+
+const POSTFX_SHADER := """
+shader_type canvas_item;
+uniform sampler2D screen_tex : hint_screen_texture, filter_nearest;
+uniform float pixel_size = 3.0;
+uniform float levels = 7.0;
+uniform float grain = 0.05;
+uniform float aberration = 0.6;
+const float BAYER[16] = float[](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+void fragment() {
+	vec2 cell = floor(FRAGCOORD.xy / pixel_size);
+	vec2 uv = (cell * pixel_size + pixel_size * 0.5) * SCREEN_PIXEL_SIZE;
+	vec2 off = vec2(aberration * pixel_size, 0.0) * SCREEN_PIXEL_SIZE;
+	vec3 c = vec3(texture(screen_tex, uv + off).r, texture(screen_tex, uv).g, texture(screen_tex, uv - off).b);
+	// Жёсткий контраст, холодно-зелёные тени, тёплые светлые места.
+	float l = dot(c, vec3(0.299, 0.587, 0.114));
+	c = mix(vec3(l), c, 0.75);
+	c = pow(c, vec3(1.2)) * 1.15;
+	c = mix(c * vec3(0.85, 0.95, 0.9), c * vec3(1.08, 1.0, 0.88), smoothstep(0.1, 0.6, l));
+	int bx = int(mod(cell.x, 4.0));
+	int by = int(mod(cell.y, 4.0));
+	float d = BAYER[by * 4 + bx] / 16.0 - 0.5;
+	c = floor(c * levels + d + 0.5) / levels;
+	float n = fract(sin(dot(cell + floor(TIME * 24.0), vec2(12.9898, 78.233))) * 43758.5453);
+	c += (n - 0.5) * grain;
+	COLOR = vec4(clamp(c, 0.0, 1.0), 1.0);
+}
+"""
 
 
 ## Прогон для CI (godot --headless -- --smoke): все дни, предметы, лестница, события и финал
@@ -583,6 +823,29 @@ func _smoke_test() -> void:
 		await get_tree().physics_frame
 		Input.action_release("jump")
 		dispatcher.random_call(d)
+		dispatcher.speak(Dispatcher.CLOSINGS[d])
+		for n in get_tree().get_nodes_in_group("day_objects"):
+			var note := n as Note
+			if note:
+				note.interact(player)
+				hud.close_note()
+			var pickup := n as Pickup
+			if pickup:
+				pickup.interact(player)
+		player.select(5)
+		await get_tree().process_frame
+		player.select(6)
+		player.use_item()
+		for n in get_tree().get_nodes_in_group("creatures"):
+			var cr := n as Crawler
+			if cr:
+				cr.hit()
+				cr.hit()
+				cr.hit()
+		player.take_damage(10.0)
+		doors[0].interact(player)
+		player.global_position = level.rooms[0]["center"] + Vector3(0, 0.1, 0)
+		await get_tree().physics_frame
 		cart.interact(player)
 		journal.interact(player)
 		await get_tree().create_timer(1.5).timeout

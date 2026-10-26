@@ -24,14 +24,11 @@ func _ready() -> void:
 func get_prompt(_player) -> String:
 	if Game.ended:
 		return ""
-	if Game.all_done():
-		return "E — отметиться в журнале и закончить смену"
 	return "Журнал смен — E: что осталось сделать"
 
 
 func interact(_player) -> void:
 	if Game.all_done():
-		Game.report("return")
-		Game.end_day_requested.emit()
+		Game.say("Всё сделано. Осталось доложить диспетчеру по рации (рацию в руки — ЛКМ).", Game.SYSTEM, 5.0)
 	else:
 		Game.say("Смена не закончена. Осталось: " + Game.remaining_text() + ".", Game.SYSTEM, 5.0)

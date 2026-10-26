@@ -4,6 +4,7 @@ extends CharacterBody3D
 ## инвентарь (в руках всегда один предмет), фонарь с батареей, горелка, рация, взаимодействие.
 
 signal footstep
+signal died
 
 const WALK_SPEED := 2.6
 const RUN_SPEED := 4.2
@@ -24,11 +25,14 @@ const STAMINA_REGEN := 14.0
 const STAMINA_JUMP := 18.0
 const STAMINA_DELAY := 0.9     # пауза перед восстановлением
 
-## Слоты инвентаря (клавиши 1–5).
-const ITEMS := ["flashlight", "burner", "filter", "battery", "radio"]
-const ITEM_NAMES := ["Фонарь", "Горелка", "Фильтр", "Батарейка", "Рация"]
+const HEALTH_MAX := 100.0
+const SHOT_RANGE := 40.0
+
+## Слоты инвентаря (клавиши 1–7).
+const ITEMS := ["flashlight", "burner", "filter", "battery", "radio", "map", "pistol"]
+const ITEM_NAMES := ["Фонарь", "Горелка", "Фильтр", "Батарейка", "Рация", "Карта", "Пистолет"]
 ## Масштаб модели в иконке инвентаря.
-const ICON_SCALE := {"flashlight": 1.5, "burner": 1.3, "filter": 1.3, "battery": 2.4, "radio": 1.6}
+const ICON_SCALE := {"flashlight": 1.5, "burner": 1.3, "filter": 1.3, "battery": 2.4, "radio": 1.6, "map": 1.3, "pistol": 1.9}
 
 const BEAM_SHADER := """
 shader_type spatial;
@@ -57,6 +61,12 @@ var drain_mult := 1.0
 var climbing := false
 var stamina := STAMINA_MAX
 var has_radio := false
+var has_pistol := false
+var ammo := 0
+var health := HEALTH_MAX
+var _hurt_wait := 0.0
+var _shot_cd := 0.0
+var _muzzle: OmniLight3D
 var dispatcher  # Dispatcher — повторить последнее сообщение по рации
 var _exhausted := false
 var _stamina_wait := 0.0
@@ -165,6 +175,14 @@ func _build_models() -> void:
 	_torch_light.visible = false
 	_torch_light.position = Vector3(0, 0, -0.5)
 	burner.add_child(_torch_light)
+	var pistol: Node3D = _models["pistol"]
+	_muzzle = OmniLight3D.new()
+	_muzzle.light_color = Color(1.0, 0.8, 0.5)
+	_muzzle.omni_range = 6.0
+	_muzzle.light_energy = 3.0
+	_muzzle.visible = false
+	_muzzle.position = Vector3(0, 0.02, -0.15)
+	pistol.add_child(_muzzle)
 
 
 ## Модель предмета — для руки и для иконки в инвентаре.
@@ -193,6 +211,21 @@ func make_model(item: String) -> Node3D:
 			Geo.box(root, Vector3.ZERO, Vector3(0.05, 0.05, 0.12), ProcTex.flat(Color(0.12, 0.12, 0.12), 0.5, 0.3), false)
 			Geo.box(root, Vector3(0, 0, -0.02), Vector3(0.052, 0.052, 0.03), ProcTex.flat(Color(0.9, 0.5, 0.1), 0.5), false)
 			Geo.box(root, Vector3(0, 0, -0.065), Vector3(0.02, 0.02, 0.01), steel, false)
+		"map":
+			var paper := ProcTex.flat(Color(0.86, 0.82, 0.7), 1.0)
+			var left := Geo.box(root, Vector3(-0.07, 0, 0), Vector3(0.14, 0.2, 0.004), paper, false)
+			left.rotation.y = 0.25
+			var right := Geo.box(root, Vector3(0.07, 0, 0), Vector3(0.14, 0.2, 0.004), paper, false)
+			right.rotation.y = -0.25
+			var ink := ProcTex.flat(Color(0.25, 0.2, 0.15), 1.0)
+			Geo.box(root, Vector3(0.0, 0.0, 0.025), Vector3(0.012, 0.16, 0.002), ink, false)
+			Geo.box(root, Vector3(-0.06, -0.03, 0.02), Vector3(0.09, 0.008, 0.002), ink, false)
+		"pistol":
+			var gun := ProcTex.flat(Color(0.12, 0.12, 0.13), 0.35, 0.8)
+			Geo.box(root, Vector3(0, 0.02, -0.03), Vector3(0.03, 0.035, 0.16), gun, false)
+			var grip := Geo.box(root, Vector3(0, -0.04, 0.03), Vector3(0.028, 0.09, 0.04), ProcTex.flat(Color(0.2, 0.12, 0.08), 0.7), false)
+			grip.rotation.x = 0.25
+			Geo.box(root, Vector3(0, -0.005, 0.0), Vector3(0.01, 0.02, 0.03), gun, false)
 		"radio":
 			var body := ProcTex.flat(Color(0.16, 0.2, 0.15), 0.7, 0.2)
 			Geo.box(root, Vector3.ZERO, Vector3(0.08, 0.17, 0.04), body, false)
@@ -249,6 +282,8 @@ func count_of(item: String) -> int:
 			return batteries
 		"radio":
 			return 1 if has_radio else 0
+		"pistol":
+			return 1 if has_pistol else 0
 	return 1
 
 
@@ -301,7 +336,15 @@ func use_item() -> void:
 				Game.say("Фильтр ставится в вентблок: подойди и удерживай E.", Game.SYSTEM, 3.0)
 		"radio":
 			if has_radio and dispatcher:
-				dispatcher.repeat_last()
+				# Всё сделано — докладываем, смена закрывается. Иначе — повтор последнего сообщения.
+				if Game.all_done() and Game.has_open_task("return"):
+					dispatcher.report_shift(Game.day)
+				else:
+					if not Game.all_done():
+						Game.say("Докладывать пока рано. Осталось: " + Game.remaining_text() + ".", Game.SYSTEM, 4.0)
+					dispatcher.repeat_last()
+		"pistol":
+			_shoot()
 
 
 func _show_selected() -> void:
@@ -327,6 +370,9 @@ func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
 	stamina = STAMINA_MAX
 	_exhausted = false
 	has_radio = false
+	has_pistol = false
+	ammo = 0
+	health = HEALTH_MAX
 	_burning = false
 	_flame.emitting = false
 	_show_selected()
@@ -464,13 +510,21 @@ func _process(delta: float) -> void:
 		if Input.is_action_just_pressed("burn") and held() != "burner":
 			use_item()
 	_show_selected()
+	_shot_cd -= delta
+	if _muzzle.visible and _shot_cd < 0.3:
+		_muzzle.visible = false
+	_hurt_wait -= delta
+	if _hurt_wait <= 0.0 and health < HEALTH_MAX:
+		health = minf(HEALTH_MAX, health + 1.5 * delta)
 	_update_battery(delta)
 	_sync_flashlight(delta)
 	_update_burner(delta)
 	_update_interaction(delta)
 	if hud:
 		hud.set_battery(battery, flashlight_on and held() == "flashlight")
-		hud.set_hotbar(selected, counts())
+		hud.set_hotbar(selected, counts(), ammo)
+		hud.set_health(health / HEALTH_MAX)
+		hud.set_map_visible(held() == "map" and not input_locked)
 		hud.set_stamina(stamina / STAMINA_MAX, _exhausted)
 
 
@@ -501,7 +555,12 @@ func _sync_flashlight(delta: float) -> void:
 
 
 func _update_burner(delta: float) -> void:
-	var want := Input.is_action_pressed("burn") and not input_locked and held() == "burner"
+	# Газа мало: горелка зажигается, только когда прицел на паутине.
+	var aiming_web: bool = _target != null and is_instance_valid(_target) and _target.has_method("burn")
+	if Input.is_action_just_pressed("burn") and held() == "burner" and not aiming_web and not input_locked:
+		_click_sound.play()
+		Game.say_once("burner_hint", "Газа мало. Горелку зажигаю только у паутины.", Game.THOUGHT, 3.0)
+	var want := Input.is_action_pressed("burn") and not input_locked and held() == "burner" and aiming_web
 	if want != _burning:
 		_burning = want
 		_flame.emitting = want
@@ -552,12 +611,45 @@ func _find_interactable(o: Object) -> Node:
 
 # --- Для других систем -------------------------------------------------------
 
+func _shoot() -> void:
+	if not has_pistol or _shot_cd > 0.0:
+		return
+	_shot_cd = 0.45
+	if ammo <= 0:
+		_click_sound.play()
+		Game.say_once("no_ammo", "Пусто. Патроны — в ящиках по тоннелю.", Game.THOUGHT, 3.0)
+		return
+	ammo -= 1
+	Game.play_ui(Sfx.gunshot(), -2.0)
+	_muzzle.visible = true
+	_pitch = clampf(_pitch + 0.04, -1.45, 1.45)
+	head.rotation.x = _pitch
+	var from := camera.global_position
+	var to := from - camera.global_transform.basis.z * SHOT_RANGE
+	var q := PhysicsRayQueryParameters3D.create(from, to, 1 | Geo.WALL_LAYER | Crawler.LAYER)
+	q.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	if not hit.is_empty() and hit["collider"].has_method("hit"):
+		hit["collider"].hit()
+
+
+func take_damage(amount: float) -> void:
+	health = maxf(0.0, health - amount)
+	_hurt_wait = 6.0
+	flicker(0.4)
+	if health <= 0.0:
+		died.emit()
+	else:
+		Game.say_once("hurt", "Оно меня задело... Кровь. Надо держаться света.", Game.THOUGHT, 3.0)
+
+
 func is_burning() -> bool:
 	return _burning
 
 
+## Свет, который держит страх: только фонарь. Горелка страх не снимает.
 func has_light() -> bool:
-	return flashlight.visible or _burning
+	return flashlight.visible
 
 
 func flicker(time: float) -> void:

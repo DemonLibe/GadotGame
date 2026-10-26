@@ -35,6 +35,13 @@ var _fear_bar: ProgressBar
 var _fear_fill: StyleBoxFlat
 var _stamina_bar: ProgressBar
 var _stamina_fill: StyleBoxFlat
+var _health_bar: ProgressBar
+var _map: MapView
+var _note_panel: PanelContainer
+var _note_title: Label
+var _note_text: Label
+var _reading := false
+var player: Player
 var _subtitle: Label
 var _fade: ColorRect
 var _title: Label
@@ -76,17 +83,42 @@ func _ready() -> void:
 	_place(_hold, 0.5, 0.5, 0.5, 0.5, -90, 80, 90, 88)
 	_ingame.add_child(_hold)
 
+	# Список дел — на маленьком бумажном планшете с зажимом.
+	var board := PanelContainer.new()
+	board.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var board_style := StyleBoxFlat.new()
+	board_style.bg_color = Color(0.36, 0.25, 0.15)
+	board_style.set_corner_radius_all(6)
+	board_style.set_content_margin_all(8)
+	board_style.content_margin_top = 18
+	board_style.shadow_color = Color(0, 0, 0, 0.5)
+	board_style.shadow_size = 6
+	board.add_theme_stylebox_override("panel", board_style)
+	_place(board, 0, 0, 0, 0, 18, 14, 330, 14)
+	board.rotation = deg_to_rad(-1.5)
+	_ingame.add_child(board)
+	var sheet := PanelContainer.new()
+	sheet.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sheet_style := StyleBoxFlat.new()
+	sheet_style.bg_color = Color(0.88, 0.85, 0.74)
+	sheet_style.set_content_margin_all(10)
+	sheet.add_theme_stylebox_override("panel", sheet_style)
+	board.add_child(sheet)
+	var clip := ColorRect.new()
+	clip.color = Color(0.55, 0.56, 0.58)
+	clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_place(clip, 0, 0, 0, 0, 140, 8, 200, 24)
+	_ingame.add_child(clip)
 	_tasks = RichTextLabel.new()
 	_tasks.bbcode_enabled = true
 	_tasks.fit_content = true
 	_tasks.scroll_active = false
+	_tasks.custom_minimum_size = Vector2(290, 0)
 	_tasks.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_tasks.add_theme_font_size_override("normal_font_size", 17)
-	_tasks.add_theme_font_size_override("bold_font_size", 17)
-	_tasks.add_theme_constant_override("outline_size", 5)
-	_tasks.add_theme_color_override("font_outline_color", Color.BLACK)
-	_place(_tasks, 0, 0, 0, 0, 24, 20, 640, 320)
-	_ingame.add_child(_tasks)
+	_tasks.add_theme_font_size_override("normal_font_size", 14)
+	_tasks.add_theme_font_size_override("bold_font_size", 15)
+	_tasks.add_theme_color_override("default_color", Color(0.15, 0.13, 0.12))
+	sheet.add_child(_tasks)
 
 	_battery_label = _make_label(_ingame, 18, HORIZONTAL_ALIGNMENT_RIGHT)
 	_place(_battery_label, 1, 1, 1, 1, -300, -80, -24, -56)
@@ -112,6 +144,15 @@ func _ready() -> void:
 	_fear_fill = _fear_bar.get_theme_stylebox("fill") as StyleBoxFlat
 	_place(_fear_bar, 0.5, 0, 0.5, 0, -150, 32, 150, 42)
 	_ingame.add_child(_fear_bar)
+	_health_bar = _bar(Color(0.75, 0.2, 0.18))
+	_place(_health_bar, 0.5, 0, 0.5, 0, -150, 48, 150, 54)
+	_ingame.add_child(_health_bar)
+	# Карта в руках — бумажная схема справа.
+	_map = MapView.new()
+	_map.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_map.visible = false
+	_place(_map, 1, 0.5, 1, 0.5, -400, -250, -40, 250)
+	_ingame.add_child(_map)
 	# Выносливость — тонкая полоска над инвентарём.
 	_stamina_bar = _bar(Color(0.8, 0.82, 0.75))
 	_stamina_fill = _stamina_bar.get_theme_stylebox("fill") as StyleBoxFlat
@@ -134,6 +175,37 @@ func _ready() -> void:
 	_place(_title_sub, 0, 0.5, 1, 0.5, 160, -30, -160, 200)
 	_title.modulate.a = 0.0
 	_title_sub.modulate.a = 0.0
+
+	# Записка во весь экран.
+	_note_panel = PanelContainer.new()
+	var ns := StyleBoxFlat.new()
+	ns.bg_color = Color(0.84, 0.8, 0.66)
+	ns.set_content_margin_all(28)
+	ns.shadow_color = Color(0, 0, 0, 0.6)
+	ns.shadow_size = 12
+	_note_panel.add_theme_stylebox_override("panel", ns)
+	_place(_note_panel, 0.5, 0.5, 0.5, 0.5, -300, -260, 300, 260)
+	_note_panel.rotation = deg_to_rad(0.8)
+	_note_panel.visible = false
+	_root.add_child(_note_panel)
+	var nbox := VBoxContainer.new()
+	nbox.add_theme_constant_override("separation", 14)
+	_note_panel.add_child(nbox)
+	_note_title = Label.new()
+	_note_title.add_theme_font_size_override("font_size", 22)
+	_note_title.add_theme_color_override("font_color", Color(0.2, 0.12, 0.08))
+	nbox.add_child(_note_title)
+	_note_text = Label.new()
+	_note_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_note_text.custom_minimum_size = Vector2(540, 0)
+	_note_text.add_theme_font_size_override("font_size", 18)
+	_note_text.add_theme_color_override("font_color", Color(0.15, 0.13, 0.12))
+	nbox.add_child(_note_text)
+	var hint := Label.new()
+	hint.text = "E / Esc — убрать"
+	hint.add_theme_font_size_override("font_size", 13)
+	hint.add_theme_color_override("font_color", Color(0.4, 0.35, 0.3))
+	nbox.add_child(hint)
 
 	Game.tasks_changed.connect(_refresh_tasks)
 	Game.message.connect(_on_message)
@@ -237,8 +309,8 @@ func set_battery(value: float, on: bool) -> void:
 	_battery_fill.bg_color = Color(0.9, 0.2, 0.15).lerp(Color(0.95, 0.85, 0.4), clampf(value / 40.0, 0.0, 1.0))
 
 
-func set_hotbar(selected: int, counts: Array) -> void:
-	var state := "%d %s" % [selected, str(counts)]
+func set_hotbar(selected: int, counts: Array, ammo: int) -> void:
+	var state := "%d %s %d" % [selected, str(counts), ammo]
 	if state == _hotbar_state:
 		return
 	_hotbar_state = state
@@ -247,6 +319,8 @@ func set_hotbar(selected: int, counts: Array) -> void:
 		var text := " %d" % (i + 1)
 		if Player.ITEMS[i] == "filter" or Player.ITEMS[i] == "battery":
 			text += "           × %d" % n
+		elif Player.ITEMS[i] == "pistol" and n > 0:
+			text += "         пт %d" % ammo
 		_slot_labels[i].text = text
 		_slot_icons[i].visible = n > 0
 		_slot_labels[i].modulate.a = 1.0 if n > 0 else 0.35
@@ -258,6 +332,59 @@ func set_fear(value: float) -> void:
 	_vignette_mat.set_shader_parameter("fear", value)
 	_fear_bar.value = value * 100.0
 	_fear_fill.bg_color = Color(0.45, 0.08, 0.06).lerp(Color(1.0, 0.15, 0.1), value)
+
+
+func set_health(value: float) -> void:
+	_health_bar.value = value * 100.0
+	_health_bar.modulate.a = 0.0 if value >= 0.999 else 1.0
+
+
+func set_map_visible(value: bool) -> void:
+	if _map.visible != value:
+		_map.visible = value
+
+
+## Карта читает уровень и открытые сегодня участки.
+func setup_map(level: Level, who: Node3D) -> void:
+	_map.level = level
+	_map.player = who
+
+
+func update_map(limit_z: float, branches: Array, rooms: Array, chargers: Array[Vector3]) -> void:
+	_map.limit_z = limit_z
+	_map.open_branches = branches
+	_map.open_rooms = rooms
+	_map.chargers = chargers
+
+
+func is_reading() -> bool:
+	return _reading
+
+
+func show_note(title: String, text: String) -> void:
+	_note_title.text = title
+	_note_text.text = text
+	_note_panel.visible = true
+	_reading = true
+	if player:
+		player.input_locked = true
+
+
+func _input(event: InputEvent) -> void:
+	if not _reading:
+		return
+	if event.is_action_pressed("interact") or event.is_action_pressed("ui_cancel") or event.is_action_pressed("burn"):
+		get_viewport().set_input_as_handled()
+		close_note()
+
+
+func close_note() -> void:
+	_note_panel.visible = false
+	# Небольшая пауза, чтобы та же клавиша E не открыла записку снова.
+	await get_tree().create_timer(0.25).timeout
+	_reading = false
+	if player:
+		player.input_locked = false
 
 
 func set_stamina(value: float, exhausted: bool) -> void:
@@ -307,15 +434,17 @@ func _on_message(text: String, color: Color, duration: float) -> void:
 
 
 func _refresh_tasks() -> void:
-	var lines: PackedStringArray = ["[b]СМЕНА %d — ПОРУЧЕНИЯ[/b]" % Game.day]
+	var lines: PackedStringArray = ["[b]СМЕНА № %d — СПИСОК ДЕЛ[/b]" % Game.day, ""]
 	for t in Game.tasks:
 		var text := str(t["text"])
 		if int(t["target"]) > 1:
 			text += " (%d/%d)" % [int(t["progress"]), int(t["target"])]
 		if t["done"]:
-			lines.append("[color=#7a9a7a][s]%s[/s][/color]" % text)
+			lines.append("[color=#6b6a5e][s]%s[/s][/color]" % text)
 		else:
-			lines.append("• " + text)
+			lines.append("— " + text)
+	lines.append("")
+	lines.append("[color=#6b5a48]записки: %d из %d[/color]" % [Game.notes_read.size(), Game.NOTES_TOTAL])
 	_tasks.text = "\n".join(lines)
 
 

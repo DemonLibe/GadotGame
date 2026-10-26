@@ -53,7 +53,6 @@ func _ready() -> void:
 	_light.light_color = Color(1.0, 0.55, 0.2)
 	_light.omni_range = 4.0
 	_light.light_energy = 0.0
-	_light.add_to_group("fear_light")
 	add_child(_light)
 
 

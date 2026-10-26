@@ -35,9 +35,9 @@ func start_day(d: int) -> void:
 	match d:
 		1: _budget = {}
 		2: _budget = {"footsteps": 1, "sighting": 1, "radio": 1}
-		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1, "radio": 1}
-		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1, "radio": 1}
-		_: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1}
+		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1, "radio": 1, "crawler": 1}
+		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1, "radio": 1, "crawler": 2}
+		_: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1, "crawler": 3}
 
 
 func _process(delta: float) -> void:
@@ -120,6 +120,9 @@ func _story() -> void:
 		var pos := Vector3(Level.TUN_CX, Level.FLOOR_Y, -60.0)
 		stalker.appear(pos, "watch", 15.0)
 		Game.play_at(Sfx.step(), pos, 2.0)
+	if y < Level.FLOOR_Y + 5.0 and Game.has_open_task("inspect:end") and z < main.day_limit() + 4.0:
+		Game.report("inspect:end")
+		Game.say("Ограждение. За ним завал... и в завале что-то шевелится. Хватит, назад.", Game.THOUGHT, 5.0)
 	if y < Level.FLOOR_Y + 5.0 and z < Level.GRATE_Z + 4.0 and Game.has_open_task("inspect:grate"):
 		Game.report("inspect:grate")
 		if d == Game.FINAL_DAY:
@@ -159,6 +162,8 @@ func _run(ev: String) -> bool:
 			return main.regrow_web_behind(player.global_position.z)
 		"radio":
 			return player.has_radio and main.dispatcher.random_call(Game.day)
+		"crawler":
+			return _crawler()
 	return false
 
 
@@ -178,6 +183,21 @@ func _sighting() -> bool:
 	if not level.is_walkable(pos):
 		return false
 	stalker.appear(pos, "sighting", 7.0)
+	return true
+
+
+## Из темноты выползает ещё одно существо — впереди по проходу, вне света.
+func _crawler() -> bool:
+	var p := player.global_position
+	var axis := level.axis_at(p)
+	var f := player.forward_flat()
+	var sgn := 1.0 if f.dot(axis) >= 0.0 else -1.0
+	var pos := p + axis * sgn * randf_range(16.0, 24.0)
+	pos.y = Level.FLOOR_Y
+	if not level.is_walkable(pos) or level.is_lit_near(pos) or pos.z > Level.TUN_Z0 - 10.0 or pos.z < main.day_limit() + 2.0:
+		return false
+	main.spawn_crawler(pos)
+	Game.play_at(Sfx.hiss(), pos + Vector3(0, 0.5, 0), 2.0)
 	return true
 
 

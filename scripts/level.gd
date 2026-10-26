@@ -19,6 +19,16 @@ const TUBE_CY := FLOOR_Y + 1.2
 const JUNCTION_MAIN := 8.0   # развилка: ± столько метров основного тоннеля строится через CSG
 const JUNCTION_BRANCH := 10.0  # ...и столько метров штольни от оси тоннеля
 const WALL_T := 0.3          # толщина обделки (для CSG-развилок)
+const ROOM_SECTION := 4.0    # ± столько метров трубы у двери в комнату строится через CSG
+const ROOM_W := 3.4          # служебная комната: ширина, глубина, высота
+const ROOM_D := 3.4
+const ROOM_H := 2.6
+## Комнаты сбоку от основного тоннеля (ещё по одной — в конце каждой штольни).
+const SIDE_ROOMS := [
+	{"z": -72.0, "side": 1},
+	{"z": -128.0, "side": -1},
+	{"z": -185.0, "side": 1},
+]
 
 const SHAFT_X := -1.6        # центр шахты
 const SHAFT_Z := -32.0
@@ -37,10 +47,12 @@ var lamps: Array[Dictionary] = []
 var tunnel_lights_off := false
 var blackout := false
 var grate: Node3D
+var rooms: Array[Dictionary] = []  # {center, basis, door}: basis +Z смотрит из комнаты к двери
 var _segments: Array[Dictionary] = []  # оси проходов {a, b, dir} в XZ — для событий
 
 var m_tubbing: Material
 var m_tubbing_tri: Material
+var m_room: Material
 var m_tiles: Material
 var m_granite: Material
 var m_ballast: Material
@@ -56,6 +68,7 @@ var _time := 0.0
 func build() -> void:
 	m_tubbing = ProcTex.tubbing()
 	m_tubbing_tri = ProcTex.tubbing_triplanar()
+	m_room = ProcTex.paint(Color(0.5, 0.5, 0.46), "paint_room")
 	m_tiles = ProcTex.tiles()
 	m_granite = ProcTex.granite()
 	m_ballast = ProcTex.ballast()
@@ -195,6 +208,11 @@ func cross_yaw(tunnel: int) -> float:
 	return atan2(d.x, d.z)
 
 
+## Оси проходов для схемы на карте: [{a, b}] в XZ.
+func map_segments() -> Array[Dictionary]:
+	return _segments
+
+
 func set_grate_open(open: bool) -> void:
 	grate.rotation.y = deg_to_rad(85.0) if open else 0.0
 
@@ -320,13 +338,20 @@ func _build_station() -> void:
 
 func _build_main_tunnel() -> void:
 	# Прямые куски трубы между развилками; сами развилки строятся через CSG.
-	var cuts: Array[float] = [TUN_Z0]
+	# Вырезаем участки под развилки и двери комнат — их строит CSG.
+	var holes: Array = []
 	for b in BRANCHES:
-		cuts.append(float(b["z"]) + JUNCTION_MAIN)
-		cuts.append(float(b["z"]) - JUNCTION_MAIN)
-	cuts.append(TUN_Z1)
-	for i in range(0, cuts.size(), 2):
-		_main_segment(cuts[i], cuts[i + 1])
+		holes.append([float(b["z"]) + JUNCTION_MAIN, float(b["z"]) - JUNCTION_MAIN])
+	for r in SIDE_ROOMS:
+		holes.append([float(r["z"]) + ROOM_SECTION, float(r["z"]) - ROOM_SECTION])
+	holes.sort_custom(func(a, b): return a[0] > b[0])
+	var zc := TUN_Z0
+	for h in holes:
+		_main_segment(zc, h[0])
+		zc = h[1]
+	_main_segment(zc, TUN_Z1)
+	for r in SIDE_ROOMS:
+		_build_side_room(r)
 	Geo.box(self, Vector3(TUN_CX, TUBE_CY, TUN_Z1 - 0.15), Vector3(TUBE_R * 2 + 0.4, TUBE_R * 2 + 0.4, 0.3), m_concrete)
 	_segments.append({"a": Vector2(TUN_CX, TUN_Z0), "b": Vector2(TUN_CX, TUN_Z1), "dir": Vector3.FORWARD})
 	# Светильники в сетках на стене через 12 м, попеременно слева и справа. Часть разбита.
@@ -339,6 +364,9 @@ func _build_main_tunnel() -> void:
 		elif i % 5 == 2:
 			mode = "flicker"
 		var side := -1 if i % 2 == 0 else 1
+		for r in SIDE_ROOMS:
+			if absf(z - float(r["z"])) < 2.5 and side == int(r["side"]):
+				side = -side  # не вешать светильник в дверной проём
 		var ly := FLOOR_Y + 2.45
 		_add_wall_lamp(Vector3(wall_x(side, ly, 0.12), ly, z), Vector3(-side, 0, 0), mode)
 		z -= 12.0
@@ -443,6 +471,84 @@ func _build_junction(index: int) -> void:
 	_add_lamp(Vector3(TUN_CX, TUBE_CY + TUBE_R - 0.25, zj - 2.0), Color(1.0, 0.72, 0.42), 1.1, 9.0, "ok", true)
 
 
+# --- Служебные комнаты ------------------------------------------------------
+
+## Комната сбоку от основного тоннеля: кусок трубы, дверной проём в обделке и сама комната.
+func _build_side_room(r: Dictionary) -> void:
+	var zr: float = r["z"]
+	var side := float(r["side"])
+	var axis := Vector3(TUN_CX, TUBE_CY, zr)
+	var main_basis := Basis(Vector3.RIGHT, PI / 2)
+	var room_basis := Basis(Vector3.UP, atan2(-side, 0.0))  # +Z комнаты — к тоннелю
+	var center := Vector3(TUN_CX + side * (TUBE_R + WALL_T + ROOM_D / 2), FLOOR_Y, zr)
+	var csg := _new_csg()
+	_csg_tube(csg, TUBE_R + WALL_T, ROOM_SECTION * 2, Transform3D(main_basis, axis), m_concrete, false)
+	_csg_room(csg, center, room_basis)
+	_csg_tube(csg, TUBE_R, ROOM_SECTION * 2 + 0.04, Transform3D(main_basis, axis), m_tubbing_tri, true)
+	var d_in := 1.4
+	var d_out := TUBE_R + WALL_T + 0.1
+	_csg_box(csg, Vector3(d_out - d_in, 2.2, 1.3), Transform3D(Basis.IDENTITY, Vector3(TUN_CX + side * (d_in + d_out) / 2, FLOOR_Y + 1.1, zr)), m_concrete, true)
+	var chord := _tube_half(FLOOR_Y) * 2.0
+	Geo.box(self, Vector3(TUN_CX, FLOOR_Y - 0.15, zr), Vector3(chord, 0.3, ROOM_SECTION * 2), m_floor)
+	Geo.box(self, Vector3(TUN_CX + side * 1.95, FLOOR_Y - 0.152, zr), Vector3(1.3, 0.3, 1.3), m_floor)
+	_room_floor(center, room_basis)
+	rooms.append({"center": center, "basis": room_basis,
+		"door": Transform3D(room_basis, Vector3(TUN_CX + side * (TUBE_R + WALL_T - 0.05), FLOOR_Y, zr))})
+
+
+## Комната в тупике штольни: торец трубы с дверью и комната за ним.
+func _build_end_room(index: int) -> void:
+	var length: float = BRANCHES[index]["length"]
+	var d := branch_dir(index)
+	var origin := branch_origin(index)
+	var yaw := _yaw_to(d)
+	var room_basis := Basis(Vector3.UP, yaw)  # +Z — обратно по штольне, к двери
+	var axis := origin + Vector3(0, TUBE_CY - FLOOR_Y, 0)
+	var pipe := Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, -PI / 2)
+	var center := origin + d * (length + WALL_T + ROOM_D / 2)
+	var csg := _new_csg()
+	# Наружная труба заходит на толщину стенки дальше — получается глухой торец.
+	_csg_tube(csg, TUBE_R + WALL_T, ROOM_SECTION + WALL_T, Transform3D(pipe, axis + d * (length - ROOM_SECTION / 2 + WALL_T / 2)), m_concrete, false)
+	_csg_room(csg, center, room_basis)
+	_csg_tube(csg, TUBE_R, ROOM_SECTION + 0.02, Transform3D(pipe, axis + d * (length - ROOM_SECTION / 2 - 0.01)), m_tubbing_tri, true)
+	_csg_box(csg, Vector3(1.3, 2.2, 0.8), Transform3D(room_basis, origin + d * (length + WALL_T / 2) + Vector3(0, 1.1, 0)), m_concrete, true)
+	var chord := _tube_half(FLOOR_Y) * 2.0
+	Geo.box(self, origin + d * (length - ROOM_SECTION / 2) + Vector3(0, -0.155, 0), Vector3(chord, 0.3, ROOM_SECTION), m_floor, true, room_basis)
+	Geo.box(self, origin + d * (length + 0.15) + Vector3(0, -0.152, 0), Vector3(1.3, 0.3, 0.8), m_floor, true, room_basis)
+	_room_floor(center, room_basis)
+	rooms.append({"center": center, "basis": room_basis,
+		"door": Transform3D(room_basis, origin + d * (length + WALL_T - 0.05))})
+
+
+func _csg_room(csg: Node, center: Vector3, basis: Basis) -> void:
+	var c := center + Vector3(0, ROOM_H / 2, 0)
+	_csg_box(csg, Vector3(ROOM_W + WALL_T * 2, ROOM_H + WALL_T * 2, ROOM_D + WALL_T * 2), Transform3D(basis, c), m_concrete, false)
+	_csg_box(csg, Vector3(ROOM_W, ROOM_H, ROOM_D), Transform3D(basis, c), m_room, true)
+
+
+func _room_floor(center: Vector3, basis: Basis) -> void:
+	Geo.box(self, center + Vector3(0, -0.15, 0), Vector3(ROOM_W, 0.3, ROOM_D), m_floor, true, basis)
+
+
+func _new_csg() -> CSGCombiner3D:
+	var csg := CSGCombiner3D.new()
+	csg.use_collision = true
+	csg.collision_layer = Geo.WALL_LAYER
+	csg.collision_mask = 0
+	add_child(csg)
+	return csg
+
+
+func _csg_box(parent: Node, size: Vector3, xf: Transform3D, mat: Material, subtract: bool) -> void:
+	var b := CSGBox3D.new()
+	b.size = size
+	b.material = mat
+	b.transform = xf
+	if subtract:
+		b.operation = CSGShape3D.OPERATION_SUBTRACTION
+	parent.add_child(b)
+
+
 func _csg_tube(parent: Node, radius: float, height: float, xf: Transform3D, mat: Material, subtract: bool) -> void:
 	var c := CSGCylinder3D.new()
 	c.radius = radius
@@ -464,20 +570,21 @@ func _build_branch(index: int) -> void:
 	var yaw := _yaw_to(d)
 	# Прямая часть штольни — те же куски трубы, что и в основном тоннеле, повёрнутые по оси штольни.
 	var s := JUNCTION_BRANCH
-	while s < length - 0.01:
-		var s2 := minf(s + CHUNK, length)
+	var straight_end := length - ROOM_SECTION
+	while s < straight_end - 0.01:
+		var s2 := minf(s + CHUNK, straight_end)
 		var piece := Node3D.new()
 		piece.transform = Transform3D(Basis(Vector3.UP, yaw), origin)
 		add_child(piece)
 		_tube_piece(piece, s, s2, 0.005)
 		s = s2
 	var end := origin + d * length
-	Geo.box(self, end + d * 0.15 + Vector3(0, TUBE_CY - FLOOR_Y, 0), Vector3(TUBE_R * 2 + 0.4, TUBE_R * 2 + 0.4, 0.3), m_concrete, true, Basis(Vector3.UP, yaw))
-	# Завал у тупика.
+	_build_end_room(index)
+	# Обвалившийся грунт у стены перед дверью.
 	var r := _right_of(d)
-	for k in 7:
-		var rp := end - d * randf_range(0.4, 2.2) + r * randf_range(-1.2, 1.2) + Vector3(0, 0.2, 0)
-		var rock := Geo.box(self, rp, Vector3.ONE * randf_range(0.3, 0.75), m_concrete, false)
+	for k in 5:
+		var rp := end - d * randf_range(0.6, 3.0) + r * (1.1 if k % 2 == 0 else -1.1) + Vector3(0, 0.15, 0)
+		var rock := Geo.box(self, rp, Vector3.ONE * randf_range(0.25, 0.5), m_concrete, false)
 		rock.rotation = Vector3(randf() * TAU, randf() * TAU, randf() * TAU)
 	# В штольнях почти все светильники разбиты.
 	var ld := JUNCTION_BRANCH + 4.0

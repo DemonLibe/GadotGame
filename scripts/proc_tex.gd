@@ -40,6 +40,7 @@ static func concrete(color: Color, scale := 0.3) -> StandardMaterial3D:
 	m.normal_enabled = true
 	m.normal_texture = normal
 	m.roughness = 0.95
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
 	m.uv1_triplanar = true
 	m.uv1_scale = Vector3.ONE * scale
 	_cache[key] = m
@@ -338,7 +339,7 @@ static func _textured(key: String, albedo: Image, tint: Color, roughness: float,
 	m.normal_texture = ImageTexture.create_from_image(normal)
 	m.roughness = roughness
 	m.metallic = metallic
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
 	if world_size > 0.0:
 		m.uv1_triplanar = true
 		m.uv1_world_triplanar = true

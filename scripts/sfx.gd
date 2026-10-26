@@ -63,6 +63,14 @@ static func rung() -> AudioStreamWAV:
 	return _stream("rung")
 
 
+static func gunshot() -> AudioStreamWAV:
+	return _stream("gunshot")
+
+
+static func hiss() -> AudioStreamWAV:
+	return _stream("hiss")
+
+
 static func radio() -> AudioStreamWAV:
 	return _stream("radio")
 
@@ -90,6 +98,8 @@ static func _stream(key: String) -> AudioStreamWAV:
 		"creak": w = _make_creak()
 		"rung": w = _make_rung()
 		"radio": w = _make_radio(0.5, false)
+		"gunshot": w = _make_gunshot()
+		"hiss": w = _make_hiss()
 		"radio_loop": w = _make_radio(2.0, true)
 		_: w = _make_pickup()
 	_cache[key] = w
@@ -299,3 +309,32 @@ static func _make_radio(dur: float, loop: bool) -> AudioStreamWAV:
 				v = sin(TAU * 1200.0 * t) * 0.3
 		s[i] = v
 	return _wav(s, loop)
+
+
+# Выстрел в тоннеле: резкий хлопок и долгий гул эха.
+static func _make_gunshot() -> AudioStreamWAV:
+	var s := _buf(1.4)
+	var lp := 0.0
+	for i in s.size():
+		var t := float(i) / RATE
+		var n := randf_range(-1.0, 1.0)
+		lp += 0.08 * (n - lp)
+		var crack := n * exp(-t * 60.0)
+		var boom := sin(TAU * 55.0 * t) * exp(-t * 9.0)
+		var tail := lp * 3.0 * exp(-t * 2.2)
+		s[i] = clampf(crack * 0.9 + boom * 0.7 + tail * 0.6, -1.0, 1.0)
+	return _wav(s)
+
+
+# Шипение существа.
+static func _make_hiss() -> AudioStreamWAV:
+	var dur := 1.1
+	var s := _buf(dur)
+	var lp := 0.0
+	for i in s.size():
+		var t := float(i) / RATE
+		var n := randf_range(-1.0, 1.0)
+		lp += 0.5 * (n - lp)
+		var env := minf(t * 10.0, 1.0) * minf((dur - t) * 3.0, 1.0) * (0.7 + 0.3 * sin(TAU * 17.0 * t))
+		s[i] = (n - lp) * env * 0.6
+	return _wav(s)
