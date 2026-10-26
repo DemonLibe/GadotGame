@@ -229,7 +229,7 @@ func _ready() -> void:
 
 
 ## Панель инвентаря внизу по центру: в каждом слоте — вращающаяся модель предмета.
-func setup_hotbar(player: Player) -> void:
+func setup_hotbar(player: Player, with_icons := true) -> void:
 	var bar := HBoxContainer.new()
 	bar.add_theme_constant_override("separation", 8)
 	bar.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -248,6 +248,18 @@ func setup_hotbar(player: Player) -> void:
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_theme_stylebox_override("panel", style)
 		bar.add_child(panel)
+		if not with_icons:
+			_slot_icons.append(Node3D.new())
+			var plain := Label.new()
+			plain.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+			plain.add_theme_font_size_override("font_size", 13)
+			plain.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			panel.add_child(plain)
+			_slots.append(panel)
+			_slot_styles.append(style)
+			_slot_labels.append(plain)
+			plain.text = Player.ITEM_NAMES[i]
+			continue
 		# Своя маленькая 3D-сцена: камера, свет и модель предмета.
 		var holder := SubViewportContainer.new()
 		holder.stretch = true

@@ -140,12 +140,13 @@ func _ready() -> void:
 	add_child(player)
 	hud = Hud.new()
 	add_child(hud)
-	hud.setup_hotbar(player)
+	hud.setup_hotbar(player, not debug_flag("noicons"))
 	hud.setup_map(level, player)
 	hud.player = player
 	player.hud = hud
 	player.died.connect(func(): fail_day("Тебя утащили во тьму."))
-	_setup_postfx()
+	if not debug_flag("nofx"):
+		_setup_postfx()
 	dispatcher = Dispatcher.new()
 	add_child(dispatcher)
 	player.dispatcher = dispatcher
@@ -183,6 +184,14 @@ func _ready() -> void:
 		_smoke_test()
 	else:
 		_show_main_menu()
+
+
+## Отладочные переключатели из адреса страницы, например …/index.html?nofx&noicons.
+static func debug_flag(name: String) -> bool:
+	if not OS.has_feature("web"):
+		return false
+	var search := str(JavaScriptBridge.eval("window.location.search", true))
+	return search.contains(name)
 
 
 ## Облегчённый рендер (браузер). Там нет объёмного тумана, луч рисуется отдельным конусом.
