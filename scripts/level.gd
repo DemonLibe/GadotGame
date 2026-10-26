@@ -13,6 +13,7 @@ const RIGHT_X := 2.9         # TUN_CX + TUN_HW
 const TUN_Z0 := -50.0        # портал тоннеля на станции
 const TUN_Z1 := -265.0       # тупик
 const GRATE_Z := -232.0      # решётка
+const RAIL_TILE := 2.0       # длина звена пути
 const CHUNK := 14.0          # длина куска геометрии (лимит ламп на объект в браузере)
 const TUBE_R := 2.1          # радиус трубы тоннеля
 const TUBE_CY := FLOOR_Y + 1.2
@@ -764,8 +765,13 @@ func _build_branch(index: int) -> void:
 # --- Пути --------------------------------------------------------------------
 
 func _build_rails() -> void:
-	var sleeper := BoxMesh.new()
-	sleeper.size = Vector3(1.6, 0.06, 0.22)
+	# Звено пути (рельсы на шпалах) — Rail из Mine Object collection (loafbrr_1, CC0).
+	# В модели путь идёт вдоль X; поворачиваем вдоль тоннеля и растягиваем шпалы под колею вагонетки.
+	var tile := load("res://models/mine/Rail.fbx").instantiate() as Node3D
+	var rail_mesh := (tile.find_child("Rail", true, false) as MeshInstance3D).mesh
+	tile.free()
+	var rail_mat := ProcTex.model_skin("res://models/mine/rails_albedo.png", Color(0.5, 0.45, 0.42), 0.6, 0.5)
+	var basis := Basis(Vector3.UP, PI / 2) * Basis.from_scale(Vector3(RAIL_TILE / 2.0, 1.2, 1.15))
 	var cover := ProcTex.flat(Color(0.25, 0.2, 0.14), 0.9)
 	var z_a := -29.0
 	var z_end := GRATE_Z - 30.0
@@ -773,21 +779,20 @@ func _build_rails() -> void:
 		var z_b := maxf(z_a - CHUNK, z_end)
 		var length := z_a - z_b
 		var cz := (z_a + z_b) / 2.0
-		for off in [-0.55, 0.55]:
-			Geo.box(self, Vector3(TUN_CX + float(off), FLOOR_Y + 0.05, cz), Vector3(0.07, 0.1, length), m_rail, false)
 		# Контактный рельс под деревянным коробом.
 		Geo.box(self, Vector3(TUN_CX + 1.05, FLOOR_Y + 0.15, cz), Vector3(0.08, 0.12, length), m_rail, false)
 		Geo.box(self, Vector3(TUN_CX + 1.08, FLOOR_Y + 0.28, cz), Vector3(0.26, 0.03, length), cover, false)
+		# Звенья по одному мешу на кусок: свет считается на кусок, как и у остальной геометрии.
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = sleeper
-		var count := int(length / 0.9)
+		mm.mesh = rail_mesh
+		var count := ceili(length / RAIL_TILE - 0.01)
 		mm.instance_count = count
 		for i in count:
-			mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, Vector3(TUN_CX, FLOOR_Y, z_a - 0.45 - i * 0.9)))
+			mm.set_instance_transform(i, Transform3D(basis, Vector3(TUN_CX, FLOOR_Y, z_a - RAIL_TILE * (i + 0.5))))
 		var mmi := MultiMeshInstance3D.new()
 		mmi.multimesh = mm
-		mmi.material_override = m_wood
+		mmi.material_override = rail_mat
 		add_child(mmi)
 		z_a = z_b
 

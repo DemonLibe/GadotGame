@@ -19,12 +19,11 @@ var hp := 2
 var state := "wander"  # wander / investigate / chase
 var _dead := false
 var _cooldown := 0.0
-var _t := 0.0
 var _think := 0.0
 var _goal := Vector3.ZERO
 var _wait := 0.0
 var _unseen := 0.0
-var _legs: Array[Node3D] = []
+var _anim: AnimationPlayer
 var _body: Node3D
 var _hiss: AudioStreamPlayer3D
 
@@ -43,27 +42,13 @@ func _ready() -> void:
 	shape.position.y = 0.4
 	add_child(shape)
 
-	var skin := ProcTex.flat(Color(0.72, 0.7, 0.66), 0.4)
+	# Модель: Alien Bug Animated (CDmir, CC0) в рост собаки, бледная. Смотрит в +Z — разворачиваем.
+	var skin := ProcTex.model_skin("res://models/alien_bug/bug_albedo.png", Color(0.85, 0.82, 0.76), 0.4)
 	skin.rim_enabled = true
 	skin.rim = 0.6
-	_body = Node3D.new()
-	add_child(_body)
-	var torso := Geo.capsule(_body, Vector3(0, 0.45, 0), 0.17, 0.95, skin, Basis(Vector3.RIGHT, PI / 2))
-	torso.scale = Vector3(1.0, 1.0, 0.75)
-	var head := Geo.sphere(_body, Vector3(0, 0.42, -0.6), 0.14, skin)
-	head.scale = Vector3(0.8, 0.9, 1.3)
-	var mouth := ProcTex.flat(Color(0.05, 0.02, 0.02), 1.0)
-	Geo.box(_body, Vector3(0, 0.36, -0.75), Vector3(0.12, 0.05, 0.04), mouth, false)
-	# Четыре длинные коленчатые лапы.
-	for z in [-0.3, 0.3]:
-		for side in [-1.0, 1.0]:
-			var hip := Node3D.new()
-			hip.position = Vector3(float(side) * 0.15, 0.5, float(z))
-			_body.add_child(hip)
-			var upper := Geo.cylinder(hip, Vector3(float(side) * 0.22, 0.12, 0), 0.03, 0.5, skin, Basis(Vector3.FORWARD, -float(side) * 1.1))
-			upper.name = "upper"
-			Geo.cylinder(hip, Vector3(float(side) * 0.48, -0.15, 0), 0.025, 0.6, skin, Basis(Vector3.FORWARD, float(side) * 0.35))
-			_legs.append(hip)
+	_body = Geo.model(self, "res://models/alien_bug/alien-bug.glb", skin, Vector3.ZERO, Basis(Vector3.UP, PI).scaled(Vector3.ONE * 1.9))
+	_anim = Geo.model_anim(_body, ["Idle", "Run"])
+	_anim.play("Idle")
 	_hiss = AudioStreamPlayer3D.new()
 	_hiss.stream = Sfx.hiss()
 	_hiss.unit_size = 4.0
@@ -89,7 +74,6 @@ func _on_noise(pos: Vector3, radius: float) -> void:
 func _physics_process(delta: float) -> void:
 	if _dead or player == null:
 		return
-	_t += delta
 	_cooldown -= delta
 	if not is_on_floor():
 		velocity.y -= 12.0 * delta
@@ -125,13 +109,15 @@ func _physics_process(delta: float) -> void:
 	velocity.x = v.x
 	velocity.z = v.z
 	move_and_slide()
-	# Лапы перебирают.
+	# Бег, пока ползёт; удар не прерываем.
 	var moving := v.length() > 0.1
-	for i in _legs.size():
-		_legs[i].rotation.x = sin(_t * 12.0 + i * 1.6) * 0.5 if moving else 0.0
-	_body.position.y = absf(sin(_t * 12.0)) * 0.04 if moving else 0.0
+	if not _anim.current_animation.begins_with("Attack"):
+		_anim.play("Run" if moving else "Idle", 0.2)
+		_anim.speed_scale = clampf(v.length() / 2.0, 0.6, 1.6) if moving else 1.0
 	if state == "chase" and dist < ATTACK_RANGE and _cooldown <= 0.0:
 		_cooldown = 1.3
+		_anim.speed_scale = 1.0
+		_anim.play("Attack_000" if randf() < 0.5 else "Attack_001", 0.1)
 		if player.hiding:
 			player.exit_hide()  # вытащил из шкафа
 		player.take_damage(DAMAGE)
@@ -223,6 +209,7 @@ func hit() -> void:
 func _die() -> void:
 	_dead = true
 	collision_layer = 0
+	_anim.pause()
 	var dust := ProcTex.fire(40, 0.9)
 	var grad := Gradient.new()
 	grad.set_color(0, Color(0.1, 0.1, 0.1, 0.9))
@@ -236,6 +223,6 @@ func _die() -> void:
 	add_child(dust)
 	dust.emitting = true
 	var tw := create_tween()
-	tw.tween_property(_body, "scale", Vector3(1.2, 0.05, 1.2), 0.5)
+	tw.tween_property(_body, "scale", Vector3(2.3, 0.1, 2.3), 0.5)
 	tw.tween_interval(1.0)
 	tw.tween_callback(queue_free)
