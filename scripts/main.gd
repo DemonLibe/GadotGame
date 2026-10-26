@@ -213,6 +213,11 @@ func _process(delta: float) -> void:
 		if _debug_t <= 0.0:
 			_debug_t = 1.0
 			var cam := get_viewport().get_camera_3d()
+			var lights := 0
+			for l in get_tree().root.find_children("*", "Light3D", true, false):
+				if (l as Light3D).is_visible_in_tree():
+					lights += 1
+			print("DBG lights=%d day_objects=%d" % [lights, get_tree().get_nodes_in_group("day_objects").size()])
 			print("DBG state=%s busy=%s player=%s rot=%s cam=%s campos=%s fade=%s fps=%d" % [state, busy,
 				player.global_position, player.rotation, cam.get_path() if cam else "none",
 				cam.global_position if cam else Vector3.ZERO, hud.fade_alpha(), Engine.get_frames_per_second()])
@@ -408,11 +413,16 @@ func start_day(d: int) -> void:
 		n.queue_free()
 
 	_setup_vents_and_crates(d)
-	_spawn_webs(d)
-	_spawn_spiders(d)
-	_spawn_notes(d)
-	_setup_access(d)
-	_setup_rooms(d)
+	if not debug_flag("nowebs"):
+		_spawn_webs(d)
+	if not debug_flag("nospiders"):
+		_spawn_spiders(d)
+	if not debug_flag("nonotes"):
+		_spawn_notes(d)
+	if not debug_flag("noaccess"):
+		_setup_access(d)
+	if not debug_flag("norooms"):
+		_setup_rooms(d)
 	_spawn_threats(d)
 	# На третий день вагонетка уезжает в тоннель сама.
 	cart.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, -120.0 if d == 3 else -40.0)
