@@ -1,0 +1,90 @@
+# Полноценный релиз: сборки для Windows, Linux, macOS и браузера выкладываются в GitHub Releases.
+# Запуск: пуш тега вида v1.0.0 (или вручную, указав тег).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Тег релиза, например v1.0.0"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: "4.3"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot and export templates
+        run: |
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          wget -q "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          wget -q "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q "Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          unzip -q "Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mv templates/* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+          rm -rf templates *.zip *.tpz
+
+      - name: Import project
+        run: timeout 300 godot --headless --editor --quit || true
+
+      - name: Smoke test (all days + endings)
+        run: |
+          set +e
+          timeout 240 godot --headless -- --smoke 2>&1 | grep -v -e "mesh_get_surface_count" -e "Parameter \"m\" is null" | tee smoke.log
+          set -e
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" smoke.log; then
+            echo "::error::Script errors during smoke test"
+            exit 1
+          fi
+          grep -q "SMOKE OK" smoke.log || { echo "::error::Smoke test did not finish"; exit 1; }
+
+      - name: Export all platforms
+        run: |
+          mkdir -p build/windows build/linux build/macos build/web dist
+          godot --headless --export-release "Windows" build/windows/HopeLight.exe
+          godot --headless --export-release "Linux" build/linux/HopeLight.x86_64
+          godot --headless --export-release "macOS" build/macos/HopeLight.zip
+          godot --headless --export-release "Web" build/web/index.html
+          test -f build/windows/HopeLight.exe
+          test -f build/linux/HopeLight.x86_64
+          test -f build/macos/HopeLight.zip
+          test -f build/web/index.wasm
+          (cd build/windows && zip -q -r ../../dist/HopeLight-windows.zip .)
+          (cd build/linux && chmod +x HopeLight.x86_64 && tar -czf ../../dist/HopeLight-linux.tar.gz .)
+          cp build/macos/HopeLight.zip dist/HopeLight-macos.zip
+          (cd build/web && zip -q -r ../../dist/HopeLight-web.zip .)
+          ls -la dist
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          cat > notes.md <<'NOTES'
+          Хоррор от первого лица: пять ночных смен обходчика станции «Тихая».
+
+          **Скачать:**
+          - Windows — `HopeLight-windows.zip`, распаковать и запустить `HopeLight.exe` (SmartScreen: «Подробнее» → «Выполнить в любом случае»).
+          - Linux — `HopeLight-linux.tar.gz`, распаковать и запустить `HopeLight.x86_64`.
+          - macOS — `HopeLight-macos.zip`, распаковать; при первом запуске правый клик по приложению → «Открыть» (сборка без подписи Apple).
+          - Браузер — https://demonlibe.github.io/GadotGame/ или `HopeLight-web.zip` для своего сервера.
+
+          Три концовки, девять записок, всегда высокая сложность. Лучше играть в наушниках.
+          NOTES
+          sed -i 's/^          //' notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --title "Hope Light ${TAG}" --notes-file notes.md --target "${GITHUB_SHA}"
+          fi
