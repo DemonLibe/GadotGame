@@ -25,6 +25,7 @@ func _ready() -> void:
 	_heading("Изображение")
 	_slider("fov", "Поле зрения", 55.0, 100.0, 1.0, func(v): return "%d°" % int(v))
 	_slider("brightness", "Яркость", 0.6, 1.6, 0.05, _percent)
+	_slider("ui_scale", "Масштаб интерфейса", 0.8, 1.25, 0.05, _percent, true)
 	_check("grain", "Плёночное зерно")
 	_check("fullscreen", "Во весь экран")
 
@@ -81,7 +82,8 @@ func _heading(text: String) -> void:
 	add_child(l)
 
 
-func _slider(key: String, text: String, lo: float, hi: float, step: float, fmt: Callable) -> void:
+## on_release — применять, только когда ползунок отпустили (масштаб интерфейса двигает сам ползунок под мышью).
+func _slider(key: String, text: String, lo: float, hi: float, step: float, fmt: Callable, on_release := false) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	add_child(row)
@@ -105,9 +107,16 @@ func _slider(key: String, text: String, lo: float, hi: float, step: float, fmt: 
 	row.add_child(value_label)
 	var update := func(): value_label.text = fmt.call(s.value)
 	s.set_meta("update", update)
+	var dragging := [false]
 	s.value_changed.connect(func(v: float):
 		update.call()
-		Settings.set_value(key, v))
+		if not (on_release and dragging[0]):
+			Settings.set_value(key, v))
+	if on_release:
+		s.drag_started.connect(func(): dragging[0] = true)
+		s.drag_ended.connect(func(_changed: bool):
+			dragging[0] = false
+			Settings.set_value(key, s.value))
 	s.focus_entered.connect(func(): name_label.add_theme_color_override("font_color", AMBER))
 	s.focus_exited.connect(func(): name_label.add_theme_color_override("font_color", TEXT))
 	_rows[key] = s
