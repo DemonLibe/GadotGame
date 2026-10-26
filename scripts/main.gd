@@ -414,8 +414,10 @@ func start_day(d: int) -> void:
 	Game.day = d
 	Game.fear = 0.0
 	Game.ended = false
-	Game.save_day(d)
-	Game.build_tasks(d)
+	if not debug_flag("s_save"):
+		Game.save_day(d)
+	if not debug_flag("s_tasks"):
+		Game.build_tasks(d)
 	for n in get_tree().get_nodes_in_group("day_objects"):
 		n.queue_free()
 
@@ -433,25 +435,29 @@ func start_day(d: int) -> void:
 		_setup_rooms(d)
 	_spawn_threats(d)
 	# На третий день вагонетка уезжает в тоннель сама.
-	cart.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, -120.0 if d == 3 else -40.0)
-	level.set_grate_open(d == Game.FINAL_DAY)
-	level.tunnel_lights_off = false
-	level.blackout = false
-	stalker.hide_now()
-	hatch.set_open(false)
+	if not debug_flag("s_misc"):
+		cart.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, -120.0 if d == 3 else -40.0)
+		level.set_grate_open(d == Game.FINAL_DAY)
+		level.tunnel_lights_off = false
+		level.blackout = false
+		stalker.hide_now()
+		hatch.set_open(false)
 	if not debug_flag("noradio"):
 		radio.reset()
 	dispatcher.stop()
 
-	player.reset_for_day(SPAWN, SPAWN_YAW, START_BATTERY)
+	if not debug_flag("s_reset"):
+		player.reset_for_day(SPAWN, SPAWN_YAW, START_BATTERY)
 	player.drain_mult = 1.0 + (d - 1) * 0.15
 	player.input_locked = true
 
-	director.start_day(d)
-	hud.set_black()
-	hud.show_title("День %d" % d, DAY_SUBTITLES[d], 2.5)
-	await get_tree().create_timer(3.0).timeout
-	await hud.fade_to(0.0, 2.0).finished
+	if not debug_flag("s_dir"):
+		director.start_day(d)
+	if not debug_flag("s_fade"):
+		hud.set_black()
+		hud.show_title("День %d" % d, DAY_SUBTITLES[d], 2.5)
+		await get_tree().create_timer(3.0).timeout
+		await hud.fade_to(0.0, 2.0).finished
 	player.input_locked = false
 	busy = false
 	Game.say(DAY_THOUGHTS[d], Game.THOUGHT, 6.0)
