@@ -1,17 +1,27 @@
 class_name Player
 extends CharacterBody3D
-## Обходчик: ходьба от первого лица, фонарь с батареей, горелка для паутины, взаимодействие.
+## Обходчик: ходьба, подъём по лестнице, инвентарь (в руках всегда один предмет),
+## фонарь с батареей, горелка для паутины, взаимодействие.
 
 signal footstep
 
 const WALK_SPEED := 2.6
-const RUN_SPEED := 4.4
+const RUN_SPEED := 4.2
+const CLIMB_SPEED := 0.85               # 100 м лестницы — около двух минут
 const GRAVITY := 12.0
 const MOUSE_SENS := 0.0022
 const MAX_FILTERS := 3
-const DRAIN_PER_SEC := 100.0 / 300.0  # полный заряд — 5 минут
+const MAX_BATTERIES := 2
+const DRAIN_PER_SEC := 100.0 / 240.0    # полный заряд — 4 минуты
 const REACH := 2.4
 const STEP_LENGTH := 1.25
+const RUNG_STEP := 0.3
+const HAND_POS := Vector3(0.24, -0.25, -0.42)
+
+## Слоты инвентаря (клавиши 1–4).
+const ITEMS := ["flashlight", "burner", "filter", "battery"]
+const ITEM_NAMES := ["Фонарь", "Горелка", "Фильтр", "Батарейка"]
+
 const BEAM_SHADER := """
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
@@ -32,20 +42,28 @@ var hud: Hud
 var battery := 60.0
 var flashlight_on := true
 var filters := 0
+var batteries := 0
+var selected := 0
 var input_locked := false
 var drain_mult := 1.0
+var climbing := false
 
 var head: Node3D
 var camera: Camera3D
 var flashlight: SpotLight3D
 
 var _ray: RayCast3D
+var _hand: Node3D
+var _models := {}
+var _lens_mat: StandardMaterial3D
 var _flame: CPUParticles3D
 var _torch_light: OmniLight3D
 var _flame_sound: AudioStreamPlayer
 var _step_sound: AudioStreamPlayer
 var _click_sound: AudioStreamPlayer
+var _rung_sound: AudioStreamPlayer
 var _target = null  # интерактивный объект под прицелом (утиная типизация)
+var _ladder = null
 var _burning := false
 var _bob := 0.0
 var _bob_amp := 0.0
@@ -78,7 +96,7 @@ func _ready() -> void:
 	camera.current = true
 	head.add_child(camera)
 
-	# Фонарь живёт отдельно от камеры и догоняет её с небольшой инерцией.
+	# Луч фонаря живёт отдельно от камеры и догоняет её с небольшой инерцией.
 	flashlight = SpotLight3D.new()
 	flashlight.top_level = true
 	flashlight.light_color = Color(1.0, 0.93, 0.8)
@@ -98,32 +116,63 @@ func _ready() -> void:
 	_ray.collide_with_areas = true
 	camera.add_child(_ray)
 
-	# Горелка в правой руке.
+	_hand = Node3D.new()
+	_hand.position = HAND_POS
+	camera.add_child(_hand)
+	_build_models()
+
+	_flame_sound = _sound(Sfx.flame(), -10.0)
+	_step_sound = _sound(Sfx.step(), -14.0)
+	_click_sound = _sound(Sfx.click(), -6.0)
+	_rung_sound = _sound(Sfx.rung(), -12.0)
+	_show_selected()
+
+
+# --- Модели в руке -----------------------------------------------------------
+
+func _build_models() -> void:
+	var steel := ProcTex.flat(Color(0.25, 0.25, 0.27), 0.4, 0.8)
+	var along := Basis(Vector3.RIGHT, PI / 2)
+
 	var torch := Node3D.new()
-	torch.position = Vector3(0.26, -0.24, -0.45)
-	camera.add_child(torch)
-	Geo.cylinder(torch, Vector3(0, 0, 0.1), 0.025, 0.25, ProcTex.flat(Color(0.4, 0.4, 0.42), 0.4, 0.9), Basis(Vector3.RIGHT, PI / 2))
-	Geo.cylinder(torch, Vector3(0, -0.05, 0.25), 0.045, 0.16, ProcTex.flat(Color(0.6, 0.1, 0.08), 0.6, 0.3))
+	Geo.cylinder(torch, Vector3(0, 0, 0.02), 0.025, 0.2, steel, along)
+	Geo.cylinder(torch, Vector3(0, 0, -0.1), 0.038, 0.05, steel, along)
+	_lens_mat = ProcTex.emissive(Color(1.0, 0.95, 0.8), 2.0)
+	Geo.cylinder(torch, Vector3(0, 0, -0.126), 0.032, 0.005, _lens_mat, along)
+	_models["flashlight"] = torch
+
+	var burner := Node3D.new()
+	Geo.cylinder(burner, Vector3(0, 0, -0.02), 0.022, 0.25, ProcTex.flat(Color(0.4, 0.4, 0.42), 0.4, 0.9), along)
+	Geo.cylinder(burner, Vector3(0, -0.05, 0.13), 0.045, 0.16, ProcTex.flat(Color(0.6, 0.1, 0.08), 0.6, 0.3))
 	_flame = ProcTex.fire(48, 0.35)
 	_flame.direction = Vector3(0, 0, -1)
 	_flame.spread = 10.0
 	_flame.initial_velocity_min = 2.0
 	_flame.initial_velocity_max = 3.2
 	_flame.gravity = Vector3(0, 1.0, 0)
-	_flame.position = Vector3(0, 0, -0.05)
-	torch.add_child(_flame)
+	_flame.position = Vector3(0, 0, -0.16)
+	burner.add_child(_flame)
 	_torch_light = OmniLight3D.new()
 	_torch_light.light_color = Color(1.0, 0.55, 0.2)
 	_torch_light.omni_range = 5.0
 	_torch_light.light_energy = 0.0
-	_torch_light.position = Vector3(0, 0, -0.4)
-	torch.add_child(_torch_light)
+	_torch_light.visible = false
+	_torch_light.position = Vector3(0, 0, -0.5)
+	burner.add_child(_torch_light)
+	_models["burner"] = burner
 
-	_flame_sound = _sound(Sfx.flame(), -10.0)
-	_step_sound = _sound(Sfx.step(), -14.0)
-	_click_sound = _sound(Sfx.click(), -6.0)
+	var filter := Node3D.new()
+	Geo.box(filter, Vector3(-0.05, 0.02, 0), Vector3(0.26, 0.22, 0.05), ProcTex.flat(Color(0.88, 0.88, 0.82), 0.95), false)
+	Geo.box(filter, Vector3(-0.05, 0.02, 0.0), Vector3(0.28, 0.24, 0.03), steel, false)
+	_models["filter"] = filter
 
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	var cell := Node3D.new()
+	Geo.box(cell, Vector3(0, 0, 0), Vector3(0.05, 0.05, 0.12), ProcTex.flat(Color(0.12, 0.12, 0.12), 0.5, 0.3), false)
+	Geo.box(cell, Vector3(0, 0, -0.02), Vector3(0.052, 0.052, 0.03), ProcTex.flat(Color(0.9, 0.5, 0.1), 0.5), false)
+	_models["battery"] = cell
+
+	for key in _models:
+		_hand.add_child(_models[key])
 
 
 ## Видимый луч для браузерного рендера: прозрачный конус, гаснущий к краям и вдаль.
@@ -159,21 +208,118 @@ func _sound(stream: AudioStream, volume_db: float) -> AudioStreamPlayer:
 	return p
 
 
+# --- Инвентарь ---------------------------------------------------------------
+
+func held() -> String:
+	return ITEMS[selected]
+
+
+func count_of(item: String) -> int:
+	match item:
+		"filter":
+			return filters
+		"battery":
+			return batteries
+	return 1
+
+
+func counts() -> Array:
+	var c := []
+	for item in ITEMS:
+		c.append(count_of(item))
+	return c
+
+
+func select(index: int) -> void:
+	if index == selected or index < 0 or index >= ITEMS.size():
+		return
+	selected = index
+	_hand.position = HAND_POS + Vector3(0, -0.35, 0)
+	create_tween().tween_property(_hand, "position", HAND_POS, 0.22).set_ease(Tween.EASE_OUT)
+	_click_sound.play()
+	_show_selected()
+
+
+## Следующий/предыдущий непустой слот (колесо мыши).
+func cycle(step: int) -> void:
+	var i := selected
+	for k in ITEMS.size():
+		i = posmod(i + step, ITEMS.size())
+		if count_of(ITEMS[i]) > 0:
+			select(i)
+			return
+
+
+## Действие предметом в руке (ЛКМ). Горелка работает, пока кнопка зажата.
+func use_item() -> void:
+	match held():
+		"flashlight":
+			flashlight_on = not flashlight_on
+			_click_sound.play()
+		"battery":
+			if batteries <= 0:
+				return
+			if battery >= 99.0:
+				Game.say("Фонарь и так заряжен.", Game.SYSTEM, 2.0)
+				return
+			batteries -= 1
+			battery = 100.0
+			_empty_warned = false
+			Game.play_at(Sfx.clank(), global_position + Vector3(0, 1.4, 0), -12.0)
+			Game.say("Новая батарейка. Фонарь заряжен.", Game.SYSTEM, 2.5)
+		"filter":
+			if filters > 0:
+				Game.say("Фильтр ставится в вентблок: подойди и удерживай E.", Game.SYSTEM, 3.0)
+
+
+func _show_selected() -> void:
+	for key in _models:
+		var m: Node3D = _models[key]
+		m.visible = key == held() and count_of(key) > 0
+
+
+## Сброс в начале смены.
+func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
+	climbing = false
+	_ladder = null
+	global_position = pos
+	rotation.y = yaw
+	_pitch = 0.0
+	head.rotation.x = 0.0
+	velocity = Vector3.ZERO
+	battery = start_battery
+	flashlight_on = true
+	filters = 0
+	batteries = 0
+	selected = 0
+	_burning = false
+	_flame.emitting = false
+	_show_selected()
+
+
+# --- Ввод --------------------------------------------------------------------
+
 func _unhandled_input(event: InputEvent) -> void:
+	if input_locked:
+		return
 	var motion := event as InputEventMouseMotion
-	if motion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and not input_locked:
+	if motion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-motion.relative.x * MOUSE_SENS)
 		_pitch = clampf(_pitch - motion.relative.y * MOUSE_SENS, -1.45, 1.45)
 		head.rotation.x = _pitch
 		return
 	var button := event as InputEventMouseButton
-	if button and button.pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	elif event.is_action_pressed("ui_cancel"):
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if button and button.pressed:
+		if button.button_index == MOUSE_BUTTON_WHEEL_UP:
+			cycle(-1)
+		elif button.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			cycle(1)
 
 
 func _physics_process(delta: float) -> void:
+	if climbing:
+		_climb(delta)
+		return
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	var input := Vector2.ZERO
@@ -203,27 +349,84 @@ func _physics_process(delta: float) -> void:
 		+ Vector3(randf_range(-shake, shake), randf_range(-shake, shake), 0)
 
 
+# --- Лестница ----------------------------------------------------------------
+
+func start_climb(ladder) -> void:
+	if climbing:
+		return
+	_ladder = ladder
+	climbing = true
+	velocity = Vector3.ZERO
+	var y := global_position.y
+	if y > ladder.top_y - 0.5:
+		y -= 1.0  # сверху — сразу опускаемся в люк
+	global_position = Vector3(ladder.climb_x, clampf(y, ladder.bottom_y, ladder.top_y - 1.2), ladder.climb_z)
+	rotation.y = ladder.facing_yaw
+	Game.say_once("ladder", "Сто метров вниз. Не смотреть вниз. Просто считать ступеньки.")
+
+
+func stop_climb(pos: Vector3) -> void:
+	climbing = false
+	_ladder = null
+	global_position = pos
+	velocity = Vector3.ZERO
+
+
+func _climb(delta: float) -> void:
+	var up := 0.0
+	if not input_locked:
+		up = Input.get_axis("move_back", "move_forward")
+	var y := global_position.y + up * CLIMB_SPEED * delta
+	if up > 0.0 and y >= _ladder.top_y - 1.2:
+		stop_climb(_ladder.exit_top)
+		return
+	if up < 0.0 and y <= _ladder.bottom_y:
+		stop_climb(Vector3(global_position.x, _ladder.bottom_y + 0.02, global_position.z + 0.3))
+		return
+	global_position.y = y
+	velocity = Vector3.ZERO
+	if up != 0.0:
+		_step_acc += absf(up) * CLIMB_SPEED * delta
+		_bob += delta * PI * 1.5
+		if _step_acc >= RUNG_STEP:
+			_step_acc = 0.0
+			_rung_sound.pitch_scale = randf_range(0.9, 1.1)
+			_rung_sound.play()
+			footstep.emit()
+	camera.position = Vector3(sin(_bob) * 0.02, absf(cos(_bob)) * 0.03, 0)
+
+
+# --- Каждый кадр -------------------------------------------------------------
+
 func _process(delta: float) -> void:
-	if Input.is_action_just_pressed("flashlight") and not input_locked:
-		flashlight_on = not flashlight_on
-		_click_sound.play()
+	if not input_locked:
+		for i in ITEMS.size():
+			if Input.is_action_just_pressed("slot_%d" % (i + 1)):
+				select(i)
+		if Input.is_action_just_pressed("flashlight"):
+			if held() == "flashlight":
+				use_item()
+			else:
+				select(0)
+		if Input.is_action_just_pressed("burn") and held() != "burner":
+			use_item()
+	_show_selected()
 	_update_battery(delta)
 	_sync_flashlight(delta)
 	_update_burner(delta)
 	_update_interaction(delta)
 	if hud:
-		hud.set_battery(battery, flashlight_on)
-		hud.set_filters(filters, MAX_FILTERS)
+		hud.set_battery(battery, flashlight_on and held() == "flashlight")
+		hud.set_hotbar(selected, counts())
 
 
 func _update_battery(delta: float) -> void:
-	if flashlight_on and battery > 0.0:
+	var on := flashlight_on and held() == "flashlight" and battery > 0.0
+	if on:
 		battery = maxf(0.0, battery - DRAIN_PER_SEC * drain_mult * delta)
 		if battery <= 0.0 and not _empty_warned:
 			_empty_warned = true
-			Game.say("Фонарь сел. Нужно к зарядке... быстро.")
-	if battery > 5.0:
-		_empty_warned = false
+			Game.say("Фонарь сел. Нужна батарейка или зарядка... быстро.")
 	var energy := 4.0 * clampf(battery / 30.0, 0.25, 1.0)
 	if battery < 15.0 and randf() < 0.04:
 		_flicker = maxf(_flicker, randf_range(0.05, 0.2))
@@ -231,8 +434,9 @@ func _update_battery(delta: float) -> void:
 		_flicker -= delta
 		if randf() < 0.5:
 			energy *= randf_range(0.0, 0.2)
-	flashlight.visible = flashlight_on and battery > 0.0
+	flashlight.visible = on and battery > 0.0
 	flashlight.light_energy = energy
+	_lens_mat.emission_energy_multiplier = energy * 0.6 if flashlight.visible else 0.0
 
 
 func _sync_flashlight(delta: float) -> void:
@@ -243,10 +447,11 @@ func _sync_flashlight(delta: float) -> void:
 
 
 func _update_burner(delta: float) -> void:
-	var want := Input.is_action_pressed("burn") and not input_locked
+	var want := Input.is_action_pressed("burn") and not input_locked and held() == "burner"
 	if want != _burning:
 		_burning = want
 		_flame.emitting = want
+		_torch_light.visible = want
 		if want:
 			_flame_sound.play()
 		else:
@@ -272,7 +477,7 @@ func _update_interaction(delta: float) -> void:
 		prompt = _target.get_prompt(self)
 		if Input.is_action_just_pressed("interact") and _target.has_method("interact"):
 			_target.interact(self)
-		if _target.has_method("hold_interact"):
+		if _target != null and is_instance_valid(_target) and _target.has_method("hold_interact"):
 			if Input.is_action_pressed("interact"):
 				hold = _target.hold_interact(self, delta)
 			else:
@@ -298,7 +503,7 @@ func is_burning() -> bool:
 
 
 func has_light() -> bool:
-	return (flashlight_on and battery > 0.0) or _burning
+	return flashlight.visible or _burning
 
 
 func flicker(time: float) -> void:

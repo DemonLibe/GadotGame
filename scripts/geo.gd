@@ -72,3 +72,76 @@ static func _add(parent: Node, mesh: Mesh, pos: Vector3, mat: Material, basis: B
 	mi.transform = Transform3D(basis, pos)
 	parent.add_child(mi)
 	return mi
+
+
+## Невидимая стена (только столкновения).
+static func solid(parent: Node, pos: Vector3, size: Vector3) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.position = pos
+	collider_box(body, size)
+	parent.add_child(body)
+	return body
+
+
+## Внутренняя поверхность трубы радиуса radius вдоль локальной оси Z (от z_from до z_to).
+## Ось трубы — локальные (0, 0). Сегменты, у которых sin(угла) < min_sin (ниже пола), пропускаются.
+## UV: u — вдоль окружности (u_tile метров на картинку), v — вдоль оси (v_tile метров).
+static func tube_mesh(radius: float, z_from: float, z_to: float, segments: int, min_sin: float, u_tile: float, v_tile: float) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in segments:
+		var a0 := TAU * i / segments
+		var a1 := TAU * (i + 1) / segments
+		if sin(a0) < min_sin and sin(a1) < min_sin:
+			continue
+		var quad := [[a0, z_from], [a1, z_from], [a1, z_to], [a0, z_from], [a1, z_to], [a0, z_to]]
+		for q in quad:
+			var a: float = q[0]
+			var z: float = q[1]
+			st.set_normal(-Vector3(cos(a), sin(a), 0.0))
+			st.set_uv(Vector2(a * radius / u_tile, -z / v_tile))
+			st.add_vertex(Vector3(cos(a) * radius, sin(a) * radius, z))
+	st.generate_tangents()
+	return st.commit()
+
+
+## Стена-заглушка с круглым проёмом: прямоугольник rect (относительно центра проёма,
+## в плоскости XY) минус круг радиуса radius. Используется там, где труба входит в стену.
+static func portal_mesh(radius: float, rect: Rect2, segments: int) -> ArrayMesh:
+	var angles: Array[float] = []
+	for i in segments:
+		angles.append(TAU * i / segments)
+	for corner in [rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)]:
+		var c: Vector2 = corner
+		angles.append(fposmod(c.angle(), TAU))
+	angles.sort()
+	angles.append(angles[0] + TAU)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in angles.size() - 1:
+		var d0 := Vector2.from_angle(angles[i])
+		var d1 := Vector2.from_angle(angles[i + 1])
+		var o0 := d0 * _ray_to_rect(d0, rect)
+		var o1 := d1 * _ray_to_rect(d1, rect)
+		var i0 := d0 * minf(radius, _ray_to_rect(d0, rect))
+		var i1 := d1 * minf(radius, _ray_to_rect(d1, rect))
+		for p in [i0, o0, o1, i0, o1, i1]:
+			var v: Vector2 = p
+			st.set_normal(Vector3.BACK)
+			st.set_uv(v)
+			st.add_vertex(Vector3(v.x, v.y, 0.0))
+	st.generate_tangents()
+	return st.commit()
+
+
+static func _ray_to_rect(d: Vector2, rect: Rect2) -> float:
+	var t := INF
+	if d.x > 0.0001:
+		t = minf(t, rect.end.x / d.x)
+	elif d.x < -0.0001:
+		t = minf(t, rect.position.x / d.x)
+	if d.y > 0.0001:
+		t = minf(t, rect.end.y / d.y)
+	elif d.y < -0.0001:
+		t = minf(t, rect.position.y / d.y)
+	return t

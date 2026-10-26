@@ -55,6 +55,14 @@ static func pickup() -> AudioStreamWAV:
 	return _stream("pickup")
 
 
+static func creak() -> AudioStreamWAV:
+	return _stream("creak")
+
+
+static func rung() -> AudioStreamWAV:
+	return _stream("rung")
+
+
 static func _stream(key: String) -> AudioStreamWAV:
 	if _cache.has(key):
 		return _cache[key]
@@ -71,6 +79,8 @@ static func _stream(key: String) -> AudioStreamWAV:
 		"rumble": w = _make_rumble()
 		"heartbeat": w = _make_heartbeat()
 		"flame": w = _make_flame()
+		"creak": w = _make_creak()
+		"rung": w = _make_rung()
 		_: w = _make_pickup()
 	_cache[key] = w
 	return w
@@ -234,4 +244,29 @@ static func _make_pickup() -> AudioStreamWAV:
 		var t := float(i) / RATE
 		var f := 600.0 if t < 0.1 else 900.0
 		s[i] = sin(TAU * f * t) * exp(-fmod(t, 0.1) * 30.0) * 0.25
+	return _wav(s)
+
+
+# Скрип тяжёлой крышки люка.
+static func _make_creak() -> AudioStreamWAV:
+	var dur := 1.3
+	var s := _buf(dur)
+	var phase := 0.0
+	for i in s.size():
+		var t := float(i) / RATE
+		var f := 95.0 + 40.0 * sin(t * 7.0) + 25.0 * sin(t * 23.0)
+		phase += f / RATE
+		var saw := fmod(phase, 1.0) * 2.0 - 1.0
+		var env := minf(t * 8.0, 1.0) * minf((dur - t) * 4.0, 1.0)
+		s[i] = (saw * 0.35 + randf_range(-1.0, 1.0) * 0.08) * env
+	return _wav(s)
+
+
+# Ступенька металлической лестницы.
+static func _make_rung() -> AudioStreamWAV:
+	var s := _buf(0.18)
+	for i in s.size():
+		var t := float(i) / RATE
+		var v := 0.6 * sin(TAU * 880.0 * t) + 0.35 * sin(TAU * 2310.0 * t)
+		s[i] = (v * exp(-t * 28.0) + randf_range(-1.0, 1.0) * exp(-t * 150.0)) * 0.4
 	return _wav(s)

@@ -52,8 +52,8 @@ func _process(delta: float) -> void:
 	if Game.fear >= 100.0:
 		main.panic()
 		return
-	if player.global_position.z > Level.TUN_Z0 - 4.0:
-		return  # события только в тоннеле
+	if player.global_position.z > Level.TUN_Z0 - 4.0 or player.global_position.y > Level.FLOOR_Y + 5.0:
+		return  # события только в тоннелях
 	_cooldown -= delta
 	if _cooldown > 0.0 or stalker.visible:
 		return
@@ -75,9 +75,9 @@ func _process(delta: float) -> void:
 
 func _update_fear(delta: float) -> void:
 	var pos := player.global_position
-	var lit := player.has_light() or level.is_lit_near(pos) or pos.z > -28.0
+	var lit := player.has_light() or level.is_lit_near(pos) or pos.y > Level.ROOM_Y - 1.0
 	if lit:
-		Game.add_fear(-delta * (6.0 if pos.z > Level.TUN_Z0 else 2.5))
+		Game.add_fear(-delta * (6.0 if pos.z > Level.TUN_Z0 or pos.y > Level.ROOM_Y - 1.0 else 2.5))
 	else:
 		Game.add_fear(delta * (3.5 + Game.day * 1.2))
 		Game.say_once("dark", "Темно... Слишком темно. Нужен свет.")
@@ -99,24 +99,35 @@ func _heartbeat(delta: float) -> void:
 
 func _story() -> void:
 	var z := player.global_position.z
+	var y := player.global_position.y
 	var d := Game.day
-	if d == 1 and Game.all_done() and z < -30.0 and z > -50.0 and _once("rumble"):
+	var at_station := y < Level.FLOOR_Y + 5.0 and z < -30.0 and z > -50.0
+	# В шахте: кто-то ещё на лестнице.
+	if player.climbing and d >= 2 and y > 20.0 and y < 60.0 and _once("shaft"):
+		Game.play_at(Sfx.rung(), player.global_position + Vector3(0, 9.0, 0), 4.0)
+		get_tree().create_timer(0.6).timeout.connect(func(): Game.play_at(Sfx.rung(), player.global_position + Vector3(0, 8.7, 0), 4.0))
+		Game.say("Сверху... ступеньки звенят. Кто-то спускается следом?", Game.THOUGHT, 5.0)
+	if player.climbing and d >= 4 and y > -5.0 and y < 15.0 and _once("shaft_dark"):
+		player.flicker(1.5)
+		Game.play_at(Sfx.whisper(), player.global_position + Vector3(0, -6.0, 0), 0.0)
+		Game.say_once("shaft_whisper", "…ниже… ещё ниже…", Game.WHISPER)
+	if d == 1 and Game.all_done() and at_station and _once("rumble"):
 		Game.play_ui(Sfx.rumble(), -6.0)
 		Game.say("Что-то обрушилось в глубине тоннеля... Завтра проверю.", Game.THOUGHT, 5.0)
-	if d == 3 and z < -33.0 and _once("cart"):
+	if d == 3 and at_station and z < -34.0 and _once("cart"):
 		Game.say("Где вагонетка?.. Она всегда стоит здесь. Всегда.", Game.THOUGHT, 5.0)
-	if d == 4 and Game.all_done() and z > -49.0 and z < -36.0 and _once("watch"):
+	if d == 4 and Game.all_done() and at_station and z < -36.0 and _once("watch"):
 		var pos := Vector3(Level.TUN_CX, Level.FLOOR_Y, -60.0)
 		stalker.appear(pos, "watch", 15.0)
 		Game.play_at(Sfx.step(), pos, 2.0)
-	if z < Level.GRATE_Z + 4.0 and Game.has_open_task("inspect:grate"):
+	if y < Level.FLOOR_Y + 5.0 and z < Level.GRATE_Z + 4.0 and Game.has_open_task("inspect:grate"):
 		Game.report("inspect:grate")
 		if d == Game.FINAL_DAY:
 			Game.say("Решётка открыта. Замок сорван... изнутри.", Game.THOUGHT, 5.0)
 			Game.add_task("inspect:nest", "Узнать, что за решёткой", 1)
 		else:
 			Game.say("Решётка заперта. За ней... каски? Чьи это каски?", Game.THOUGHT, 5.0)
-	if d == Game.FINAL_DAY and z < -249.0:
+	if d == Game.FINAL_DAY and y < Level.FLOOR_Y + 5.0 and z < -249.0:
 		main.ending()
 
 
@@ -151,13 +162,23 @@ func _run(ev: String) -> bool:
 
 ## Силуэт далеко впереди — на краю луча.
 func _sighting() -> bool:
+	# Работает в основном тоннеле или в штольне — силуэт всегда по взгляду вдоль прохода.
 	var f := player.forward_flat()
-	if absf(f.z) < 0.6:
+	var p := player.global_position
+	var pos: Vector3
+	if absf(p.x - Level.TUN_CX) < Level.TUN_HW:
+		if absf(f.z) < 0.6:
+			return false
+		pos = Vector3(Level.TUN_CX + randf_range(-0.7, 0.7), Level.FLOOR_Y, p.z + signf(f.z) * randf_range(20.0, 28.0))
+		if pos.z > Level.TUN_Z0 - 2.0 or pos.z < Level.GRATE_Z + 1.0:
+			return false
+	else:
+		if absf(f.x) < 0.6:
+			return false
+		pos = Vector3(p.x + signf(f.x) * randf_range(16.0, 22.0), Level.FLOOR_Y, p.z + randf_range(-0.5, 0.5))
+	if not level.is_walkable(pos):
 		return false
-	var z := player.global_position.z + signf(f.z) * randf_range(20.0, 28.0)
-	if z > Level.TUN_Z0 - 2.0 or z < Level.GRATE_Z + 1.0:
-		return false
-	stalker.appear(Vector3(Level.TUN_CX + randf_range(-0.7, 0.7), Level.FLOOR_Y, z), "sighting", 7.0)
+	stalker.appear(pos, "sighting", 7.0)
 	return true
 
 
@@ -165,8 +186,7 @@ func _sighting() -> bool:
 func _behind() -> bool:
 	var pos := player.global_position - player.forward_flat() * 3.2
 	pos.y = Level.FLOOR_Y
-	pos.x = clampf(pos.x, Level.LEFT_X + 0.4, Level.RIGHT_X - 0.4)
-	if pos.z > Level.TUN_Z0 - 2.0 or pos.z < Level.GRATE_Z + 1.0:
+	if not level.is_walkable(pos) or pos.z > Level.TUN_Z0 - 2.0:
 		return false
 	stalker.appear(pos, "behind", 9.0)
 	Game.play_at(Sfx.whisper(), pos + Vector3(0, 1.7, 0), -4.0)

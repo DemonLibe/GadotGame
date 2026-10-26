@@ -63,11 +63,13 @@ func get_prompt(player) -> String:
 		return "Вентиляция %s — фильтр чистый" % vent_name
 	if player.filters <= 0:
 		return "Вентиляция %s — фильтр забит. Нужен новый фильтр" % vent_name
+	if player.held() != "filter":
+		return "Вентиляция %s — возьми фильтр в руки (клавиша 3)" % vent_name
 	return "Удерживай E — заменить фильтр в %s" % vent_name
 
 
 func hold_interact(player, delta: float) -> float:
-	if not dirty or player.filters <= 0:
+	if not dirty or player.filters <= 0 or player.held() != "filter":
 		return -1.0
 	_progress += delta / REPLACE_TIME
 	if _progress >= 1.0:

@@ -9,6 +9,7 @@ const FINAL_DAY := 5
 const THOUGHT := Color(0.93, 0.91, 0.84)
 const WHISPER := Color(0.62, 0.64, 0.75)
 const SYSTEM := Color(0.6, 0.86, 0.6)
+const SAVE_PATH := "user://hope_light.cfg"
 
 var day := 1
 var tasks: Array[Dictionary] = []
@@ -105,6 +106,21 @@ func remaining_text() -> String:
 	return ", ".join(parts)
 
 
+# --- Сохранение (какая смена следующая) ----------------------------------------
+
+func save_day(d: int) -> void:
+	var cf := ConfigFile.new()
+	cf.set_value("progress", "day", d)
+	cf.save(SAVE_PATH)
+
+
+func load_day() -> int:
+	var cf := ConfigFile.new()
+	if cf.load(SAVE_PATH) != OK:
+		return 1
+	return clampi(int(cf.get_value("progress", "day", 1)), 1, FINAL_DAY)
+
+
 # --- Реплики и страх -------------------------------------------------------
 
 func say(text: String, color := THOUGHT, duration := 4.0) -> void:
@@ -159,8 +175,11 @@ func _setup_input() -> void:
 	_bind("run", [KEY_SHIFT])
 	_bind("interact", [KEY_E])
 	_bind("flashlight", [KEY_F])
-	_bind("help", [KEY_H])
 	_bind("restart", [KEY_R])
+	_bind("slot_1", [KEY_1])
+	_bind("slot_2", [KEY_2])
+	_bind("slot_3", [KEY_3])
+	_bind("slot_4", [KEY_4])
 	if not InputMap.has_action("burn"):
 		InputMap.add_action("burn")
 	var mb := InputEventMouseButton.new()
