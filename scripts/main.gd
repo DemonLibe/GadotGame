@@ -148,6 +148,10 @@ func _ready() -> void:
 	player.hud = hud
 	player.died.connect(func(): fail_day("Тебя утащили во тьму."))
 	_debug_log = debug_flag("debug")
+	if debug_flag("novig"):
+		hud.hide_vignette()
+	if debug_flag("nodirector"):
+		director.process_mode = Node.PROCESS_MODE_DISABLED
 	if not debug_flag("nofx"):
 		_setup_postfx()
 	dispatcher = Dispatcher.new()
@@ -296,7 +300,7 @@ func _on_continue() -> void:
 func _begin(d: int) -> void:
 	menu.hide_all()
 	state = "playing"
-	hud.set_ingame(true)
+	hud.set_ingame(not debug_flag("noingame"))
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_grace = 1.5
 	start_day(d)

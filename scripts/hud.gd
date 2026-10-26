@@ -506,6 +506,12 @@ func set_stamina(value: float, exhausted: bool) -> void:
 	_stamina_fill.bg_color = Color(0.9, 0.35, 0.2) if exhausted else Color(0.8, 0.82, 0.75)
 
 
+func hide_vignette() -> void:
+	for c in _root.get_children():
+		if c is ColorRect and (c as ColorRect).material == _vignette_mat:
+			c.visible = false
+
+
 func fade_alpha() -> float:
 	return _fade.color.a
 
