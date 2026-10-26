@@ -217,7 +217,10 @@ func _process(delta: float) -> void:
 			for l in get_tree().root.find_children("*", "Light3D", true, false):
 				if (l as Light3D).is_visible_in_tree():
 					lights += 1
-			print("DBG lights=%d day_objects=%d" % [lights, get_tree().get_nodes_in_group("day_objects").size()])
+			print("DBG lights=%d day_objects=%d draws=%d objects=%d prims=%d" % [lights, get_tree().get_nodes_in_group("day_objects").size(),
+				RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
+				RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME),
+				RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)])
 			print("DBG state=%s busy=%s player=%s rot=%s cam=%s campos=%s fade=%s fps=%d" % [state, busy,
 				player.global_position, player.rotation, cam.get_path() if cam else "none",
 				cam.global_position if cam else Vector3.ZERO, hud.fade_alpha(), Engine.get_frames_per_second()])
@@ -308,6 +311,10 @@ func _begin(d: int) -> void:
 	hud.set_ingame(not debug_flag("noingame"))
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_grace = 1.5
+	if debug_flag("skipstart"):
+		player.input_locked = false
+		busy = false
+		return
 	start_day(d)
 
 
