@@ -136,7 +136,8 @@ func _ready() -> void:
 	head.position.y = 1.62
 	add_child(head)
 	camera = Camera3D.new()
-	camera.fov = 72.0
+	_apply_settings()
+	Settings.changed.connect(_apply_settings)
 	camera.near = 0.03
 	camera.current = true
 	head.add_child(camera)
@@ -289,6 +290,10 @@ func _make_beam() -> MeshInstance3D:
 	return beam
 
 
+func _apply_settings() -> void:
+	camera.fov = float(Settings.get_value("fov"))
+
+
 func _sound(stream: AudioStream, volume_db: float) -> AudioStreamPlayer:
 	var p := AudioStreamPlayer.new()
 	p.stream = stream
@@ -419,8 +424,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var motion := event as InputEventMouseMotion
 	if motion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		rotate_y(-motion.relative.x * MOUSE_SENS)
-		_pitch = clampf(_pitch - motion.relative.y * MOUSE_SENS, -1.45, 1.45)
+		var sens := MOUSE_SENS * float(Settings.get_value("mouse_sens"))
+		var dy := -motion.relative.y if Settings.get_value("invert_y") else motion.relative.y
+		rotate_y(-motion.relative.x * sens)
+		_pitch = clampf(_pitch - dy * sens, -1.45, 1.45)
 		head.rotation.x = _pitch
 		return
 	var button := event as InputEventMouseButton

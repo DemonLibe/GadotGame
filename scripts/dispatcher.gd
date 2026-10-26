@@ -35,9 +35,11 @@ func _ready() -> void:
 	_static = AudioStreamPlayer.new()
 	_static.stream = Sfx.radio()
 	_static.volume_db = -10.0
+	_static.bus = "Voice"
 	add_child(_static)
 	_speech = AudioStreamPlayer.new()
 	_speech.volume_db = 2.0
+	_speech.bus = "Voice"
 	add_child(_speech)
 	_load_lines()
 
