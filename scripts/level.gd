@@ -63,6 +63,8 @@ var m_rust: Material
 var m_wood: Material
 var m_rail: Material
 var _time := 0.0
+var _window_light: OmniLight3D
+var _lightning := 12.0
 
 
 func build() -> void:
@@ -92,6 +94,7 @@ func build() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	_update_lightning(delta)
 	for l in lamps:
 		var light: OmniLight3D = l["light"]
 		var mat: StandardMaterial3D = l["mat"]
@@ -105,6 +108,20 @@ func _process(delta: float) -> void:
 		light.light_energy = float(l["energy"]) * f
 		light.visible = f > 0.0
 		mat.emission_energy_multiplier = 3.0 * f
+
+
+## Молния за окном дежурки: двойная вспышка и далёкий гром.
+func _update_lightning(delta: float) -> void:
+	if _window_light == null:
+		return
+	_lightning -= delta
+	var t := -_lightning
+	if _lightning <= 0.0:
+		_window_light.light_energy = 3.0 if (t < 0.08 or (t > 0.18 and t < 0.26)) else 0.0
+		if t > 0.3:
+			_lightning = randf_range(12.0, 30.0)
+			if is_inside_tree() and get_viewport().get_camera_3d() and get_viewport().get_camera_3d().global_position.y > ROOM_Y - 2.0:
+				Game.play_at(Sfx.rumble(), _window_light.global_position + Vector3(-6, 0, 0), -10.0)
 
 
 # --- Запросы для других систем ------------------------------------------------
@@ -220,6 +237,7 @@ func set_grate_open(open: bool) -> void:
 # --- Комната с люком ---------------------------------------------------------
 
 func _build_room() -> void:
+	# Дежурка обходчика: линолеум, крашеные стены, окно с дождём, люк в ограждении посередине.
 	var y := ROOM_Y
 	var h := 3.0
 	var x0 := SHAFT_X - 3.5
@@ -230,34 +248,149 @@ func _build_room() -> void:
 	var hx1 := SHAFT_X + SHAFT_HALF
 	var hz0 := SHAFT_Z - SHAFT_HALF
 	var hz1 := SHAFT_Z + SHAFT_HALF
-	# Пол с отверстием люка посередине.
-	Geo.box(self, Vector3(SHAFT_X, y - 0.15, (z0 + hz0) / 2), Vector3(7.6, 0.3, hz0 - z0), m_floor)
-	Geo.box(self, Vector3(SHAFT_X, y - 0.15, (hz1 + z1) / 2), Vector3(7.6, 0.3, z1 - hz1), m_floor)
-	Geo.box(self, Vector3((x0 - 0.3 + hx0) / 2, y - 0.15, SHAFT_Z), Vector3(hx0 - x0 + 0.3, 0.3, SHAFT_HALF * 2), m_floor)
-	Geo.box(self, Vector3((hx1 + x1 + 0.3) / 2, y - 0.15, SHAFT_Z), Vector3(x1 + 0.3 - hx1, 0.3, SHAFT_HALF * 2), m_floor)
-	# Стальная окантовка люка.
-	for e in [[Vector3(SHAFT_X, y + 0.01, hz0 - 0.05), Vector3(1.9, 0.02, 0.1)],
-			[Vector3(SHAFT_X, y + 0.01, hz1 + 0.05), Vector3(1.9, 0.02, 0.1)],
-			[Vector3(hx0 - 0.05, y + 0.01, SHAFT_Z), Vector3(0.1, 0.02, 1.9)],
-			[Vector3(hx1 + 0.05, y + 0.01, SHAFT_Z), Vector3(0.1, 0.02, 1.9)]]:
-		Geo.box(self, e[0], e[1], m_metal, false)
-	# Стены: внизу тёмно-зелёная краска, сверху побелка — как в старых подсобках.
-	var green := ProcTex.paint(Color(0.2, 0.33, 0.26), "paint_green")
-	var white := ProcTex.paint(Color(0.82, 0.81, 0.76), "paint_white")
-	for w in [[Vector3(x0 - 0.15, 0, SHAFT_Z), Vector3(0.3, 0, 7.6)], [Vector3(x1 + 0.15, 0, SHAFT_Z), Vector3(0.3, 0, 7.6)],
-			[Vector3(SHAFT_X, 0, z0 - 0.15), Vector3(7.6, 0, 0.3)], [Vector3(SHAFT_X, 0, z1 + 0.15), Vector3(7.6, 0, 0.3)]]:
+	var lino := ProcTex.linoleum()
+	var dark := ProcTex.flat(Color(0.12, 0.1, 0.09), 0.8)
+	var wood := ProcTex.flat(Color(0.32, 0.2, 0.12), 0.75)
+	# Пол с отверстием люка.
+	Geo.box(self, Vector3(SHAFT_X, y - 0.15, (z0 + hz0) / 2), Vector3(7.6, 0.3, hz0 - z0), lino)
+	Geo.box(self, Vector3(SHAFT_X, y - 0.15, (hz1 + z1) / 2), Vector3(7.6, 0.3, z1 - hz1), lino)
+	Geo.box(self, Vector3((x0 - 0.3 + hx0) / 2, y - 0.15, SHAFT_Z), Vector3(hx0 - x0 + 0.3, 0.3, SHAFT_HALF * 2), lino)
+	Geo.box(self, Vector3((hx1 + x1 + 0.3) / 2, y - 0.15, SHAFT_Z), Vector3(x1 + 0.3 - hx1, 0.3, SHAFT_HALF * 2), lino)
+	# Предупреждающая разметка вокруг люка.
+	var hazard := ProcTex.hazard()
+	Geo.box(self, Vector3(SHAFT_X, y + 0.004, hz0 - 0.1), Vector3(2.2, 0.008, 0.2), hazard, false)
+	Geo.box(self, Vector3(SHAFT_X, y + 0.004, hz1 + 0.1), Vector3(2.2, 0.008, 0.2), hazard, false)
+	Geo.box(self, Vector3(hx0 - 0.1, y + 0.004, SHAFT_Z), Vector3(0.2, 0.008, 1.8), hazard, false)
+	Geo.box(self, Vector3(hx1 + 0.1, y + 0.004, SHAFT_Z), Vector3(0.2, 0.008, 1.8), hazard, false)
+	# Ограждение люка с боков (спереди — лестница, сзади — крышка на петлях).
+	var red := ProcTex.flat(Color(0.6, 0.1, 0.07), 0.6, 0.3)
+	for cx in [hx0 - 0.15, hx1 + 0.15]:
+		for cz in [hz0 - 0.15, hz1 + 0.15]:
+			Geo.cylinder(self, Vector3(float(cx), y + 0.5, float(cz)), 0.03, 1.0, red)
+		for ry in [0.5, 0.95]:
+			Geo.box(self, Vector3(float(cx), y + float(ry), SHAFT_Z), Vector3(0.04, 0.04, 2.1), red, false)
+		Geo.solid(self, Vector3(float(cx), y + 0.5, SHAFT_Z), Vector3(0.1, 1.0, 2.1))
+	# Стены: внизу тёмно-зелёная краска, сверху побелка, между ними — полоса.
+	var green := ProcTex.paint(Color(0.18, 0.32, 0.26), "paint_green")
+	var white := ProcTex.paint(Color(0.82, 0.8, 0.72), "paint_white")
+	var stripe := ProcTex.flat(Color(0.35, 0.1, 0.08), 0.7)
+	for w in [[Vector3(x0 - 0.15, 0, SHAFT_Z), Vector3(0.3, 0, 7.6), Vector3(0.02, 0, 0)],
+			[Vector3(x1 + 0.15, 0, SHAFT_Z), Vector3(0.3, 0, 7.6), Vector3(-0.02, 0, 0)],
+			[Vector3(SHAFT_X, 0, z0 - 0.15), Vector3(7.6, 0, 0.3), Vector3(0, 0, 0.02)],
+			[Vector3(SHAFT_X, 0, z1 + 0.15), Vector3(7.6, 0, 0.3), Vector3(0, 0, -0.02)]]:
 		var p: Vector3 = w[0]
-		var s: Vector3 = w[1]
-		Geo.box(self, Vector3(p.x, y + 0.7, p.z), Vector3(s.x, 1.4, s.z), green)
-		Geo.box(self, Vector3(p.x, y + 2.2, p.z), Vector3(s.x, 1.6, s.z), white, false)
+		var sz: Vector3 = w[1]
+		var inward: Vector3 = w[2]
+		Geo.box(self, Vector3(p.x, y + 0.7, p.z), Vector3(sz.x, 1.4, sz.z), green)
+		Geo.box(self, Vector3(p.x, y + 2.2, p.z), Vector3(sz.x, 1.6, sz.z), white, false)
+		Geo.box(self, Vector3(p.x, y + 1.4, p.z) + inward, Vector3(maxf(sz.x, 0.3), 0.04, maxf(sz.z, 0.3)), stripe, false)
+		Geo.box(self, Vector3(p.x, y + 0.05, p.z) + inward * 2.5, Vector3(maxf(sz.x, 0.3), 0.1, maxf(sz.z, 0.3)), dark, false)
 	Geo.box(self, Vector3(SHAFT_X, y + h + 0.15, SHAFT_Z), Vector3(7.6, 0.3, 7.6), m_concrete)
-	_add_lamp(Vector3(SHAFT_X, y + h - 0.1, SHAFT_Z + 1.2), Color(1.0, 0.85, 0.6), 1.4, 9.0, "ok", false)
-	# Дверь домой, шкафчики, таблички.
-	Geo.box(self, Vector3(SHAFT_X - 2.0, y + 1.05, z1 - 0.03), Vector3(1.0, 2.1, 0.06), m_wood, false)
+	# Трубы под потолком.
+	var along_x := Basis(Vector3.FORWARD, PI / 2)
+	Geo.cylinder(self, Vector3(SHAFT_X, y + 2.8, z0 + 0.25), 0.06, 7.0, m_rust, along_x)
+	Geo.cylinder(self, Vector3(SHAFT_X, y + 2.65, z0 + 0.25), 0.04, 7.0, m_metal, along_x)
+	# Лампа под эмалированным абажуром над люком.
+	var lamp_pos := Vector3(SHAFT_X + 0.4, y + 2.3, SHAFT_Z + 1.0)
+	Geo.cylinder(self, lamp_pos + Vector3(0, 0.38, 0), 0.008, 0.6, dark)
+	var shade := CylinderMesh.new()
+	shade.top_radius = 0.05
+	shade.bottom_radius = 0.26
+	shade.height = 0.18
+	var shade_mi := MeshInstance3D.new()
+	shade_mi.mesh = shade
+	shade_mi.material_override = ProcTex.flat(Color(0.2, 0.35, 0.28), 0.4, 0.3)
+	shade_mi.position = lamp_pos + Vector3(0, 0.05, 0)
+	add_child(shade_mi)
+	_add_lamp(lamp_pos - Vector3(0, 0.03, 0), Color(1.0, 0.8, 0.55), 1.5, 9.0, "ok", false, false)
+	# Окно на западной стене: ночь, дождь, иногда молния.
+	var wz := SHAFT_Z - 1.7
+	var glass := ProcTex.emissive(Color(0.05, 0.08, 0.14), 0.8)
+	Geo.box(self, Vector3(x0 + 0.03, y + 1.8, wz), Vector3(0.02, 1.0, 1.4), glass, false)
+	for fz in [-0.72, 0.0, 0.72]:
+		Geo.box(self, Vector3(x0 + 0.05, y + 1.8, wz + float(fz)), Vector3(0.05, 1.1, 0.06), wood, false)
+	for fy in [1.27, 1.8, 2.33]:
+		Geo.box(self, Vector3(x0 + 0.05, y + float(fy), wz), Vector3(0.05, 0.06, 1.5), wood, false)
+	Geo.box(self, Vector3(x0 + 0.12, y + 1.22, wz), Vector3(0.2, 0.04, 1.6), wood, false)
+	_window_light = OmniLight3D.new()
+	_window_light.position = Vector3(x0 + 0.6, y + 1.8, wz)
+	_window_light.light_color = Color(0.6, 0.7, 1.0)
+	_window_light.omni_range = 6.0
+	_window_light.light_energy = 0.0
+	add_child(_window_light)
+	_room_sound(Sfx.rain(), Vector3(x0 + 0.3, y + 1.8, wz), -10.0)
+	# Стол с монитором камеры у окна.
+	var tx := x0 + 0.4
+	var tz := SHAFT_Z - 0.2
+	Geo.box(self, Vector3(tx, y + 0.72, tz), Vector3(0.6, 0.04, 0.9), wood)
+	for lx in [-0.25, 0.25]:
+		for lz in [-0.4, 0.4]:
+			Geo.box(self, Vector3(tx + float(lx), y + 0.36, tz + float(lz)), Vector3(0.04, 0.72, 0.04), wood, false)
+	Geo.box(self, Vector3(tx - 0.02, y + 0.95, tz), Vector3(0.42, 0.42, 0.45), ProcTex.flat(Color(0.75, 0.72, 0.62), 0.6))
+	var screen := ProcTex.emissive(Color(0.25, 0.55, 0.35), 1.2)
+	Geo.box(self, Vector3(tx + 0.2, y + 0.97, tz), Vector3(0.01, 0.3, 0.36), screen, false)
+	Geo.label(self, Vector3(tx + 0.21, y + 0.98, tz), "КАМЕРА 3 — ТОННЕЛЬ\nНЕТ СИГНАЛА", 90, 18, Color(0.7, 1.0, 0.75), false, 0.0018)
+	var glow := OmniLight3D.new()
+	glow.position = Vector3(tx + 0.5, y + 1.0, tz)
+	glow.light_color = Color(0.4, 0.9, 0.5)
+	glow.omni_range = 2.0
+	glow.light_energy = 0.4
+	glow.add_to_group("fear_light")
+	add_child(glow)
+	# Часы, полка с папками, памятка, календарь, щиток, вешалка.
+	var cx := SHAFT_X + 2.2
+	var face := Geo.cylinder(self, Vector3(cx, y + 2.35, z0 + 0.03), 0.2, 0.04, ProcTex.flat(Color(0.9, 0.88, 0.8), 0.5), Basis(Vector3.RIGHT, PI / 2))
+	face.name = "ClockFace"
+	Geo.cylinder(self, Vector3(cx, y + 2.35, z0 + 0.02), 0.22, 0.03, dark, Basis(Vector3.RIGHT, PI / 2))
+	var hand := Geo.box(self, Vector3(cx + 0.05, y + 2.37, z0 + 0.06), Vector3(0.12, 0.012, 0.005), dark, false)
+	hand.rotation.z = 0.4
+	Geo.box(self, Vector3(cx, y + 2.42, z0 + 0.06), Vector3(0.012, 0.15, 0.005), dark, false)
+	_room_sound(Sfx.tick(), Vector3(cx, y + 2.35, z0 + 0.1), -18.0)
+	var shx := SHAFT_X - 2.6
+	for sy in [1.6, 2.1]:
+		Geo.box(self, Vector3(shx, y + float(sy), z0 + 0.15), Vector3(1.2, 0.03, 0.3), wood, false)
+		for k in 6:
+			var col := Color(randf_range(0.2, 0.55), randf_range(0.15, 0.3), randf_range(0.1, 0.25))
+			Geo.box(self, Vector3(shx - 0.45 + k * 0.17, y + float(sy) + 0.16, z0 + 0.16), Vector3(0.06, 0.3, 0.24), ProcTex.flat(col, 0.8), false)
+	var paper := ProcTex.flat(Color(0.86, 0.83, 0.72), 0.95)
+	Geo.box(self, Vector3(x1 - 0.01, y + 1.9, SHAFT_Z + 1.6), Vector3(0.01, 0.7, 0.5), paper, false)
+	Geo.label(self, Vector3(x1 - 0.02, y + 1.9, SHAFT_Z + 1.6), "ПАМЯТКА\nОБХОДЧИКА\n\nНе спускайся\nбез фонаря.\nСвет — твоя смена.\nДокладывай\nпо рации.", -90, 22, Color(0.15, 0.12, 0.1), true, 0.0022)
+	Geo.box(self, Vector3(x1 - 0.01, y + 1.7, SHAFT_Z - 0.4), Vector3(0.01, 0.45, 0.32), paper, false)
+	Geo.label(self, Vector3(x1 - 0.02, y + 1.8, SHAFT_Z - 0.4), "ОКТЯБРЬ", -90, 22, Color(0.55, 0.1, 0.08), true, 0.0022)
+	var panel_x := SHAFT_X + 0.9
+	Geo.box(self, Vector3(panel_x, y + 1.6, z1 - 0.06), Vector3(0.5, 0.6, 0.1), ProcTex.flat(Color(0.4, 0.42, 0.4), 0.5, 0.5), false)
+	for k in 3:
+		Geo.box(self, Vector3(panel_x - 0.14 + k * 0.14, y + 1.55, z1 - 0.12), Vector3(0.05, 0.1, 0.03), dark, false)
+	Geo.sphere(self, Vector3(panel_x + 0.15, y + 1.8, z1 - 0.11), 0.02, ProcTex.emissive(Color(1.0, 0.15, 0.1), 2.0))
+	Geo.box(self, Vector3(SHAFT_X - 1.2, y + 1.2, z1 - 0.12), Vector3(0.45, 0.95, 0.12), ProcTex.flat(Color(0.2, 0.22, 0.18), 1.0), false)
+	Geo.box(self, Vector3(SHAFT_X - 1.2, y + 1.72, z1 - 0.05), Vector3(0.06, 0.04, 0.1), m_metal, false)
+	# Дверь домой, коврик, шкафчики.
+	Geo.box(self, Vector3(SHAFT_X - 2.0, y + 1.05, z1 - 0.03), Vector3(1.0, 2.1, 0.06), wood, false)
+	Geo.box(self, Vector3(SHAFT_X - 1.62, y + 1.0, z1 - 0.08), Vector3(0.04, 0.12, 0.05), m_metal, false)
 	Geo.label(self, Vector3(SHAFT_X - 2.0, y + 2.35, z1 - 0.07), "ВЫХОД", 180, 40, Color(0.85, 0.25, 0.2))
+	Geo.box(self, Vector3(SHAFT_X - 2.0, y + 0.006, z1 - 0.5), Vector3(0.9, 0.012, 0.6), ProcTex.flat(Color(0.25, 0.15, 0.1), 1.0), false)
 	Geo.box(self, Vector3(x0 + 0.3, y + 0.95, SHAFT_Z + 1.6), Vector3(0.5, 1.9, 0.6), m_metal)
 	Geo.box(self, Vector3(x0 + 0.3, y + 0.95, SHAFT_Z + 2.25), Vector3(0.5, 1.9, 0.6), m_metal)
+	# Стул у стола с журналом.
+	var chx := SHAFT_X + 2.2
+	var chz := SHAFT_Z - 1.6
+	Geo.box(self, Vector3(chx, y + 0.45, chz), Vector3(0.42, 0.04, 0.42), wood)
+	Geo.box(self, Vector3(chx - 0.2, y + 0.75, chz), Vector3(0.04, 0.6, 0.42), wood, false)
+	for lx in [-0.18, 0.18]:
+		for lz in [-0.18, 0.18]:
+			Geo.box(self, Vector3(chx + float(lx), y + 0.22, chz + float(lz)), Vector3(0.03, 0.45, 0.03), wood, false)
 	Geo.label(self, Vector3(SHAFT_X, y + 2.3, z0 + 0.02), "ШАХТА № 3 — ГЛУБИНА 100 М\nСПУСК ТОЛЬКО ПО ЛЕСТНИЦЕ", 0, 30, Color(0.15, 0.15, 0.15), true)
+
+
+func _room_sound(stream: AudioStream, pos: Vector3, volume_db: float) -> void:
+	var p := AudioStreamPlayer3D.new()
+	p.stream = stream
+	p.volume_db = volume_db
+	p.unit_size = 3.0
+	p.max_distance = 20.0
+	p.position = pos
+	p.autoplay = true
+	add_child(p)
 
 
 # --- Шахта -------------------------------------------------------------------

@@ -741,7 +741,7 @@ func _random_floor_spot(min_depth: float) -> Vector3:
 
 
 func _setup_postfx() -> void:
-	# Визуальный стиль: низкое разрешение, дизеринг, урезанная палитра, зерно (под интерфейсом).
+	# Визуальный стиль: чуть пониженное разрешение, жёсткий контраст, плёночное зерно (под интерфейсом).
 	var layer := CanvasLayer.new()
 	layer.layer = 1
 	add_child(layer)
@@ -758,29 +758,27 @@ func _setup_postfx() -> void:
 
 const POSTFX_SHADER := """
 shader_type canvas_item;
-uniform sampler2D screen_tex : hint_screen_texture, filter_nearest;
-uniform float pixel_size = 3.0;
-uniform float levels = 7.0;
-uniform float grain = 0.05;
-uniform float aberration = 0.6;
-const float BAYER[16] = float[](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
+uniform float pixel_size = 2.0;
+uniform float grain = 0.035;
+uniform float aberration = 0.35;
 void fragment() {
-	vec2 cell = floor(FRAGCOORD.xy / pixel_size);
-	vec2 uv = (cell * pixel_size + pixel_size * 0.5) * SCREEN_PIXEL_SIZE;
-	vec2 off = vec2(aberration * pixel_size, 0.0) * SCREEN_PIXEL_SIZE;
+	// Лёгкое понижение разрешения: соседние пиксели усредняются, без узора-сетки.
+	vec2 px = SCREEN_PIXEL_SIZE * pixel_size;
+	vec2 uv = (floor(SCREEN_UV / px) + 0.5) * px;
+	vec2 off = vec2(aberration * px.x, 0.0) * (length(SCREEN_UV - 0.5) * 2.0);
 	vec3 c = vec3(texture(screen_tex, uv + off).r, texture(screen_tex, uv).g, texture(screen_tex, uv - off).b);
 	// Жёсткий контраст, холодно-зелёные тени, тёплые светлые места.
 	float l = dot(c, vec3(0.299, 0.587, 0.114));
-	c = mix(vec3(l), c, 0.75);
-	c = pow(c, vec3(1.2)) * 1.15;
-	c = mix(c * vec3(0.85, 0.95, 0.9), c * vec3(1.08, 1.0, 0.88), smoothstep(0.1, 0.6, l));
-	int bx = int(mod(cell.x, 4.0));
-	int by = int(mod(cell.y, 4.0));
-	float d = BAYER[by * 4 + bx] / 16.0 - 0.5;
-	c = floor(c * levels + d + 0.5) / levels;
-	float n = fract(sin(dot(cell + floor(TIME * 24.0), vec2(12.9898, 78.233))) * 43758.5453);
-	c += (n - 0.5) * grain;
-	COLOR = vec4(clamp(c, 0.0, 1.0), 1.0);
+	c = mix(vec3(l), c, 0.78);
+	c = pow(c, vec3(1.15)) * 1.12;
+	c = mix(c * vec3(0.86, 0.96, 0.92), c * vec3(1.07, 1.0, 0.9), smoothstep(0.08, 0.6, l));
+	// Мягкое плёночное зерно на каждом экранном пикселе — меняется каждый кадр, сетки не образует.
+	float n = fract(sin(dot(FRAGCOORD.xy + fract(TIME * 7.13) * 431.0, vec2(12.9898, 78.233))) * 43758.5453);
+	c += (n - 0.5) * grain * (1.0 - l * 0.6);
+	// Виньетка.
+	float v = smoothstep(0.95, 0.35, length(SCREEN_UV - 0.5));
+	COLOR = vec4(clamp(c * mix(0.75, 1.0, v), 0.0, 1.0), 1.0);
 }
 """
 

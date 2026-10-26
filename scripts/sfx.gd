@@ -63,6 +63,14 @@ static func rung() -> AudioStreamWAV:
 	return _stream("rung")
 
 
+static func rain() -> AudioStreamWAV:
+	return _stream("rain")
+
+
+static func tick() -> AudioStreamWAV:
+	return _stream("tick")
+
+
 static func gunshot() -> AudioStreamWAV:
 	return _stream("gunshot")
 
@@ -99,6 +107,8 @@ static func _stream(key: String) -> AudioStreamWAV:
 		"rung": w = _make_rung()
 		"radio": w = _make_radio(0.5, false)
 		"gunshot": w = _make_gunshot()
+		"rain": w = _make_rain()
+		"tick": w = _make_tick()
 		"hiss": w = _make_hiss()
 		"radio_loop": w = _make_radio(2.0, true)
 		_: w = _make_pickup()
@@ -338,3 +348,31 @@ static func _make_hiss() -> AudioStreamWAV:
 		var env := minf(t * 10.0, 1.0) * minf((dur - t) * 3.0, 1.0) * (0.7 + 0.3 * sin(TAU * 17.0 * t))
 		s[i] = (n - lp) * env * 0.6
 	return _wav(s)
+
+
+# Дождь за окном: мягкий шум с редкими каплями по стеклу (петля 4 с).
+static func _make_rain() -> AudioStreamWAV:
+	var s := _buf(4.0)
+	var lp := 0.0
+	var lp2 := 0.0
+	var drop := 0.0
+	for i in s.size():
+		var n := randf_range(-1.0, 1.0)
+		lp += 0.25 * (n - lp)
+		lp2 += 0.03 * (lp - lp2)
+		if randf() < 0.0006:
+			drop = randf_range(0.3, 0.7)
+		drop *= 0.992
+		s[i] = (lp - lp2) * 0.35 + drop * randf_range(-1.0, 1.0) * 0.4
+	return _wav(s, true)
+
+
+# Ход настенных часов (петля 2 с: тик и так).
+static func _make_tick() -> AudioStreamWAV:
+	var s := _buf(2.0)
+	for i in s.size():
+		var t := float(i) / RATE
+		var a := fmod(t, 1.0)
+		var f := 3200.0 if t < 1.0 else 2700.0
+		s[i] = sin(TAU * f * a) * exp(-a * 160.0) * 0.35 + randf_range(-1.0, 1.0) * exp(-a * 400.0) * 0.2
+	return _wav(s, true)

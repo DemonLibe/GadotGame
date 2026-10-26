@@ -40,7 +40,7 @@ static func concrete(color: Color, scale := 0.3) -> StandardMaterial3D:
 	m.normal_enabled = true
 	m.normal_texture = normal
 	m.roughness = 0.95
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	m.uv1_triplanar = true
 	m.uv1_scale = Vector3.ONE * scale
 	_cache[key] = m
@@ -339,7 +339,7 @@ static func _textured(key: String, albedo: Image, tint: Color, roughness: float,
 	m.normal_texture = ImageTexture.create_from_image(normal)
 	m.roughness = roughness
 	m.metallic = metallic
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	if world_size > 0.0:
 		m.uv1_triplanar = true
 		m.uv1_world_triplanar = true
@@ -348,3 +348,37 @@ static func _textured(key: String, albedo: Image, tint: Color, roughness: float,
 		m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_cache[key] = m
 	return m
+
+
+## Затёртый линолеум «в шашку» (пол дежурки).
+static func linoleum() -> StandardMaterial3D:
+	if _cache.has("linoleum"):
+		return _cache["linoleum"]
+	var s := 256
+	var img := _noise(s, 0.03, 3)
+	img.adjust_bcs(1.2, 0.25, 1.0)
+	var dark := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	dark.fill(Color(0.0, 0.0, 0.0, 0.35))
+	for y in range(0, s, 64):
+		for x in range(0, s, 64):
+			if (x / 64 + y / 64) % 2 == 0:
+				img.blend_rect(dark, Rect2i(0, 0, 64, 64), Vector2i(x, y))
+	_streaks(img, 6, Color(0.3, 0.25, 0.18), 160, true)
+	return _textured("linoleum", img, Color(0.6, 0.42, 0.3), 0.55, 0.0, 1.0, 1.6)
+
+
+## Жёлто-чёрная предупреждающая разметка.
+static func hazard() -> StandardMaterial3D:
+	if _cache.has("hazard"):
+		return _cache["hazard"]
+	var s := 128
+	var img := Image.create(s, s, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0.9, 0.72, 0.1))
+	for i in range(-s, s, 32):
+		for y in s:
+			var x0 := i + y
+			img.fill_rect(Rect2i(x0, y, 16, 1), Color(0.08, 0.08, 0.08))
+	var over := Image.create(s, s, false, Image.FORMAT_RGBA8)
+	over.fill(Color(0.4, 0.38, 0.35, 0.25))
+	img.blend_rect(over, Rect2i(0, 0, s, s), Vector2i.ZERO)
+	return _textured("hazard", img, Color.WHITE, 0.7, 0.0, 0.5, 0.6)
