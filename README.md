@@ -20,7 +20,7 @@
 **https://github.com/DemonLibe/GadotGame/releases/latest**
 
 Релиз собирает workflow `.github/workflows/release.yml` при пуше тега вида `v1.0.0`
-(или вручную из вкладки Actions): прогоняет автотест, экспортирует все платформы и выкладывает архивы.
+(или вручную из вкладки Actions): прогоняет автотест, экспортирует Windows, Linux и macOS и выкладывает архивы.
 
 ## Играть в браузере
 
