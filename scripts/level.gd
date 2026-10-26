@@ -52,7 +52,7 @@ func _process(delta: float) -> void:
 		var light: OmniLight3D = l["light"]
 		var mat: StandardMaterial3D = l["mat"]
 		var mode: String = l["mode"]
-		var on := mode != "broken" and not blackout and not (l["tunnel"] and tunnel_lights_off)
+		var on: bool = mode != "broken" and not blackout and not (l["tunnel"] and tunnel_lights_off)
 		var f := 1.0 if on else 0.0
 		if on and mode == "flicker":
 			var phase: float = l["t"]

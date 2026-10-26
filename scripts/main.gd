@@ -106,7 +106,7 @@ func _ready() -> void:
 
 ## Облегчённый рендер (браузер). Там нет объёмного тумана, луч рисуется отдельным конусом.
 static func is_web_renderer() -> bool:
-	return RenderingServer.get_current_rendering_method() == "gl_compatibility"
+	return str(ProjectSettings.get_setting_with_override("rendering/renderer/rendering_method")) == "gl_compatibility"
 
 
 ## Прогон для CI (godot --headless -- --smoke): все дни, все события и финал

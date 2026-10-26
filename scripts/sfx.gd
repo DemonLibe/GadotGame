@@ -8,54 +8,54 @@ static var _cache := {}
 
 
 static func drone() -> AudioStreamWAV:
-	return _get("drone")
+	return _stream("drone")
 
 
 static func step() -> AudioStreamWAV:
-	return _get("step")
+	return _stream("step")
 
 
 static func drip() -> AudioStreamWAV:
-	return _get("drip")
+	return _stream("drip")
 
 
 static func sting() -> AudioStreamWAV:
-	return _get("sting")
+	return _stream("sting")
 
 
 static func whisper() -> AudioStreamWAV:
-	return _get("whisper")
+	return _stream("whisper")
 
 
 static func hum() -> AudioStreamWAV:
-	return _get("hum")
+	return _stream("hum")
 
 
 static func clank() -> AudioStreamWAV:
-	return _get("clank")
+	return _stream("clank")
 
 
 static func click() -> AudioStreamWAV:
-	return _get("click")
+	return _stream("click")
 
 
 static func rumble() -> AudioStreamWAV:
-	return _get("rumble")
+	return _stream("rumble")
 
 
 static func heartbeat() -> AudioStreamWAV:
-	return _get("heartbeat")
+	return _stream("heartbeat")
 
 
 static func flame() -> AudioStreamWAV:
-	return _get("flame")
+	return _stream("flame")
 
 
 static func pickup() -> AudioStreamWAV:
-	return _get("pickup")
+	return _stream("pickup")
 
 
-static func _get(key: String) -> AudioStreamWAV:
+static func _stream(key: String) -> AudioStreamWAV:
 	if _cache.has(key):
 		return _cache[key]
 	var w: AudioStreamWAV
