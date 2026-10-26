@@ -12,6 +12,7 @@ const RIGHT_X := 2.9         # TUN_CX + TUN_HW
 const TUN_Z0 := -50.0        # начало тоннеля (стена станции)
 const TUN_Z1 := -265.0       # тупик
 const GRATE_Z := -232.0      # решётка
+const CHUNK := 14.0          # длина куска геометрии тоннеля
 
 var lamps: Array[Dictionary] = []
 var tunnel_lights_off := false
@@ -173,13 +174,25 @@ func _build_station() -> void:
 # --- Тоннель -----------------------------------------------------------------
 
 func _build_tunnel() -> void:
-	var length := TUN_Z0 - TUN_Z1
-	var cz := (TUN_Z0 + TUN_Z1) / 2.0
 	var w := TUN_HW * 2.0
-	Geo.box(self, Vector3(TUN_CX, FLOOR_Y - 0.15, cz), Vector3(w + 0.6, 0.3, length), m_floor)
-	Geo.box(self, Vector3(TUN_CX, FLOOR_Y + TUN_H + 0.15, cz), Vector3(w + 0.6, 0.3, length), m_dark)
-	Geo.box(self, Vector3(LEFT_X - 0.15, FLOOR_Y + TUN_H / 2, cz), Vector3(0.3, TUN_H, length), m_wall)
-	Geo.box(self, Vector3(RIGHT_X + 0.15, FLOOR_Y + TUN_H / 2, cz), Vector3(0.3, TUN_H, length), m_wall)
+	# Тоннель собирается кусками по 14 м: в браузерном рендере (GL Compatibility)
+	# на один объект действует ограниченное число ламп, длинный цельный пол освещался бы неправильно.
+	var along := Basis(Vector3.RIGHT, PI / 2)
+	var cable := ProcTex.flat(Color(0.05, 0.05, 0.05))
+	var z_a := TUN_Z0
+	while z_a > TUN_Z1 + 0.01:
+		var z_b := maxf(z_a - CHUNK, TUN_Z1)
+		var length := z_a - z_b
+		var cz := (z_a + z_b) / 2.0
+		Geo.box(self, Vector3(TUN_CX, FLOOR_Y - 0.15, cz), Vector3(w + 0.6, 0.3, length), m_floor)
+		Geo.box(self, Vector3(TUN_CX, FLOOR_Y + TUN_H + 0.15, cz), Vector3(w + 0.6, 0.3, length), m_dark)
+		Geo.box(self, Vector3(LEFT_X - 0.15, FLOOR_Y + TUN_H / 2, cz), Vector3(0.3, TUN_H, length), m_wall)
+		Geo.box(self, Vector3(RIGHT_X + 0.15, FLOOR_Y + TUN_H / 2, cz), Vector3(0.3, TUN_H, length), m_wall)
+		# Трубы и кабель вдоль стен.
+		Geo.cylinder(self, Vector3(LEFT_X + 0.18, FLOOR_Y + 2.5, cz), 0.09, length, m_rust, along)
+		Geo.cylinder(self, Vector3(LEFT_X + 0.14, FLOOR_Y + 2.2, cz), 0.06, length, m_metal, along)
+		Geo.cylinder(self, Vector3(RIGHT_X - 0.06, FLOOR_Y + 2.7, cz), 0.025, length, cable, along)
+		z_a = z_b
 	Geo.box(self, Vector3(TUN_CX, FLOOR_Y + TUN_H / 2, TUN_Z1 - 0.15), Vector3(w + 0.6, TUN_H, 0.3), m_wall)
 	# Рёбра крепи каждые 7 м — чтобы глаз чувствовал движение в темноте.
 	var z := TUN_Z0 - 4.0
@@ -188,11 +201,6 @@ func _build_tunnel() -> void:
 		Geo.box(self, Vector3(RIGHT_X - 0.1, FLOOR_Y + TUN_H / 2, z), Vector3(0.2, TUN_H, 0.45), m_dark, false)
 		Geo.box(self, Vector3(TUN_CX, FLOOR_Y + TUN_H - 0.1, z), Vector3(w, 0.2, 0.45), m_dark, false)
 		z -= 7.0
-	# Трубы и кабель вдоль стен.
-	var along := Basis(Vector3.RIGHT, PI / 2)
-	Geo.cylinder(self, Vector3(LEFT_X + 0.18, FLOOR_Y + 2.5, cz), 0.09, length, m_rust, along)
-	Geo.cylinder(self, Vector3(LEFT_X + 0.14, FLOOR_Y + 2.2, cz), 0.06, length, m_metal, along)
-	Geo.cylinder(self, Vector3(RIGHT_X - 0.06, FLOOR_Y + 2.7, cz), 0.025, length, ProcTex.flat(Color(0.05, 0.05, 0.05)), along)
 	# Лампы каждые 14 м: часть разбита, часть мигает.
 	var i := 0
 	z = TUN_Z0 - 6.0
@@ -212,25 +220,28 @@ func _build_tunnel() -> void:
 
 
 func _build_rails() -> void:
-	var z0 := -29.0
-	var z1 := GRATE_Z - 30.0
-	var length := z0 - z1
-	var cz := (z0 + z1) / 2.0
-	for off in [-0.55, 0.55]:
-		Geo.box(self, Vector3(TUN_CX + float(off), FLOOR_Y + 0.05, cz), Vector3(0.07, 0.1, length), m_rail, false)
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
 	var sleeper := BoxMesh.new()
 	sleeper.size = Vector3(1.6, 0.06, 0.22)
-	mm.mesh = sleeper
-	var count := int(length / 0.9)
-	mm.instance_count = count
-	for i in count:
-		mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, Vector3(TUN_CX, FLOOR_Y, z0 - i * 0.9)))
-	var mmi := MultiMeshInstance3D.new()
-	mmi.multimesh = mm
-	mmi.material_override = m_wood
-	add_child(mmi)
+	var z_a := -29.0
+	var z_end := GRATE_Z - 30.0
+	while z_a > z_end + 0.01:
+		var z_b := maxf(z_a - CHUNK, z_end)
+		var length := z_a - z_b
+		var cz := (z_a + z_b) / 2.0
+		for off in [-0.55, 0.55]:
+			Geo.box(self, Vector3(TUN_CX + float(off), FLOOR_Y + 0.05, cz), Vector3(0.07, 0.1, length), m_rail, false)
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = sleeper
+		var count := int(length / 0.9)
+		mm.instance_count = count
+		for i in count:
+			mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, Vector3(TUN_CX, FLOOR_Y, z_a - 0.45 - i * 0.9)))
+		var mmi := MultiMeshInstance3D.new()
+		mmi.multimesh = mm
+		mmi.material_override = m_wood
+		add_child(mmi)
+		z_a = z_b
 
 
 func _build_grate() -> void:

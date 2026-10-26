@@ -98,7 +98,44 @@ func _ready() -> void:
 	ambience.play()
 
 	Game.end_day_requested.connect(end_day)
-	start_day(1)
+	if OS.get_cmdline_user_args().has("--smoke"):
+		_smoke_test()
+	else:
+		start_day(1)
+
+
+## Облегчённый рендер (браузер). Там нет объёмного тумана, луч рисуется отдельным конусом.
+static func is_web_renderer() -> bool:
+	return RenderingServer.get_current_rendering_method() == "gl_compatibility"
+
+
+## Прогон для CI (godot --headless -- --smoke): все дни, все события и финал
+## должны отработать без ошибок скрипта.
+func _smoke_test() -> void:
+	for d in range(1, Game.FINAL_DAY + 1):
+		start_day(d)
+		await get_tree().create_timer(5.5).timeout
+		player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -110.0)
+		for ev in ["footsteps", "sighting", "behind", "lamps", "whisper", "regrow"]:
+			director._run(ev)
+		for v in vents:
+			v.hold_interact(player, 0.1)
+		for n in get_tree().get_nodes_in_group("webs"):
+			var web := n as Web
+			if web:
+				web.burn(2.0)
+		for c in crates:
+			c.interact(player)
+		cart.interact(player)
+		journal.interact(player)
+		await get_tree().create_timer(1.5).timeout
+		stalker.hide_now()
+	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -230.0)
+	await get_tree().create_timer(1.0).timeout
+	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -252.0)
+	await get_tree().create_timer(9.0).timeout
+	print("SMOKE ", "OK" if Game.ended else "FAIL: финал не сработал")
+	get_tree().quit(0 if Game.ended else 1)
 
 
 func _process(delta: float) -> void:
@@ -126,12 +163,17 @@ func _setup_environment() -> void:
 	env.ambient_light_energy = 0.04
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.glow_enabled = true
-	env.ssao_enabled = true
-	# Объёмный туман — луч фонаря становится видимым.
-	env.volumetric_fog_enabled = true
-	env.volumetric_fog_density = 0.03
-	env.volumetric_fog_albedo = Color(0.6, 0.6, 0.6)
-	env.volumetric_fog_length = 40.0
+	# Обычный туман работает везде, в том числе в браузере: дальний конец тоннеля тонет в черноте.
+	env.fog_enabled = true
+	env.fog_light_color = Color(0.015, 0.015, 0.02)
+	env.fog_density = 0.045
+	if not Main.is_web_renderer():
+		# На ПК с Forward+ — объёмный туман, в нём виден луч фонаря.
+		env.ssao_enabled = true
+		env.volumetric_fog_enabled = true
+		env.volumetric_fog_density = 0.03
+		env.volumetric_fog_albedo = Color(0.6, 0.6, 0.6)
+		env.volumetric_fog_length = 40.0
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)

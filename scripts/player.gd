@@ -12,6 +12,21 @@ const MAX_FILTERS := 3
 const DRAIN_PER_SEC := 100.0 / 300.0  # полный заряд — 5 минут
 const REACH := 2.4
 const STEP_LENGTH := 1.25
+const BEAM_SHADER := """
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
+uniform float length = 9.0;
+uniform float intensity = 0.07;
+varying float along;
+void vertex() {
+	along = VERTEX.y / length + 0.5;  // 0 у фонаря, 1 на дальнем конце
+}
+void fragment() {
+	float edge = pow(abs(dot(NORMAL, VIEW)), 1.5);
+	ALBEDO = vec3(1.0, 0.93, 0.8);
+	ALPHA = intensity * (1.0 - along) * edge;
+}
+"""
 
 var hud: Hud
 var battery := 60.0
@@ -74,6 +89,8 @@ func _ready() -> void:
 	flashlight.shadow_enabled = true
 	flashlight.light_volumetric_fog_energy = 1.5
 	add_child(flashlight)
+	if Main.is_web_renderer():
+		flashlight.add_child(_make_beam())
 
 	_ray = RayCast3D.new()
 	_ray.target_position = Vector3(0, 0, -REACH)
@@ -107,6 +124,31 @@ func _ready() -> void:
 	_click_sound = _sound(Sfx.click(), -6.0)
 
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+## Видимый луч для браузерного рендера: прозрачный конус, гаснущий к краям и вдаль.
+func _make_beam() -> MeshInstance3D:
+	var length := 9.0
+	var cone := CylinderMesh.new()
+	cone.height = length
+	cone.top_radius = tan(deg_to_rad(flashlight.spot_angle)) * length
+	cone.bottom_radius = 0.03
+	cone.radial_segments = 24
+	cone.rings = 1
+	cone.cap_top = false
+	cone.cap_bottom = false
+	var shader := Shader.new()
+	shader.code = BEAM_SHADER
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	mat.set_shader_parameter("length", length)
+	var beam := MeshInstance3D.new()
+	beam.mesh = cone
+	beam.material_override = mat
+	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Ось цилиндра (Y) разворачиваем вперёд (-Z), узкий конец — у фонаря.
+	beam.transform = Transform3D(Basis(Vector3.RIGHT, -PI / 2), Vector3(0, 0, -length / 2))
+	return beam
 
 
 func _sound(stream: AudioStream, volume_db: float) -> AudioStreamPlayer:
