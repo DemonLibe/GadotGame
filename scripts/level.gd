@@ -94,6 +94,10 @@ func build() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	var cam := get_viewport().get_camera_3d()
+	if cam:
+		_cam_pos = cam.global_position
+	_update_extra_lights()
 	_update_lightning(delta)
 	for l in lamps:
 		var light: OmniLight3D = l["light"]
@@ -106,8 +110,26 @@ func _process(delta: float) -> void:
 			if sin(_time * 13.0 + phase) + sin(_time * 7.3 + phase * 2.0) < -1.1:
 				f = 0.05
 		light.light_energy = float(l["energy"]) * f
-		light.visible = f > 0.0
+		light.visible = f > 0.0 and _near_camera(light.global_position)
 		mat.emission_energy_multiplier = 3.0 * f
+
+
+## В браузерном рендере данные о всех включённых источниках света уходят в шейдер одним блоком
+## ограниченного размера; если их слишком много, весь кадр выходит чёрным. Поэтому далёкие лампы гасим.
+const LIGHT_CULL_DISTANCE := 32.0
+var _cam_pos := Vector3.ZERO
+
+
+func _near_camera(p: Vector3) -> bool:
+	return p.distance_squared_to(_cam_pos) < LIGHT_CULL_DISTANCE * LIGHT_CULL_DISTANCE
+
+
+func _update_extra_lights() -> void:
+	# Прочие постоянные огоньки (зарядки, монитор, фонари в комнатах) — тоже только поблизости.
+	for n in get_tree().get_nodes_in_group("cull_light"):
+		var l := n as Light3D
+		if l:
+			l.visible = _near_camera(l.global_position)
 
 
 ## Молния за окном дежурки: двойная вспышка и далёкий гром.
@@ -336,6 +358,7 @@ func _build_room() -> void:
 	glow.omni_range = 2.0
 	glow.light_energy = 0.4
 	glow.add_to_group("fear_light")
+	glow.add_to_group("cull_light")
 	add_child(glow)
 	# Часы, полка с папками, памятка, календарь, щиток, вешалка.
 	var cx := SHAFT_X + 2.2

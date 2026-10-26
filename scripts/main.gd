@@ -815,6 +815,7 @@ func _setup_rooms(d: int) -> void:
 		lamp.omni_range = 3.5
 		lamp.light_energy = 0.5
 		lamp.add_to_group("fear_light")
+		lamp.add_to_group("cull_light")
 		lamp.add_to_group("day_objects")
 		add_child(lamp)
 		k += 1

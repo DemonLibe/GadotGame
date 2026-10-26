@@ -53,6 +53,7 @@ func _ready() -> void:
 	_light.light_color = Color(1.0, 0.55, 0.2)
 	_light.omni_range = 4.0
 	_light.light_energy = 0.0
+	_light.visible = false  # включается только пока паутина горит — лишний свет в браузере даёт чёрный кадр
 	add_child(_light)
 
 
@@ -94,10 +95,12 @@ func _process(delta: float) -> void:
 	_mesh.rotation.x = sin(_t * 0.7) * 0.03
 	if _heat > 0.0:
 		_heat -= delta
+		_light.visible = true
 		_light.light_energy = randf_range(1.2, 2.0)
 		if _heat <= 0.0:
 			_fire.emitting = false
 			_light.light_energy = 0.0
+			_light.visible = false
 	if regrown and not _dead:
 		var p := get_tree().get_first_node_in_group("player") as Node3D
 		if p and p.global_position.distance_to(global_position) < 6.0:
