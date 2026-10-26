@@ -419,7 +419,8 @@ func start_day(d: int) -> void:
 	for n in get_tree().get_nodes_in_group("day_objects"):
 		n.queue_free()
 
-	_setup_vents_and_crates(d)
+	if not debug_flag("novents"):
+		_setup_vents_and_crates(d)
 	if not debug_flag("nowebs"):
 		_spawn_webs(d)
 	if not debug_flag("nospiders"):
@@ -438,7 +439,8 @@ func start_day(d: int) -> void:
 	level.blackout = false
 	stalker.hide_now()
 	hatch.set_open(false)
-	radio.reset()
+	if not debug_flag("noradio"):
+		radio.reset()
 	dispatcher.stop()
 
 	player.reset_for_day(SPAWN, SPAWN_YAW, START_BATTERY)
