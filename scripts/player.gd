@@ -131,8 +131,10 @@ func _ready() -> void:
 	flashlight.shadow_enabled = true
 	flashlight.light_volumetric_fog_energy = 1.5
 	add_child(flashlight)
-	if Main.is_web_renderer():
+	if Main.is_web_renderer() and not Main.debug_flag("nobeam"):
 		flashlight.add_child(_make_beam())
+	if Main.debug_flag("noshadow"):
+		flashlight.shadow_enabled = false
 
 	_ray = RayCast3D.new()
 	_ray.target_position = Vector3(0, 0, -REACH)
