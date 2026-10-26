@@ -657,6 +657,13 @@ func flicker(time: float) -> void:
 	_flicker = maxf(_flicker, time)
 
 
+## Отладка: повернуть взгляд (наклон, поворот относительно текущего).
+func debug_look(pitch: float, yaw: float) -> void:
+	_pitch = pitch
+	head.rotation.x = pitch
+	rotate_y(yaw)
+
+
 func forward_flat() -> Vector3:
 	var f := -global_transform.basis.z
 	f.y = 0.0

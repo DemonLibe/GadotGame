@@ -460,6 +460,12 @@ func start_day(d: int) -> void:
 		await hud.fade_to(0.0, 2.0).finished
 	player.input_locked = false
 	busy = false
+	if debug_flag("lookup"):
+		player.debug_look(0.9, 0.0)
+	if debug_flag("lookback"):
+		player.debug_look(0.0, PI)
+	if debug_flag("lookleft"):
+		player.debug_look(0.0, PI / 2)
 	Game.say(DAY_THOUGHTS[d], Game.THOUGHT, 6.0)
 	Game.say("На столе шипит рация. Диспетчер ждёт.", Game.THOUGHT, 3.5)
 
