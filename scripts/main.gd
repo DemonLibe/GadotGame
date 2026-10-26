@@ -13,64 +13,64 @@ const MENU_SCENE := "res://scenes/main_menu.tscn"
 # Вентблоки: [tunnel, side, along, имя]
 const VENT_SPOTS := [
 	[-2, 0, -43.0, "В-1"],
-	[-1, -1, -78.0, "В-2"],
-	[0, 1, 30.0, "В-3"],
-	[-1, 1, -135.0, "В-4"],
-	[1, -1, 38.0, "В-5"],
-	[2, 1, 32.0, "В-6"],
+	[-1, -1, -92.0, "В-2"],
+	[0, 1, 42.0, "В-3"],
+	[-1, 1, -177.5, "В-4"],
+	[1, -1, 53.0, "В-5"],
+	[2, 1, 45.0, "В-6"],
 ]
 # Зарядки: [tunnel, side, along, id]
 const CHARGER_SPOTS := [
 	[-2, 0, -34.5, "station"],
-	[1, 1, 52.0, "far"],
+	[1, 1, 73.0, "far"],
 ]
 # Ящики: [tunnel, along, смещение поперёк]
 const CRATE_SPOTS := [
 	[-2, -46.5, 0.0],
-	[-1, -92.0, -1.3],
-	[0, 42.0, 1.0],
-	[-1, -128.0, 1.3],
-	[1, 24.0, -1.0],
-	[2, 37.0, -1.0],
+	[-1, -113.0, -1.3],
+	[0, 59.0, 1.0],
+	[-1, -167.0, 1.3],
+	[1, 33.5, -1.0],
+	[2, 52.0, -1.0],
 ]
 # Места для большой паутины поперёк прохода: [tunnel, along]. Берутся по порядку.
 const WEB_SPOTS := [
-	[-1, -66.0], [-1, -88.0], [0, 16.0], [-1, -125.0], [1, 14.0],
-	[-1, -145.0], [2, 15.0], [-1, -180.0], [-1, -215.0],
+	[-1, -74.0], [-1, -107.0], [0, 22.5], [-1, -162.5], [1, 19.5],
+	[-1, -192.5], [2, 21.0], [-1, -245.0], [-1, -297.5],
 ]
 const WEBS_PER_DAY := [0, 2, 4, 5, 7, 9]
 # Шкафы-укрытия: [tunnel, side, along]. tunnel -2 — станция.
 const HIDEOUT_SPOTS := [
-	[-2, 1, -34.0], [-1, 1, -64.0], [-1, 1, -90.0], [-1, -1, -142.0], [-1, -1, -174.0],
-	[-1, 1, -220.0], [0, -1, 22.0], [1, 1, 32.0], [2, -1, 22.0],
+	[-2, 1, -34.0], [-1, 1, -71.0], [-1, 1, -110.0], [-1, -1, -188.0], [-1, -1, -236.0],
+	[-1, 1, -305.0], [0, -1, 31.0], [1, 1, 45.0], [2, -1, 31.0],
 ]
 ## Генератор: сколько топлива в баке в начале смены и сколько канистр спрятано в тоннелях.
 const GEN_FUEL := [0.0, 100.0, 70.0, 60.0, 50.0, 50.0]
 const CANISTERS_PER_DAY := [0, 0, 1, 2, 2, 2]
 ## Затопленная штольня (четвёртая смена): номер штольни и участок воды.
 const FLOOD_BRANCH := 2
-const FLOOD_FROM := 13.0
+const FLOOD_FROM := 18.0
 # Где искрит кабель на третьей смене: [side, z].
-const CABLE_SPOTS := [[-1, -84.0], [1, -118.0], [1, -140.0]]
+const CABLE_SPOTS := [[-1, -101.0], [1, -152.0], [1, -185.0]]
 const LETTER := ["Письмо от Маши",
 	"Папа! Мама говорит, ты теперь работаешь под землёй, как гном из сказки.\n\nВрач сказал, после операции я смогу бегать. Я нарисовала тебе фонарик, чтобы тебе там не было темно.\n\nВозвращайся скорее. Маша, 7 лет."]
 
 # Надписи мелом: [tunnel, side, along, высота над полом, текст]. tunnel -3 — стена шахты (along = y).
 # Копятся день за днём.
 const NOTES := {
-	2: [[-1, -1, -98.0, 1.7, "НЕ ОСТАВАЙСЯ\nБЕЗ СВЕТА"]],
-	3: [[-1, 1, -150.0, 1.7, "ПАУКИ НЕ ОПАСНЫ.\nОПАСНО ТО,\nЧЕГО БОЯТСЯ ПАУКИ"],
-		[-1, -1, -60.0, 1.4, "|||| |||| |||| ||"]],
-	4: [[-1, -1, -84.0, 1.7, "ОН СЧИТАЕТ\nТВОИ ШАГИ"],
-		[0, 1, 40.0, 1.7, "СМЕНА №7.\nНЕ ХОДИ\nЗА РЕШЁТКУ"],
+	2: [[-1, -1, -122.0, 1.7, "НЕ ОСТАВАЙСЯ\nБЕЗ СВЕТА"]],
+	3: [[-1, 1, -200.0, 1.7, "ПАУКИ НЕ ОПАСНЫ.\nОПАСНО ТО,\nЧЕГО БОЯТСЯ ПАУКИ"],
+		[-1, -1, -65.0, 1.4, "|||| |||| |||| ||"]],
+	4: [[-1, -1, -101.0, 1.7, "ОН СЧИТАЕТ\nТВОИ ШАГИ"],
+		[0, 1, 56.0, 1.7, "СМЕНА №7.\nНЕ ХОДИ\nЗА РЕШЁТКУ"],
 		[-3, 0, 40.0, 0.0, "НЕ СМОТРИ ВНИЗ"]],
-	5: [[-1, -1, -229.0, 1.8, "ТВОЯ СМЕНА"],
-		[-1, 1, -95.0, 1.7, "ОН УЖЕ ЗДЕСЬ"]],
+	5: [[-1, -1, -318.5, 1.8, "ТВОЯ СМЕНА"],
+		[-1, 1, -117.5, 1.7, "ОН УЖЕ ЗДЕСЬ"]],
 }
 
 ## Карта растёт: докуда по основному тоннелю открыто в каждую смену (z ограждения)
 ## и с какой смены открыта каждая штольня.
-const DAY_LIMIT_Z := [0.0, -95.0, -148.0, -176.0, -231.0, -1000.0]
+const DAY_LIMIT_Z := [0.0, -117.5, -197.0, -239.0, -321.5, -1000.0]
 const BRANCH_OPEN_DAY := [2, 3, 4]
 ## Сложность растёт: существа, коробки патронов, патроны в оружейном ящике.
 const CREATURES_PER_DAY := [0, 0, 0, 2, 4, 6]
@@ -88,23 +88,59 @@ const ROOM_SCHEDULE := {
 ## Записки прежних обходчиков: из них складывается история тоннеля.
 const NOTE_TEXTS := {
 	"n1": ["Журнал бригады Гусева, 1979",
-		"Пробили стенку на двести двенадцатом метре. За ней — пустота, тёплый воздух и звук, будто кто-то дышит.\n\nНачальство велело замуровать и забыть. Мы замуровали. Забыть не получается."],
+		"12 марта. Прокладываем перегон к «Тихой». Грунт сухой, идём быстро, план перевыполнили. Бригадир обещал премию к майским.\n\n"
+		+ "17 марта. На двести семьдесят третьем метре щит упёрся в старую кладку. Кирпич дореволюционный, раствор чёрный, как дёготь. На схемах здесь ничего нет. Пробили — за стенкой пустота, тёплый воздух и звук, будто кто-то медленно дышит во сне.\n\n"
+		+ "18 марта. Петров полез с фонарём и вернулся бледный. Говорит, там тоннель, старше нашего, и уходит вниз. Говорит, видел каски. Наши, жёлтые. Мы такие ещё не получали.\n\n"
+		+ "19 марта. Приезжали из управления. Велели замуровать, поставить решётку и забыть. Мы замуровали. Решётку поставили.\n\n"
+		+ "Забыть не получается. Петров перестал выключать свет дома."],
 	"n2": ["Обходчик № 2, 1986",
-		"Пишу, пока светит фонарь. Свет его не убивает — он просто не любит, когда на него смотрят.\n\nПауки чувствуют его раньше нас. Если паутина свежая — он рядом."],
+		"Пишу, пока светит фонарь. Батарейку берегу, поэтому коротко — но, наверное, не получится.\n\n"
+		+ "Первые две смены всё было как обещали: фильтры, паутина, генератор. На третью кто-то пошёл за мной в такт. Я останавливаюсь — он делает ещё два шага. Я считал.\n\n"
+		+ "Свет его не убивает. Он просто не любит, когда на него смотрят. Если поймать его лучом — он уходит, как будто его и не было. Но потом возвращается ближе.\n\n"
+		+ "Пауки чувствуют его раньше нас. Они бегут все разом, в одну сторону — от него. Если паутина свежая там, где ты её только что сжёг, — он рядом. Если пауки пропали совсем — он уже здесь.\n\n"
+		+ "В шкафах для инструмента можно отсидеться. Главное — не дышать, когда он подходит. Он слушает."],
 	"n3": ["Без подписи",
-		"Не верь голосу в рации, если он зовёт тебя к решётке. Наверху так не говорят.\n\nНаверху вообще не знают, что здесь."],
+		"Не верь голосу в рации, если он зовёт тебя к решётке. Наверху так не говорят. Наверху говорят коротко и с матом, а этот — вежливо, по имени-отчеству.\n\n"
+		+ "Я проверял: позвонил диспетчеру с поверхности после смены. Он сказал, что в ту ночь со мной не связывался. Что линия была отключена на ремонт.\n\n"
+		+ "Наверху вообще не знают, что здесь. Или делают вид. Платят втрое — это не за вредность.\n\n"
+		+ "Если голос просит доложить, где ты, — промолчи. Просто промолчи."],
 	"n4": ["Обходчик № 4, 1993",
-		"Вагонетку двигал не я. Он учится.\n\nСначала шаги. Потом голоса. Потом вещи. Потом — мы."],
+		"Вагонетку двигал не я. Одному её с места не сдвинуть — я пробовал, когда искал, куда закатился фильтр. Тонна железа, колёса прикипели к рельсам.\n\n"
+		+ "Утром она стояла на сто пятом метре, носом к станции. Как будто кто-то катал её ночью туда-сюда и бросил на полпути.\n\n"
+		+ "Он учится. Я записываю, чтобы не сойти с ума:\n"
+		+ "сначала были шаги;\n"
+		+ "потом голоса — моим голосом, из штольни;\n"
+		+ "потом вещи — дверь, зарядка, ящики;\n"
+		+ "потом — мы.\n\n"
+		+ "Я не знаю, что значит последний пункт. Но он написан не моей рукой."],
 	"n5": ["Обходчик № 4, последняя запись",
-		"С ним пришли другие. Бледные, ползают на четвереньках. В луче фонаря они медленнее.\n\nПистолет диспетчер выдал на третью ночь. Значит, наверху знают."],
+		"С ним пришли другие. Бледные, худые, ползают на четвереньках, как побитые собаки. В луче фонаря они медленнее — будто вязнут в свете. Без света видят шагов на пять, не больше, но слышат всё: бег, прыжок, выстрел.\n\n"
+		+ "Пистолет диспетчер выдал на третью ночь. Значит, наверху знают. Значит, знали и раньше.\n\n"
+		+ "Два попадания — и ползун рассыпается в пыль. Пыль пахнет как старые каски.\n\n"
+		+ "Он сам — другое. Его пуля не берёт. От него только прятаться: шкаф, тишина, задержать дыхание. С каждой ночью он ищет дольше. Сегодня он стоял у моего шкафа, пока я не досчитал до трёхсот.\n\n"
+		+ "Завтра не спущусь."],
 	"n6": ["Обходчик № 6",
-		"Седьмой — это не номер смены. Нас было семеро.\n\nКаждый следующий — его новая пара глаз. Вчера я видел Пятого. Он полз."],
+		"Седьмой — это не номер смены. Нас было семеро. Я нашёл список в столе диспетчерской, под газетой: семь фамилий, у шести стоят галочки. Последняя — пустая. Место для восьмого.\n\n"
+		+ "Каждый следующий — его новая пара глаз. Он смотрит нами. Поэтому он знает, где шкафы, где зарядка, где ты прячешь батарейки.\n\n"
+		+ "Вчера я видел Пятого. Он полз по третьей штольне, в своей каске, бледный, как те. Он узнал меня. Он улыбнулся.\n\n"
+		+ "Я оставлю это здесь, где темнее всего. Сюда он заходит реже: тут нечего забирать."],
 	"n7": ["Акт обследования, 2001",
-		"Обнаружено: шесть касок, личные вещи, фонари. Тел нет.\n\nСтанцию закрыть. Набор обходчиков продолжить. Сведения засекретить."],
+		"АКТ № 14-с. Комиссия в составе трёх человек провела обследование перегона за станцией «Тихая».\n\n"
+		+ "Обнаружено: шесть касок образца 1978 года, личные вещи, фонари (все в рабочем состоянии, батареи разряжены), журнал смен с записями после даты закрытия станции. Тел не обнаружено.\n\n"
+		+ "Решётка на 273-м метре повреждена. Характер повреждений указывает на воздействие изнутри.\n\n"
+		+ "Решение: станцию для пассажиров не открывать. Набор обходчиков продолжить на прежних условиях. Сведения засекретить.\n\n"
+		+ "Подпись председателя неразборчива. На обороте карандашом: «Сколько ещё?»"],
 	"n8": ["Обходчик № 7",
-		"Решётку открыл не он. Решётку открыл я.\n\nИзнутри было тише. Изнутри было не страшно."],
+		"Решётку открыл не он. Решётку открыл я.\n\n"
+		+ "Он не может открыть её сам — замок с нашей стороны. Ему нужен кто-то, кто устанет бояться. Кто придёт сюда в пятую ночь и решит, что хуже уже не будет.\n\n"
+		+ "Изнутри было тише. Изнутри было не страшно. Там тепло, и все наши там, и никто не считает шаги.\n\n"
+		+ "Но если ты дочитал до сюда — засов работает в обе стороны. Его можно запереть изнутри. Тогда он останется с нами, а не пойдёт наверх.\n\n"
+		+ "Я не смог. Может, сможешь ты."],
 	"n9": ["Без подписи. Чернила ещё свежие",
-		"Если ты читаешь это — ты восьмой.\n\nНе выключай фонарь. Не докладывай. Поднимайся."],
+		"Если ты читаешь это — ты восьмой.\n\n"
+		+ "Я писал это твоей рукой. Посмотри на почерк. Посмотри.\n\n"
+		+ "Не выключай фонарь. Не докладывай, где ты. Поднимайся, пока лестница держит.\n\n"
+		+ "Или останься и закрой за собой. Выбор всегда был твой — просто тебе об этом не говорили."],
 }
 
 const DAY_SUBTITLES := ["", "Станция «Тихая». Первая смена.", "Вторая смена.", "Третья смена.", "Четвёртая смена.", "Последняя смена."]
@@ -148,6 +184,7 @@ var _uncaptured := 0.0
 var _grace := 0.0
 var _smoke := false
 var _debug_log := false
+var _fear_peak := 0.0  # для достижения «Холодная голова»
 var _debug_t := 0.0
 
 
@@ -187,6 +224,7 @@ func _ready() -> void:
 
 	stalker = Stalker.new()
 	stalker.player = player
+	stalker.level = level
 	add_child(stalker)
 
 	director = Director.new()
@@ -255,6 +293,7 @@ func _process(delta: float) -> void:
 		_drip_t = randf_range(4.0, 11.0)
 		var pos := player.global_position + Vector3(randf_range(-2.0, 2.0), 2.5, randf_range(-10.0, 10.0))
 		Game.play_at(Sfx.drip(), pos, -6.0)
+	_fear_peak = maxf(_fear_peak, Game.fear)
 	if collapsing and not busy:
 		_update_collapse(delta)
 	_update_water()
@@ -454,6 +493,7 @@ func start_day(d: int) -> void:
 		_setup_access(d)
 	if not debug_flag("norooms"):
 		_setup_rooms(d)
+	_spawn_finds(d)
 	_spawn_threats(d)
 	_setup_power(d)
 	_spawn_task_devices(d)
@@ -462,7 +502,7 @@ func start_day(d: int) -> void:
 	dispatcher.collapse_mode = false
 	# На третий день вагонетка уезжает в тоннель сама.
 	if not debug_flag("s_misc"):
-		cart.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, -120.0 if d == 3 else -40.0)
+		cart.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, -155.0 if d == 3 else -40.0)
 		level.set_grate_open(d == Game.FINAL_DAY)
 		level.tunnel_lights_off = false
 		level.blackout = false
@@ -476,6 +516,9 @@ func start_day(d: int) -> void:
 	if not debug_flag("s_reset"):
 		player.reset_for_day(SPAWN, SPAWN_YAW, START_BATTERY)
 	player.drain_mult = 1.0 + (d - 1) * 0.15
+	_fear_peak = 0.0
+	if d == Game.FINAL_DAY:
+		Achievements.unlock("shift5")
 	for c in chargers:
 		c.reset()
 	player.input_locked = true
@@ -492,7 +535,7 @@ func start_day(d: int) -> void:
 	if debug_flag("flashoff"):
 		player.flashlight_on = false
 	if debug_flag("select2"):
-		player.select(1)
+		player.hold("burner")
 	if debug_flag("lookup"):
 		player.debug_look(0.9, 0.0)
 	if debug_flag("lookback"):
@@ -503,13 +546,20 @@ func start_day(d: int) -> void:
 		Game.say(DAY_THOUGHTS[d], Game.THOUGHT, 6.0)
 		Game.say("На столе шипит рация. Диспетчер ждёт.", Game.THOUGHT, 3.5)
 		if d == 1:
-			Game.say("Рация в руке (5) и ЛКМ — спросить диспетчера, куда идти. Шуметь внизу не стоит: приседай (C).", Game.SYSTEM, 6.0)
+			Game.say("Рация в руке (4) и ЛКМ — спросить диспетчера, куда идти. Шуметь внизу не стоит: приседай (C).", Game.SYSTEM, 6.0)
 
 
 func end_day() -> void:
 	if busy:
 		return
 	busy = true
+	# Достижения за смену.
+	if Game.day == 1:
+		Achievements.unlock("shift1")
+	if not player.ran_today:
+		Achievements.unlock("quiet")
+	if _fear_peak <= Achievements.fear_max() * 0.5:
+		Achievements.unlock("brave")
 	player.input_locked = true
 	Game.play_ui(Sfx.click())
 	await hud.fade_to(1.0, 1.5).finished
@@ -621,7 +671,7 @@ func _final_scene() -> void:
 	var pos := Vector3(Level.SHAFT_X, Level.FLOOR_Y, Level.SHAFT_Z + 0.2)
 	var to := pos - player.global_position
 	player.rotation.y = atan2(-to.x, -to.z)
-	player.select(0)
+	player.hold("")
 	player.flashlight_on = true
 	player.battery = maxf(player.battery, 40.0)
 	stalker.appear(pos, "nest", 999.0)
@@ -641,6 +691,7 @@ func _final_scene() -> void:
 	await get_tree().create_timer(2.5).timeout
 	await _newspaper("A")
 	await _screamer()
+	Achievements.unlock("ending1")
 	_finish("Концовка 1 из 3 — «Доклад принят»")
 
 
@@ -665,6 +716,7 @@ func _ending_climb() -> void:
 	await get_tree().create_timer(1.5).timeout
 	await _newspaper("B")
 	await _screamer()
+	Achievements.unlock("ending2")
 	_finish("Концовка 2 из 3 — «Поднялся»")
 
 
@@ -687,6 +739,7 @@ func _ending_seal() -> void:
 	hud.show_title("ИЗНУТРИ БЫЛО ТИШЕ", "", 3.0)
 	await get_tree().create_timer(4.5).timeout
 	await _newspaper("C")
+	Achievements.unlock("ending3")
 	_finish("Концовка 3 из 3 — «Изнутри»")
 
 
@@ -719,6 +772,7 @@ func _screamer() -> void:
 	flash.global_position = cam.global_position - cam.global_transform.basis.z * 0.2
 	hud.set_clear()
 	player.extra_shake = 0.06
+	Game.play_ui(Sfx.scream(), 4.0)
 	Game.play_ui(Sfx.sting(), 6.0)
 	Game.play_ui(Sfx.hiss(), 6.0)
 	hud.show_scream("Сейчас %s. Ты ведь не спишь.\n\nЖДИ НАС.\nМЫ ИДЁМ ЗА ТОБОЙ." % clock)
@@ -785,7 +839,7 @@ func _spawn_webs(d: int) -> void:
 		# Гнездо за решёткой.
 		for i in 12:
 			var x := randf_range(Level.LEFT_X + 0.5, Level.RIGHT_X - 0.5)
-			spawn_small_web(Vector3(x, Level.FLOOR_Y + randf_range(0.8, 2.8), randf_range(-262.0, -236.0)), randf_range(1.2, 2.0))
+			spawn_small_web(Vector3(x, Level.FLOOR_Y + randf_range(0.8, 2.8), randf_range(-368.0, -329.0)), randf_range(1.2, 2.0))
 
 
 func spawn_block_web(tunnel: int, along: float, regrown := false) -> Web:
@@ -835,7 +889,7 @@ func _spawn_spiders(d: int) -> void:
 		_add_spider(-3.0, Vector3.RIGHT, -40.0, 3.0)
 	for i in d + 1:
 		var left := randf() < 0.5
-		var z := randf_range(maxf(day_limit() + 6.0, -220.0), -60.0)
+		var z := randf_range(maxf(day_limit() + 6.0, Level.GRATE_Z + 12.0), -60.0)
 		# Не в камерах развилок — там стены другие.
 		for b in Level.BRANCHES:
 			if absf(z - float(b["z"])) < Level.JUNCTION_MAIN + 4.0:
@@ -843,7 +897,12 @@ func _spawn_spiders(d: int) -> void:
 		_add_spider(Level.wall_x(-1 if left else 1, Level.FLOOR_Y + 1.5, 0.02), Vector3.RIGHT if left else Vector3.LEFT, z, 5.0)
 
 
-func _add_spider(wall_x: float, wall_normal: Vector3, z: float, range_z: float) -> void:
+## Паук-«гонец» на стене основного тоннеля (бежит от «Другого» и пропадает).
+func add_runner_spider(z: float, left: bool) -> Spider:
+	return _add_spider(Level.wall_x(-1 if left else 1, Level.FLOOR_Y + 1.5, 0.02), Vector3.RIGHT if left else Vector3.LEFT, z, 2.0)
+
+
+func _add_spider(wall_x: float, wall_normal: Vector3, z: float, range_z: float) -> Spider:
 	var s := Spider.new()
 	s.main = self
 	s.player = player
@@ -853,6 +912,7 @@ func _add_spider(wall_x: float, wall_normal: Vector3, z: float, range_z: float) 
 	s.range_z = range_z
 	s.floor_y = Level.FLOOR_Y
 	add_child(s)
+	return s
 
 
 func _spawn_notes(d: int) -> void:
@@ -938,10 +998,39 @@ func _setup_rooms(d: int) -> void:
 		k += 1
 	if d == Game.FINAL_DAY:
 		var nest := Remains.new()
-		nest.position = Vector3(Level.TUN_CX - 0.6, Level.FLOOR_Y, -244.0)
+		nest.position = Vector3(Level.TUN_CX - 0.6, Level.FLOOR_Y, -341.0)
 		nest.rotation.y = 0.7
 		add_child(nest)
-		_spawn_note("n9", Vector3(Level.TUN_CX + 0.4, Level.FLOOR_Y, -242.5))
+		_spawn_note("n9", Vector3(Level.TUN_CX + 0.4, Level.FLOOR_Y, -339.0))
+
+
+## Находки: лежат с определённой смены и пропадают навсегда, когда их подобрали.
+func _spawn_finds(d: int) -> void:
+	var spots := {
+		"pills1": _room_spot(0, Vector3(1.2, 0, -1.2)),
+		"pills2": level.floor_point(0, float(Level.BRANCHES[0]["length"]) - 8.0, 1.3),
+		"pills3": level.floor_point(2, float(Level.BRANCHES[2]["length"]) - 8.0, -1.3),
+		"lens": level.floor_point(-1, -229.0, -1.35),
+		"cell": level.floor_point(1, float(Level.BRANCHES[1]["length"]) - 7.0, -1.3),
+		"duck": _room_spot(5, Vector3(1.1, 0, 0.9)),
+	}
+	for id in Achievements.FINDS:
+		if Achievements.has_find(id) or d < int(Achievements.FINDS[id][0]):
+			continue
+		var f := Find.new()
+		f.find_id = id
+		if id == "sponjik":
+			# Надпись мелом у самого пола, за генератором.
+			f.transform = _mount(-2, 0, -47.6, Level.FLOOR_Y + 0.45)
+		else:
+			f.position = spots[id]
+			f.rotation.y = randf() * TAU
+		add_child(f)
+
+
+func _room_spot(index: int, local: Vector3) -> Vector3:
+	var room: Dictionary = level.rooms[index]
+	return room["center"] + (room["basis"] as Basis) * local
 
 
 func _spawn_note(id: String, pos: Vector3) -> void:
@@ -1009,7 +1098,7 @@ func _spawn_task_devices(d: int) -> void:
 	if Game.has_open_task("sensor"):
 		var sensor := TaskDevice.new()
 		sensor.kind = "sensor"
-		sensor.transform = level.wall_mount(-1, 1, -85.0, Level.FLOOR_Y + 1.5)
+		sensor.transform = level.wall_mount(-1, 1, Level.TUN_Z0 - Level.PICKET_STEP * 3.0 + 1.5, Level.FLOOR_Y + 1.5)
 		add_child(sensor)
 	if Game.has_open_task("cable"):
 		var spot: Array = CABLE_SPOTS.pick_random()
@@ -1080,7 +1169,7 @@ func _random_floor_spot(min_depth: float) -> Vector3:
 		if not _reachable(t, along):
 			continue
 		return level.floor_point(t, along, randf_range(-1.2, 1.2))
-	return Vector3(Level.TUN_CX + 1.0, Level.FLOOR_Y, -80.0)
+	return Vector3(Level.TUN_CX + 1.0, Level.FLOOR_Y, -95.0)
 
 
 ## Визуальный стиль: чуть пониженное разрешение, жёсткий контраст, плёночное зерно (под интерфейсом).
@@ -1140,13 +1229,13 @@ func _smoke_test() -> void:
 		await get_tree().create_timer(5.5).timeout
 		hatch.hold_interact(player, 2.0)
 		radio.interact(player)
-		player.select(4)
+		player.hold("radio")
 		player.use_item()
 		hatch.hold_interact(player, 2.0)
 		hatch.interact(player)
 		await get_tree().create_timer(0.5).timeout
-		player.stop_climb(Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -110.0))
-		for ev in ["footsteps", "sighting", "behind", "lamps", "whisper", "regrow", "interfere", "crawler"]:
+		player.stop_climb(Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -140.0))
+		for ev in ["footsteps", "sighting", "behind", "lamps", "whisper", "regrow", "interfere", "crawler", "hunt"]:
 			director._run(ev)
 		# Генератор: запуск (со второй попытки, если чихнул), заправка, остановка.
 		generator.hold_interact(player, 2.0)
@@ -1178,13 +1267,13 @@ func _smoke_test() -> void:
 		doors[0].set_open(true)
 		doors[0].slam()
 		doors[0].interact(player)
-		player.select(4)
+		player.hold("radio")
 		dispatcher.radio_pressed(d)
 		player.batteries = 1
-		player.select(3)
+		player.hold("battery")
 		player.use_item()
 		player.filters = 3
-		player.select(2)
+		player.hold("filter")
 		for v in vents:
 			v.hold_interact(player, 2.5)
 		for n in get_tree().get_nodes_in_group("webs"):
@@ -1194,7 +1283,10 @@ func _smoke_test() -> void:
 		for c in crates:
 			c.interact(player)
 		player.cycle(1)
-		player.select(0)
+		player.cycle(-1)
+		player.hold("")
+		player.toggle_light()
+		player.toggle_light()
 		Input.action_press("jump")
 		await get_tree().physics_frame
 		await get_tree().physics_frame
@@ -1211,9 +1303,9 @@ func _smoke_test() -> void:
 				pickup.interact(player)
 		for i in 30:
 			_update_water()
-		player.select(5)
+		player.hold("map")
 		await get_tree().process_frame
-		player.select(6)
+		player.hold("pistol")
 		player.use_item()
 		for n in get_tree().get_nodes_in_group("creatures"):
 			var cr := n as Crawler
@@ -1229,9 +1321,9 @@ func _smoke_test() -> void:
 		journal.interact(player)
 		await get_tree().create_timer(1.5).timeout
 		stalker.hide_now()
-	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -230.0)
+	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, Level.GRATE_Z + 2.0)
 	await get_tree().create_timer(1.0).timeout
-	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -252.0)
+	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, Level.GRATE_Z - 28.0)
 	await get_tree().create_timer(1.5).timeout
 	# Концовка 1: доложил → у станции съеден → газета → скример.
 	dispatcher.radio_pressed(5)
@@ -1244,11 +1336,11 @@ func _smoke_test() -> void:
 	# Концовка 3: все записки, засов решётки изнутри.
 	start_day(5)
 	await get_tree().create_timer(5.5).timeout
-	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -252.0)
+	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, Level.GRATE_Z - 28.0)
 	await get_tree().create_timer(1.0).timeout
 	for i in 9:
 		Game.notes_read["n%d" % (i + 1)] = true
-	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -234.0)
+	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, Level.GRATE_Z - 2.0)
 	await get_tree().physics_frame
 	for n in get_tree().get_nodes_in_group("day_objects"):
 		var lock := n as GrateLock
@@ -1262,7 +1354,7 @@ func _smoke_test() -> void:
 	# Концовка 2: не доложил, поднялся наверх.
 	start_day(5)
 	await get_tree().create_timer(5.5).timeout
-	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -252.0)
+	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, Level.GRATE_Z - 28.0)
 	await get_tree().create_timer(1.0).timeout
 	player.global_position = SPAWN
 	await get_tree().create_timer(10.0).timeout

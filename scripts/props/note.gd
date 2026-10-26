@@ -24,6 +24,10 @@ func get_prompt(_player) -> String:
 
 func interact(_player) -> void:
 	Game.notes_read[note_id] = true
+	if note_id == "masha":
+		Achievements.unlock("masha")
+	if Game.notes_count() >= Game.NOTES_TOTAL:
+		Achievements.unlock("archivist")
 	Game.tasks_changed.emit()
 	if hud:
 		hud.show_note(title, text)

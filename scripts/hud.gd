@@ -31,6 +31,7 @@ var _battery_label: Label
 var _slots: Array[PanelContainer] = []
 var _slot_styles: Array[StyleBoxFlat] = []
 var _slot_labels: Array[Label] = []
+const ICON_SIZE := 0.3  # наибольший размер модели в иконке слота, м
 var _slot_icons: Array[Node3D] = []
 var _hotbar_state := ""
 var _fear_bar: ProgressBar
@@ -41,6 +42,7 @@ var _health_bar: ProgressBar
 var _map: MapView
 var _note_panel: PanelContainer
 var _note_title: Label
+var _note_scroll: ScrollContainer
 var _note_text: Label
 var _reading := false
 var _paper: PanelContainer
@@ -48,6 +50,8 @@ var _paper_head: Label
 var _paper_body: Label
 var _paper_cap: Label
 var _status: Label
+var _toast: Label
+var _toast_t := 0.0
 var _scream: Label
 var _paper_open := false
 var player: Player
@@ -197,7 +201,7 @@ func _ready() -> void:
 	ns.shadow_color = Color(0, 0, 0, 0.6)
 	ns.shadow_size = 12
 	_note_panel.add_theme_stylebox_override("panel", ns)
-	_place(_note_panel, 0.5, 0.5, 0.5, 0.5, -300, -260, 300, 260)
+	_place(_note_panel, 0.5, 0.5, 0.5, 0.5, -360, -300, 360, 300)
 	_note_panel.rotation = deg_to_rad(0.8)
 	_note_panel.visible = false
 	_root.add_child(_note_panel)
@@ -208,14 +212,19 @@ func _ready() -> void:
 	_note_title.add_theme_font_size_override("font_size", 22)
 	_note_title.add_theme_color_override("font_color", Color(0.2, 0.12, 0.08))
 	nbox.add_child(_note_title)
+	# Длинные записки прокручиваются колесом мыши или W / S.
+	_note_scroll = ScrollContainer.new()
+	_note_scroll.custom_minimum_size = Vector2(660, 440)
+	_note_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	nbox.add_child(_note_scroll)
 	_note_text = Label.new()
 	_note_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_note_text.custom_minimum_size = Vector2(540, 0)
-	_note_text.add_theme_font_size_override("font_size", 18)
+	_note_text.custom_minimum_size = Vector2(640, 0)
+	_note_text.add_theme_font_size_override("font_size", 17)
 	_note_text.add_theme_color_override("font_color", Color(0.15, 0.13, 0.12))
-	nbox.add_child(_note_text)
+	_note_scroll.add_child(_note_text)
 	var hint := Label.new()
-	hint.text = "E / Esc — убрать"
+	hint.text = "колесо мыши / W, S — листать        E / Esc — убрать"
 	hint.add_theme_font_size_override("font_size", 13)
 	hint.add_theme_color_override("font_color", Color(0.4, 0.35, 0.3))
 	nbox.add_child(hint)
@@ -231,6 +240,13 @@ func _ready() -> void:
 	_place(_scream, 0, 0, 1, 1, 40, 40, -40, -60)
 	_scream.visible = false
 	_root.add_child(_scream)
+
+	# Плашка «Достижение получено» справа сверху.
+	_toast = _make_label(_root, 18, HORIZONTAL_ALIGNMENT_RIGHT)
+	_toast.add_theme_color_override("font_color", AMBER)
+	_place(_toast, 1, 0, 1, 0, -520, 70, -24, 130)
+	_toast.modulate.a = 0.0
+	Achievements.unlocked.connect(func(_id, title): show_toast("ДОСТИЖЕНИЕ\n" + title))
 
 	Game.tasks_changed.connect(_refresh_tasks)
 	Game.message.connect(_on_message)
@@ -294,11 +310,17 @@ func setup_hotbar(player: Player, with_icons := true) -> void:
 		env.environment.ambient_light_color = Color(0.6, 0.6, 0.65)
 		env.environment.ambient_light_energy = 0.6
 		vp.add_child(env)
+		# Модель вписывается в кадр сама: крутится вокруг своего центра.
+		var pivot := Node3D.new()
+		pivot.rotation = Vector3(0.35, 0.9, 0)
+		vp.add_child(pivot)
 		var model := player.make_model(item)
-		model.scale = Vector3.ONE * float(Player.ICON_SCALE[item])
-		model.rotation = Vector3(0.35, 0.9, 0)
-		vp.add_child(model)
-		_slot_icons.append(model)
+		pivot.add_child(model)
+		var box := Geo.mesh_bounds(model)
+		var k := ICON_SIZE / maxf(box.get_longest_axis_size(), 0.001)
+		model.scale = Vector3.ONE * k
+		model.position = -box.get_center() * k
+		_slot_icons.append(pivot)
 		# Номер клавиши и количество поверх картинки.
 		var label := Label.new()
 		label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
@@ -320,6 +342,8 @@ func _process(delta: float) -> void:
 		_subtitle.add_theme_color_override("font_color", m[1])
 		_sub_left = m[2]
 	_subtitle.modulate.a = clampf(_sub_left * 2.0, 0.0, 1.0)
+	_toast_t -= delta
+	_toast.modulate.a = clampf(_toast_t, 0.0, 1.0)
 	for m in _slot_icons:
 		m.rotate_y(delta * 0.6)
 
@@ -461,7 +485,7 @@ var _newspapers := {
 		+ "В журнале смен его рукой сделана последняя запись: «Смена сдана. Восьмой».\n\n"
 		+ "Соседи рассказывают, что ночью у его подъезда слышали скрежет — будто по асфальту ползло что-то тяжёлое.\n\n"
 		+ "Дочь пропавшего, Маша, каждый вечер ждёт отца у окна. Пульт диспетчерской станции отключён с 2001 года."],
-	"C": ["ТОННЕЛЬ ЗА СТАНЦИЕЙ «ТИХАЯ» ЗАМУРОВАН ИЗНУТРИ", "фото: решётка, 232-й метр",
+	"C": ["ТОННЕЛЬ ЗА СТАНЦИЕЙ «ТИХАЯ» ЗАМУРОВАН ИЗНУТРИ", "фото: решётка, 273-й метр",
 		"Спасатели не смогли открыть решётку в конце тоннеля: она заперта изнутри, на замок обходчика. "
 		+ "За решёткой тишина. Обвал прекратился сам.\n\n"
 		+ "Впервые за сорок лет датчики станции не фиксируют никакого движения. Набор обходчиков прекращён.\n\n"
@@ -502,6 +526,7 @@ func is_reading() -> bool:
 func show_note(title: String, text: String) -> void:
 	_note_title.text = title
 	_note_text.text = text
+	_note_scroll.scroll_vertical = 0
 	_note_panel.visible = true
 	_reading = true
 	if player:
@@ -515,6 +540,15 @@ func _input(event: InputEvent) -> void:
 		return
 	if not _reading:
 		return
+	var wheel := event as InputEventMouseButton
+	if wheel and wheel.pressed and (wheel.button_index == MOUSE_BUTTON_WHEEL_DOWN or wheel.button_index == MOUSE_BUTTON_WHEEL_UP):
+		_note_scroll.scroll_vertical += 60 if wheel.button_index == MOUSE_BUTTON_WHEEL_DOWN else -60
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("move_back") or event.is_action_pressed("move_forward"):
+		_note_scroll.scroll_vertical += 80 if event.is_action_pressed("move_back") else -80
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("interact") or event.is_action_pressed("ui_cancel") or event.is_action_pressed("burn"):
 		get_viewport().set_input_as_handled()
 		close_note()
@@ -527,6 +561,12 @@ func close_note() -> void:
 	_reading = false
 	if player:
 		player.input_locked = false
+
+
+func show_toast(text: String) -> void:
+	_toast.text = text
+	_toast_t = 4.0
+	Game.play_ui(Sfx.pickup(), -4.0)
 
 
 func set_status(text: String) -> void:

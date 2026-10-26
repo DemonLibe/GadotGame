@@ -21,29 +21,32 @@ var _cooldown := 30.0
 var _echo_left := 0
 var _hb := 0.0
 var _flags := {}
+var _hunt_pending := false
 
 
 func _ready() -> void:
 	player.footstep.connect(_on_step)
 	stalker.vanished.connect(_on_vanished)
+	stalker.caught.connect(_on_caught)
 
 
 func start_day(d: int) -> void:
 	_flags = {}
+	_hunt_pending = false
 	_echo_left = 0
 	_cooldown = randf_range(20.0, 35.0)
 	match d:
 		1: _budget = {}
 		2: _budget = {"footsteps": 1, "sighting": 1, "radio": 1}
-		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1, "radio": 1, "crawler": 1, "interfere": 1}
-		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1, "radio": 1, "crawler": 2, "interfere": 2}
-		_: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1, "crawler": 3, "interfere": 1}
+		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1, "radio": 1, "crawler": 1, "interfere": 1, "hunt": 1}
+		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1, "radio": 1, "crawler": 2, "interfere": 2, "hunt": 2}
+		_: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1, "crawler": 3, "interfere": 1, "hunt": 3}
 
 
 func _process(delta: float) -> void:
 	if main.busy:
 		return
-	main.hud.set_fear(Game.fear / 100.0)
+	main.hud.set_fear(Game.fear / Achievements.fear_max())
 	_update_fear(delta)
 	_heartbeat(delta)
 	_story()
@@ -51,7 +54,7 @@ func _process(delta: float) -> void:
 		return
 	if main.collapsing:
 		return  # во время обвала — только бегство
-	if Game.fear >= 100.0:
+	if Game.fear >= Achievements.fear_max():
 		main.panic()
 		return
 	if player.global_position.z > Level.TUN_Z0 - 4.0 or player.global_position.y > Level.FLOOR_Y + 5.0:
@@ -77,6 +80,10 @@ func _process(delta: float) -> void:
 
 func _update_fear(delta: float) -> void:
 	var pos := player.global_position
+	# На лестнице страх не копится: спуск и подъём — передышка, а не испытание.
+	if player.climbing:
+		Game.add_fear(-delta * 2.0)
+		return
 	var lit := player.has_light() or level.is_lit_near(pos) or pos.y > Level.ROOM_Y - 1.0
 	if lit:
 		Game.add_fear(-delta * (6.0 if pos.z > Level.TUN_Z0 or pos.y > Level.ROOM_Y - 1.0 else 2.5))
@@ -88,11 +95,12 @@ func _update_fear(delta: float) -> void:
 
 
 func _heartbeat(delta: float) -> void:
-	if Game.fear < 45.0:
+	var fmax := Achievements.fear_max()
+	if Game.fear < fmax * 0.45:
 		return
 	_hb -= delta
 	if _hb <= 0.0:
-		var k := (Game.fear - 45.0) / 55.0
+		var k := (Game.fear - fmax * 0.45) / (fmax * 0.55)
 		_hb = lerpf(1.1, 0.45, k)
 		Game.play_ui(Sfx.heartbeat(), lerpf(-20.0, -3.0, k))
 
@@ -119,7 +127,7 @@ func _story() -> void:
 	if d == 3 and at_station and z < -34.0 and _once("cart"):
 		Game.say("Где вагонетка?.. Она всегда стоит здесь. Всегда.", Game.THOUGHT, 5.0)
 	if d == 4 and Game.all_done() and at_station and z < -36.0 and _once("watch"):
-		var pos := Vector3(Level.TUN_CX, Level.FLOOR_Y, -60.0)
+		var pos := Vector3(Level.TUN_CX, Level.FLOOR_Y, -64.0)
 		stalker.appear(pos, "watch", 15.0)
 		Game.play_at(Sfx.step(), pos, 2.0)
 	if y < Level.FLOOR_Y + 5.0 and Game.has_open_task("inspect:end") and z < main.day_limit() + 4.0:
@@ -132,7 +140,7 @@ func _story() -> void:
 			Game.add_task("inspect:nest", "Узнать, что за решёткой", 1)
 		else:
 			Game.say("Решётка заперта. За ней... каски? Чьи это каски?", Game.THOUGHT, 5.0)
-	if d == Game.FINAL_DAY and y < Level.FLOOR_Y + 5.0 and z < -249.0:
+	if d == Game.FINAL_DAY and y < Level.FLOOR_Y + 5.0 and z < Level.GRATE_Z - 25.0:
 		main.ending()
 
 
@@ -168,7 +176,71 @@ func _run(ev: String) -> bool:
 			return _crawler()
 		"interfere":
 			return _interfere()
+		"hunt":
+			return _hunt()
 	return false
+
+
+## Охота «Другого» (3–5 смены). Сначала оттуда, где он появится, бегут пауки — и пропадают.
+## Через несколько секунд выходит он сам. С каждой сменой — быстрее, дольше ищет, меньше боится света.
+func _hunt() -> bool:
+	if _hunt_pending:
+		return false
+	var p := player.global_position
+	# Он выходит в основном тоннеле: впереди по взгляду, если обходчик в нём, или у развилки его штольни.
+	var pos := Vector3.ZERO
+	var axis := level.axis_at(p)
+	var in_main := absf(axis.dot(Vector3.FORWARD)) > 0.99
+	if in_main:
+		var sgn := -1.0 if player.forward_flat().z < 0.0 else 1.0
+		pos = Vector3(Level.TUN_CX, Level.FLOOR_Y, p.z + sgn * randf_range(30.0, 40.0))
+	else:
+		var jz := 0.0
+		for i in Level.BRANCHES.size():
+			if absf(Level.branch_dir(i).dot(axis)) > 0.99:
+				jz = float(Level.BRANCHES[i]["z"])
+		pos = Vector3(Level.TUN_CX, Level.FLOOR_Y, jz - randf_range(12.0, 20.0))
+	pos.z = clampf(pos.z, maxf(main.day_limit() + 2.0, Level.GRATE_Z + 2.0), Level.TUN_Z0 - 6.0)
+	if pos.distance_to(p) < 18.0:
+		# Впереди тупик или ограждение — тогда он выходит с другой стороны.
+		pos.z = clampf(p.z - (pos.z - p.z), maxf(main.day_limit() + 2.0, Level.GRATE_Z + 2.0), Level.TUN_Z0 - 6.0)
+		if pos.distance_to(p) < 18.0:
+			return false
+	_hunt_pending = true
+	# Пауки бегут оттуда: те, что рядом с ним, и стайка с самого места — прямо на обходчика и дальше.
+	var dir_z := signf(p.z - pos.z)
+	if dir_z == 0.0:
+		dir_z = 1.0
+	for n in get_tree().get_nodes_in_group("spiders"):
+		var sp := n as Spider
+		if sp and absf(sp.global_position.z - pos.z) < 25.0:
+			sp.flee_and_vanish(pos - Vector3(0, 0, dir_z * 3.0), randf_range(5.0, 8.0))
+	for i in 4 + Game.day:
+		var sp: Spider = main.add_runner_spider(pos.z + randf_range(-2.0, 2.0), i % 2 == 0)
+		sp.flee_and_vanish(pos - Vector3(0, 0, dir_z * 3.0), randf_range(6.0, 9.0), randf_range(3.0, 4.2))
+	Game.play_at(Sfx.scuttle(), pos + Vector3(0, 2.0, 0), 4.0)
+	get_tree().create_timer(1.2).timeout.connect(func(): Game.play_at(Sfx.scuttle(), p.lerp(pos, 0.5) + Vector3(0, 2.0, 0), 2.0))
+	Game.say("Пауки... бегут. Все разом — оттуда. Он идёт. Нужен шкаф. Быстро.", Game.THOUGHT, 4.0)
+	var delay: float = [0.0, 0.0, 0.0, 7.0, 5.5, 4.0][clampi(Game.day, 0, 5)]
+	get_tree().create_timer(delay).timeout.connect(func(): _hunt_arrive(pos))
+	return true
+
+
+func _hunt_arrive(pos: Vector3) -> void:
+	_hunt_pending = false
+	if main.busy or main.collapsing or stalker.visible:
+		return
+	stalker.hunt(pos, Game.day)
+	Game.play_at(Sfx.whisper(), pos + Vector3(0, 1.7, 0), 4.0)
+
+
+func _on_caught() -> void:
+	if main.busy or main._smoke:
+		get_tree().create_timer(1.0).timeout.connect(stalker.hide_now)
+		return
+	player.input_locked = true
+	player.flicker(1.0)
+	get_tree().create_timer(0.8).timeout.connect(func(): main.fail_day("Он нашёл тебя."))
 
 
 ## Силуэт далеко впереди — на краю луча.
@@ -319,6 +391,14 @@ func _on_vanished(m: String, seen: bool) -> void:
 				player.flicker(0.5)
 				Game.play_ui(Sfx.sting(), -10.0)
 				Game.say_once("saw", "Там... кто-то стоял. В самом конце луча.")
+		"hunt":
+			if seen:
+				Game.say_once("hunt_light", "Ушёл из луча... Не убит — просто ушёл. Он вернётся.", Game.THOUGHT, 3.5)
+			elif stalker.player_hid_during_hunt():
+				Game.say_once("hunt_hid", "Ушёл. Я пересидел его. Сердце колотится так, что он должен был услышать.", Game.THOUGHT, 4.0)
+				Achievements.unlock("hid")
+			else:
+				Game.say_once("hunt_gone", "Тихо. Он ушёл... или ждёт.", Game.WHISPER, 3.0)
 		"behind":
 			if seen:
 				Game.add_fear(35.0)

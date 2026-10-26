@@ -86,6 +86,44 @@ static func model(parent: Node, path: String, mat: Material, pos := Vector3.ZERO
 	return m
 
 
+## Модель, вписанная по наибольшему размеру в size метров: центр по X/Z в нуле, дно на нуле.
+## Удобно для предметов, у которых в файлах разный масштаб.
+static func model_fit(parent: Node, path: String, mat: Material, size: float, pos := Vector3.ZERO, basis := Basis.IDENTITY) -> Node3D:
+	var holder := Node3D.new()
+	holder.transform = Transform3D(basis, pos)
+	parent.add_child(holder)
+	var m := model(holder, path, mat)
+	var box := mesh_bounds(m)
+	var k := size / maxf(box.get_longest_axis_size(), 0.0001)
+	m.scale = Vector3.ONE * k
+	m.position = Vector3(-box.get_center().x, -box.position.y, -box.get_center().z) * k
+	return holder
+
+
+## Общий AABB всех мешей узла в его собственных координатах.
+static func mesh_bounds(root: Node3D) -> AABB:
+	var box := AABB()
+	var first := true
+	var inv := root.global_transform.affine_inverse() if root.is_inside_tree() else Transform3D.IDENTITY
+	for n in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		var xf := inv * mi.global_transform if root.is_inside_tree() else _relative(root, mi)
+		var b := xf * mi.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	return box
+
+
+static func _relative(root: Node3D, n: Node3D) -> Transform3D:
+	var xf := Transform3D.IDENTITY
+	var cur: Node = n
+	while cur != null and cur != root:
+		if cur is Node3D:
+			xf = (cur as Node3D).transform * xf
+		cur = cur.get_parent()
+	return xf
+
+
 ## AnimationPlayer модели; циклы (ходьба, бег, ожидание) зацикливаются.
 static func model_anim(m: Node, loops: Array) -> AnimationPlayer:
 	var ap := m.find_child("AnimationPlayer", true, false) as AnimationPlayer

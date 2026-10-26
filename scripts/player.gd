@@ -1,7 +1,7 @@
 class_name Player
 extends CharacterBody3D
 ## Обходчик: ходьба, бег с выносливостью, прыжок, подъём по лестнице,
-## инвентарь (в руках всегда один предмет), фонарь с батареей, горелка, рация, взаимодействие.
+## инвентарь (в руках один предмет или ничего), налобный фонарь с батареей, горелка, рация, взаимодействие.
 
 signal footstep
 signal died
@@ -28,7 +28,9 @@ const DRAIN_PER_SEC := 100.0 / 240.0    # полный заряд — 4 мину
 const REACH := 2.4
 const STEP_LENGTH := 1.25
 const RUNG_STEP := 0.3
-const HAND_POS := Vector3(0.24, -0.25, -0.42)
+const HAND_POS := Vector3(0.24, -0.2, -0.42)
+const HEADLAMP_OFFSET := Vector3(0.0, 0.09, -0.06)
+const HAND_LAYER := 2  # визуальный слой предметов в руке (их подсвечивает своя лампочка)
 const JUMP_VELOCITY := 4.2
 const STAMINA_MAX := 100.0
 const STAMINA_RUN := 22.0      # расход в секунду при беге
@@ -39,11 +41,9 @@ const STAMINA_DELAY := 0.9     # пауза перед восстановлен�
 const HEALTH_MAX := 100.0
 const SHOT_RANGE := 40.0
 
-## Слоты инвентаря (клавиши 1–7).
-const ITEMS := ["flashlight", "burner", "filter", "battery", "radio", "map", "pistol", "canister"]
-const ITEM_NAMES := ["Фонарь", "Горелка", "Фильтр", "Батарейка", "Рация", "Карта", "Пистолет", "Канистра"]
-## Масштаб модели в иконке инвентаря.
-const ICON_SCALE := {"flashlight": 1.5, "burner": 1.3, "filter": 1.3, "battery": 2.4, "radio": 1.6, "map": 1.3, "pistol": 1.9, "canister": 1.1}
+## Слоты инвентаря (клавиши 1–7). Фонарь налобный — он не в руках, а включается клавишей F.
+const ITEMS := ["burner", "filter", "battery", "radio", "map", "pistol", "canister"]
+const ITEM_NAMES := ["Горелка", "Фильтр", "Батарейка", "Рация", "Карта", "Пистолет", "Канистра"]
 
 const BEAM_SHADER := """
 shader_type spatial;
@@ -66,9 +66,11 @@ var battery := 60.0
 var flashlight_on := true
 var filters := 0
 var batteries := 0
-var selected := 0
+var selected := -1  # -1 — руки пусты
 var input_locked := false
 var drain_mult := 1.0
+var upgrade_drain := 1.0      # находка «аккумулятор»
+var ran_today := false        # для достижения «Тихоня»
 var climbing := false
 var crouching := false
 var hiding := false          # сидит в шкафу
@@ -100,7 +102,6 @@ var flashlight: SpotLight3D
 var _ray: RayCast3D
 var _hand: Node3D
 var _models := {}
-var _lens_mat: StandardMaterial3D
 var _flame: CPUParticles3D
 var _torch_light: OmniLight3D
 var _flame_sound: AudioStreamPlayer
@@ -157,6 +158,7 @@ func _ready() -> void:
 		flashlight.add_child(_make_beam())
 	if Main.debug_flag("noshadow"):
 		flashlight.shadow_enabled = false
+	apply_upgrades()
 
 	_ray = RayCast3D.new()
 	_ray.target_position = Vector3(0, 0, -REACH)
@@ -183,6 +185,18 @@ func _build_models() -> void:
 		var m := make_model(item)
 		_models[item] = m
 		_hand.add_child(m)
+		for mi in m.find_children("*", "VisualInstance3D", true, false):
+			(mi as VisualInstance3D).layers = 1 | HAND_LAYER
+	# Налобный фонарь светит вперёд, а не на руки: слабая подсветка только для предмета в руке
+	# (отдельный слой — тоннель от неё светлее не становится).
+	var fill := OmniLight3D.new()
+	fill.light_cull_mask = HAND_LAYER
+	fill.light_color = Color(1.0, 0.9, 0.75)
+	fill.light_energy = 0.6
+	fill.omni_range = 1.2
+	fill.shadow_enabled = false
+	fill.position = Vector3(0.0, 0.15, 0.1)
+	camera.add_child(fill)
 	# Огонь и свет горелки — только у модели в руке.
 	var burner: Node3D = _models["burner"]
 	_flame = ProcTex.fire(48, 0.35)
@@ -216,26 +230,19 @@ func make_model(item: String) -> Node3D:
 	var along := Basis(Vector3.RIGHT, PI / 2)
 	var root := Node3D.new()
 	match item:
-		"flashlight":
-			Geo.cylinder(root, Vector3(0, 0, 0.02), 0.025, 0.2, steel, along)
-			Geo.cylinder(root, Vector3(0, 0, -0.1), 0.038, 0.05, steel, along)
-			var lens := ProcTex.emissive(Color(1.0, 0.95, 0.8), 2.0)
-			Geo.cylinder(root, Vector3(0, 0, -0.126), 0.032, 0.005, lens, along)
-			if _lens_mat == null:
-				_lens_mat = lens
 		"burner":
-			Geo.cylinder(root, Vector3(0, 0, -0.02), 0.022, 0.25, ProcTex.flat(Color(0.4, 0.4, 0.42), 0.4, 0.9), along)
-			Geo.cylinder(root, Vector3(0, -0.05, 0.13), 0.045, 0.16, ProcTex.flat(Color(0.6, 0.1, 0.08), 0.6, 0.3))
-			Geo.box(root, Vector3(0, -0.02, 0.06), Vector3(0.02, 0.05, 0.03), steel, false)
+			# Баллончик — пропановый баллон из Containers Pack (loafbrr_1, CC0), сопло — своё.
+			Geo.model_fit(root, "res://models/items/propane.glb", ProcTex.model_skin("res://models/items/propane_albedo.png", Color(0.8, 0.75, 0.7), 0.6, 0.3), 0.15, Vector3(0, -0.12, 0.1))
+			Geo.cylinder(root, Vector3(0, 0, -0.02), 0.014, 0.25, ProcTex.flat(Color(0.4, 0.4, 0.42), 0.4, 0.9), along)
+			Geo.box(root, Vector3(0, -0.02, 0.08), Vector3(0.02, 0.05, 0.03), steel, false)
 		"filter":
 			Geo.box(root, Vector3(-0.05, 0.02, 0.0), Vector3(0.28, 0.24, 0.03), steel, false)
 			Geo.box(root, Vector3(-0.05, 0.02, 0.0), Vector3(0.25, 0.21, 0.05), ProcTex.flat(Color(0.88, 0.88, 0.82), 0.95), false)
 			for k in 4:
 				Geo.box(root, Vector3(-0.05, -0.06 + k * 0.055, 0.027), Vector3(0.24, 0.01, 0.005), ProcTex.flat(Color(0.7, 0.7, 0.65), 0.95), false)
 		"battery":
-			Geo.box(root, Vector3.ZERO, Vector3(0.05, 0.05, 0.12), ProcTex.flat(Color(0.12, 0.12, 0.12), 0.5, 0.3), false)
-			Geo.box(root, Vector3(0, 0, -0.02), Vector3(0.052, 0.052, 0.03), ProcTex.flat(Color(0.9, 0.5, 0.1), 0.5), false)
-			Geo.box(root, Vector3(0, 0, -0.065), Vector3(0.02, 0.02, 0.01), steel, false)
+			# Survival Items (artie31, CC0).
+			Geo.model_fit(root, "res://models/items/battery.glb", ProcTex.model_skin("res://models/items/survival_palette.png", Color(0.85, 0.85, 0.85), 0.5, 0.2), 0.12, Vector3(0, -0.06, 0), Basis(Vector3.RIGHT, -PI / 2))
 		"map":
 			var paper := ProcTex.flat(Color(0.86, 0.82, 0.7), 1.0)
 			var left := Geo.box(root, Vector3(-0.07, 0, 0), Vector3(0.14, 0.2, 0.004), paper, false)
@@ -246,22 +253,14 @@ func make_model(item: String) -> Node3D:
 			Geo.box(root, Vector3(0.0, 0.0, 0.025), Vector3(0.012, 0.16, 0.002), ink, false)
 			Geo.box(root, Vector3(-0.06, -0.03, 0.02), Vector3(0.09, 0.008, 0.002), ink, false)
 		"pistol":
-			var gun := ProcTex.flat(Color(0.12, 0.12, 0.13), 0.35, 0.8)
-			Geo.box(root, Vector3(0, 0.02, -0.03), Vector3(0.03, 0.035, 0.16), gun, false)
-			var grip := Geo.box(root, Vector3(0, -0.04, 0.03), Vector3(0.028, 0.09, 0.04), ProcTex.flat(Color(0.2, 0.12, 0.08), 0.7), false)
-			grip.rotation.x = 0.25
-			Geo.box(root, Vector3(0, -0.005, 0.0), Vector3(0.01, 0.02, 0.03), gun, false)
+			# Pistol (loafbrr_1, CC0): ствол вдоль модели по X — поворачиваем вперёд (-Z).
+			Geo.model_fit(root, "res://models/items/pistol.glb", ProcTex.model_skin("res://models/items/pistol_albedo.png", Color(0.7, 0.7, 0.74), 0.4, 0.7), 0.22, Vector3(-0.05, 0.0, 0.02), Basis(Vector3.UP, PI / 2 + 0.25))
 		"canister":
-			var red := ProcTex.flat(Color(0.6, 0.08, 0.06), 0.5, 0.3)
-			Geo.box(root, Vector3(0, 0, 0), Vector3(0.12, 0.2, 0.2), red, false)
-			Geo.box(root, Vector3(0, 0.12, 0.04), Vector3(0.03, 0.04, 0.1), red, false)
-			Geo.cylinder(root, Vector3(0, 0.12, -0.07), 0.02, 0.05, steel)
+			# Jerry can из Containers Pack (loafbrr_1, CC0).
+			Geo.model_fit(root, "res://models/items/jerrycan.glb", ProcTex.model_skin("res://models/items/jerrycan_albedo.png", Color(0.8, 0.7, 0.68), 0.5, 0.3), 0.26, Vector3(0, -0.13, 0))
 		"radio":
-			var body := ProcTex.flat(Color(0.16, 0.2, 0.15), 0.7, 0.2)
-			Geo.box(root, Vector3.ZERO, Vector3(0.08, 0.17, 0.04), body, false)
-			Geo.cylinder(root, Vector3(0.025, 0.14, 0.0), 0.006, 0.12, ProcTex.flat(Color(0.05, 0.05, 0.05), 0.5))
-			Geo.box(root, Vector3(0, 0.03, 0.021), Vector3(0.06, 0.06, 0.004), ProcTex.flat(Color(0.05, 0.05, 0.05), 0.9), false)
-			Geo.sphere(root, Vector3(-0.025, 0.075, 0.02), 0.006, ProcTex.emissive(Color(1.0, 0.2, 0.1), 2.0))
+			# Radio (laleksic, CC0) — переносная станция с антенной.
+			Geo.model_fit(root, "res://models/items/radio.glb", ProcTex.model_skin("res://models/items/radio_albedo.png", Color(0.85, 0.85, 0.85), 0.7, 0.1), 0.22, Vector3(-0.04, -0.03, 0), Basis(Vector3.UP, PI - 0.4))
 	return root
 
 
@@ -305,7 +304,7 @@ func _sound(stream: AudioStream, volume_db: float) -> AudioStreamPlayer:
 # --- Инвентарь ---------------------------------------------------------------
 
 func held() -> String:
-	return ITEMS[selected]
+	return ITEMS[selected] if selected >= 0 else ""
 
 
 func count_of(item: String) -> int:
@@ -330,9 +329,12 @@ func counts() -> Array:
 	return c
 
 
+## Взять предмет в руки; та же клавиша ещё раз — убрать (руки пусты).
 func select(index: int) -> void:
-	if index == selected or index < 0 or index >= ITEMS.size():
+	if index < -1 or index >= ITEMS.size():
 		return
+	if index == selected:
+		index = -1
 	selected = index
 	_hand.position = HAND_POS + Vector3(0, -0.35, 0)
 	create_tween().tween_property(_hand, "position", HAND_POS, 0.22).set_ease(Tween.EASE_OUT)
@@ -340,22 +342,27 @@ func select(index: int) -> void:
 	_show_selected()
 
 
+## Взять в руки именно этот предмет ("" — убрать всё из рук).
+func hold(item: String) -> void:
+	var i := ITEMS.find(item)
+	if i != selected:
+		select(i)
+
+
 ## Следующий/предыдущий непустой слот (колесо мыши).
 func cycle(step: int) -> void:
-	var i := selected
+	var i := selected if selected >= 0 else (-1 if step > 0 else 0)
 	for k in ITEMS.size():
 		i = posmod(i + step, ITEMS.size())
 		if count_of(ITEMS[i]) > 0:
-			select(i)
+			if i != selected:
+				select(i)
 			return
 
 
 ## Действие предметом в руке (ЛКМ). Горелка работает, пока кнопка зажата.
 func use_item() -> void:
 	match held():
-		"flashlight":
-			flashlight_on = not flashlight_on
-			_click_sound.play()
 		"battery":
 			if batteries <= 0:
 				return
@@ -397,7 +404,7 @@ func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
 	flashlight_on = true
 	filters = 0
 	batteries = 0
-	selected = 0
+	selected = -1
 	stamina = STAMINA_MAX
 	_exhausted = false
 	has_radio = false
@@ -411,7 +418,9 @@ func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
 	canisters = 0
 	speed_mult = 1.0
 	climb_mult = 1.0
+	ran_today = false
 	head.position.y = HEAD_STAND
+	apply_upgrades()
 	_burning = false
 	_flame.emitting = false
 	_show_selected()
@@ -456,6 +465,7 @@ func _physics_process(delta: float) -> void:
 	head.position.y = move_toward(head.position.y, HEAD_CROUCH if crouching else HEAD_STAND, delta * 4.0)
 	var running := Input.is_action_pressed("run") and input.length() > 0.1 and not _exhausted and not input_locked and not crouching
 	if running:
+		ran_today = true
 		stamina = maxf(0.0, stamina - STAMINA_RUN * delta)
 		_stamina_wait = STAMINA_DELAY
 		if stamina <= 0.0:
@@ -502,7 +512,7 @@ func _physics_process(delta: float) -> void:
 			Game.make_noise(global_position, noise)
 	else:
 		_bob_amp = move_toward(_bob_amp, 0.0, delta * 4.0)
-	var shake := pow(Game.fear / 100.0, 2.0) * 0.02 + extra_shake
+	var shake := pow(Game.fear / Achievements.fear_max(), 2.0) * 0.02 + extra_shake
 	camera.position = Vector3(cos(_bob) * 0.025, absf(sin(_bob)) * 0.04, 0) * _bob_amp \
 		+ Vector3(randf_range(-shake, shake), randf_range(-shake, shake), 0)
 
@@ -613,10 +623,7 @@ func _process(delta: float) -> void:
 			if Input.is_action_just_pressed("slot_%d" % (i + 1)):
 				select(i)
 		if Input.is_action_just_pressed("flashlight"):
-			if held() == "flashlight":
-				use_item()
-			else:
-				select(0)
+			toggle_light()
 		if Input.is_action_just_pressed("burn") and held() != "burner":
 			use_item()
 	_show_selected()
@@ -631,7 +638,7 @@ func _process(delta: float) -> void:
 	_update_burner(delta)
 	_update_interaction(delta)
 	if hud:
-		hud.set_battery(battery, flashlight_on and held() == "flashlight")
+		hud.set_battery(battery, flashlight_on)
 		hud.set_hotbar(selected, counts(), ammo)
 		hud.set_health(health / HEALTH_MAX)
 		hud.set_map_visible(held() == "map" and not input_locked)
@@ -647,9 +654,9 @@ func _process(delta: float) -> void:
 
 
 func _update_battery(delta: float) -> void:
-	var on := flashlight_on and held() == "flashlight" and battery > 0.0
+	var on := flashlight_on and battery > 0.0
 	if on:
-		battery = maxf(0.0, battery - DRAIN_PER_SEC * drain_mult * delta)
+		battery = maxf(0.0, battery - DRAIN_PER_SEC * drain_mult * upgrade_drain * delta)
 		if battery <= 0.0 and not _empty_warned:
 			_empty_warned = true
 			Game.say("Фонарь сел. Нужна батарейка или зарядка... быстро.")
@@ -662,11 +669,11 @@ func _update_battery(delta: float) -> void:
 			energy *= randf_range(0.0, 0.2)
 	flashlight.visible = on and battery > 0.0
 	flashlight.light_energy = energy
-	_lens_mat.emission_energy_multiplier = energy * 0.6 if flashlight.visible else 0.0
 
 
+## Налобный фонарь: над глазами, луч чуть отстаёт от поворота головы.
 func _sync_flashlight(delta: float) -> void:
-	flashlight.global_position = camera.global_position + camera.global_transform.basis * Vector3(0.15, -0.12, 0.0)
+	flashlight.global_position = camera.global_position + camera.global_transform.basis * HEADLAMP_OFFSET
 	var from := flashlight.global_transform.basis.get_rotation_quaternion()
 	var to := camera.global_transform.basis.get_rotation_quaternion()
 	flashlight.global_transform.basis = Basis(from.slerp(to, clampf(delta * 12.0, 0.0, 1.0)))
@@ -771,6 +778,20 @@ func is_burning() -> bool:
 ## Свет, который держит страх: только фонарь. Горелка страх не снимает.
 func has_light() -> bool:
 	return flashlight.visible
+
+
+## Находки для фонаря: рефлектор — луч длиннее и шире, аккумулятор — садится медленнее.
+func apply_upgrades() -> void:
+	var lens := Achievements.has_find("lens")
+	flashlight.spot_range = 34.0 if lens else 26.0
+	flashlight.spot_angle = 29.0 if lens else 24.0
+	upgrade_drain = 0.7 if Achievements.has_find("cell") else 1.0
+
+
+## Налобный фонарь: щелчок — включить или выключить.
+func toggle_light() -> void:
+	flashlight_on = not flashlight_on
+	_click_sound.play()
 
 
 func flicker(time: float) -> void:

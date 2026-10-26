@@ -23,6 +23,7 @@ general/text_to_speech=true
 
 Settings="*res://scripts/settings.gd"
 Game="*res://scripts/game.gd"
+Achievements="*res://scripts/achievements.gd"
 
 [display]
 

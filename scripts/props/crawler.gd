@@ -209,6 +209,7 @@ func hit() -> void:
 func _die() -> void:
 	_dead = true
 	collision_layer = 0
+	Achievements.unlock("hunter")
 	_anim.pause()
 	var dust := ProcTex.fire(40, 0.9)
 	var grad := Gradient.new()
