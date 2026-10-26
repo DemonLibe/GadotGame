@@ -8,7 +8,7 @@ config_version=5
 
 config/name="Hope Light"
 config/description="Хоррор про обходчика узкого тоннеля метро."
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.3", "GL Compatibility")
 
 [audio]
@@ -17,6 +17,7 @@ general/text_to_speech=true
 
 [autoload]
 
+Settings="*res://scripts/settings.gd"
 Game="*res://scripts/game.gd"
 
 [display]

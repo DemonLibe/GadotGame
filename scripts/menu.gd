@@ -1,6 +1,7 @@
 class_name Menu
 extends CanvasLayer
-## Главное меню и пауза. Работает и при остановленной игре.
+## Экран меню: главное (отдельная сцена main_menu.tscn) и пауза в игре, у обоих — настройки.
+## Работает и при остановленной игре.
 
 signal new_game
 signal continue_game
@@ -9,11 +10,11 @@ signal main_menu
 signal quit
 
 const CONTROLS := "WASD — идти        Shift — бежать        Мышь — смотреть\n" \
-	+ "E — действие (удерживать: люк, зарядка, замена фильтра)\n" \
+	+ "C / Ctrl — присесть        Space — прыжок, в шкафу — задержать дыхание\n" \
+	+ "E — действие (удерживать: люк, генератор, зарядка, фильтр)\n" \
 	+ "W / S на лестнице — вверх / вниз\n" \
-	+ "1–4 или колесо мыши — предмет в руках\n" \
-	+ "ЛКМ — использовать предмет (фонарь, горелка, батарейка)\n" \
-	+ "F — фонарь        Esc — пауза"
+	+ "1–8 или колесо мыши — предмет в руках\n" \
+	+ "ЛКМ — использовать предмет        F — фонарь        Esc — пауза"
 const AMBER := Color(1.0, 0.75, 0.3)
 
 var _bg: ColorRect
@@ -21,6 +22,9 @@ var _title: Label
 var _sub: Label
 var _buttons: VBoxContainer
 var _controls: Label
+var _box: VBoxContainer
+var _settings: SettingsPanel
+var _bg_alpha := 0.6
 var _mode := ""
 var _saved_day := 1
 var _t := 0.0
@@ -42,6 +46,7 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 14)
 	box.custom_minimum_size = Vector2(560, 0)
 	center.add_child(box)
+	_box = box
 
 	_title = _label(box, 84, AMBER)
 	_sub = _label(box, 18, Color(0.75, 0.73, 0.68))
@@ -53,6 +58,11 @@ func _ready() -> void:
 	box.add_child(_buttons)
 	_controls = _label(box, 17, Color(0.85, 0.83, 0.78))
 	_controls.text = CONTROLS
+
+	_settings = SettingsPanel.new()
+	_settings.visible = false
+	center.add_child(_settings)
+	_settings.closed.connect(_close_settings)
 	visible = false
 
 
@@ -60,17 +70,18 @@ func show_main(saved_day: int) -> void:
 	_mode = "main"
 	_saved_day = saved_day
 	visible = true
-	_bg.color.a = 0.72
+	_bg.color.a = 0.35
 	_title.text = "HOPE LIGHT"
 	_sub.text = "Станция «Тихая». Пять смен под землёй.\nСложность одна — высокая."
-	_controls.visible = false
-	_clear()
-	_button("Новая игра", func(): new_game.emit())
+	_show_box()
 	if saved_day > 1:
 		_button("Продолжить — смена %d" % saved_day, func(): continue_game.emit())
+	_button("Новая игра", func(): new_game.emit())
+	_button("Настройки", open_settings)
 	_button("Управление", _toggle_controls)
 	if not OS.has_feature("web"):
 		_button("Выход", func(): quit.emit())
+	_focus_first()
 
 
 func show_pause() -> void:
@@ -79,16 +90,35 @@ func show_pause() -> void:
 	_bg.color.a = 0.6
 	_title.text = "ПАУЗА"
 	_sub.text = "Темнота подождёт. Недолго."
-	_controls.visible = false
-	_clear()
+	_show_box()
 	_button("Продолжить", func(): resume.emit())
+	_button("Настройки", open_settings)
 	_button("Управление", _toggle_controls)
 	_button("В главное меню", func(): main_menu.emit())
+	_focus_first()
+
+
+## Надпись вместо кнопок, пока строится уровень.
+func show_loading() -> void:
+	_show_box()
+	_sub.text = "Спуск…"
+
+
+func open_settings() -> void:
+	_box.visible = false
+	_bg_alpha = _bg.color.a
+	_bg.color.a = maxf(_bg_alpha, 0.75)
+	_settings.open()
+
+
+func is_settings_open() -> bool:
+	return _settings.visible
 
 
 func hide_all() -> void:
 	_mode = ""
 	visible = false
+	_settings.visible = false
 
 
 func _process(delta: float) -> void:
@@ -104,13 +134,36 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if visible and _mode == "pause" and event.is_action_pressed("ui_cancel"):
+	if visible and _mode == "pause" and not _settings.visible and event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
 		resume.emit()
 
 
 func _toggle_controls() -> void:
 	_controls.visible = not _controls.visible
+
+
+func _close_settings() -> void:
+	_settings.visible = false
+	_bg.color.a = _bg_alpha
+	_box.visible = true
+	_focus_first()
+
+
+func _show_box() -> void:
+	_settings.visible = false
+	_box.visible = true
+	_controls.visible = false
+	_clear()
+
+
+func _focus_first() -> void:
+	# Кнопки создаются в этом же кадре, фокус ставим, когда они попадут в дерево.
+	await get_tree().process_frame
+	for c in _buttons.get_children():
+		if not c.is_queued_for_deletion():
+			(c as Button).grab_focus()
+			return
 
 
 func _clear() -> void:

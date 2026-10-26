@@ -6,6 +6,7 @@ extends Node3D
 const SPAWN := Vector3(Level.SHAFT_X + 1.6, Level.ROOM_Y + 0.1, Level.SHAFT_Z + 2.4)
 const SPAWN_YAW := 0.588  # atan2(1.6, 2.4) — лицом к люку
 const START_BATTERY := 50.0
+const MENU_SCENE := "res://scenes/main_menu.tscn"
 
 # Места в тоннелях. tunnel: -2 — станция (стена x = -3), -1 — основной тоннель (along = z),
 # 0..2 — штольни (along = метры от развилки). side: -1 / +1 — стена.
@@ -141,7 +142,7 @@ var busy := false
 var collapsing := false
 var _rumble_t := 0.0
 var _rock_t := 0.0
-var state := "menu"  # menu / playing / paused
+var state := "loading"  # loading / playing / paused
 var _drip_t := 5.0
 var _uncaptured := 0.0
 var _grace := 0.0
@@ -175,7 +176,7 @@ func _ready() -> void:
 	if debug_flag("nodirector"):
 		director.process_mode = Node.PROCESS_MODE_DISABLED
 	if not debug_flag("nofx"):
-		_setup_postfx()
+		Main.add_postfx(self)
 	dispatcher = Dispatcher.new()
 	add_child(dispatcher)
 	player.dispatcher = dispatcher
@@ -198,23 +199,21 @@ func _ready() -> void:
 	var ambience := AudioStreamPlayer.new()
 	ambience.stream = Sfx.drone()
 	ambience.volume_db = -14.0
+	ambience.bus = "Ambience"
 	add_child(ambience)
 	ambience.play()
 
 	menu = Menu.new()
 	add_child(menu)
-	menu.new_game.connect(_on_new_game)
-	menu.continue_game.connect(_on_continue)
 	menu.resume.connect(_on_resume)
 	menu.main_menu.connect(_on_main_menu)
-	menu.quit.connect(func(): get_tree().quit())
 
 	Game.end_day_requested.connect(end_day)
 	if OS.get_cmdline_user_args().has("--smoke"):
 		_smoke = true
 		_smoke_test()
 	else:
-		_show_main_menu()
+		_begin(Game.pending_day)
 
 
 ## Отладочные переключатели из адреса страницы, например …/index.html?nofx&noicons.
@@ -279,6 +278,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_pause()
 	elif Game.ended and event.is_action_pressed("restart"):
 		Game.save_day(1)
+		Game.pending_day = 1
 		get_tree().reload_current_scene()
 
 
@@ -309,29 +309,7 @@ func _setup_environment() -> void:
 
 # --- Меню и пауза ------------------------------------------------------------
 
-func _show_main_menu() -> void:
-	state = "menu"
-	busy = true
-	player.reset_for_day(SPAWN, SPAWN_YAW, START_BATTERY)
-	player.input_locked = true
-	hatch.set_open(false)
-	hud.set_ingame(false)
-	hud.set_clear()
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	menu.show_main(Game.load_day())
-
-
-func _on_new_game() -> void:
-	Game.save_day(1)
-	_begin(1)
-
-
-func _on_continue() -> void:
-	_begin(Game.load_day())
-
-
 func _begin(d: int) -> void:
-	menu.hide_all()
 	state = "playing"
 	hud.set_ingame(not debug_flag("noingame"))
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -363,7 +341,7 @@ func _on_resume() -> void:
 
 func _on_main_menu() -> void:
 	get_tree().paused = false
-	get_tree().reload_current_scene()
+	get_tree().change_scene_to_file(MENU_SCENE)
 
 
 # --- Раскладка ---------------------------------------------------------------
@@ -1105,11 +1083,12 @@ func _random_floor_spot(min_depth: float) -> Vector3:
 	return Vector3(Level.TUN_CX + 1.0, Level.FLOOR_Y, -80.0)
 
 
-func _setup_postfx() -> void:
-	# Визуальный стиль: чуть пониженное разрешение, жёсткий контраст, плёночное зерно (под интерфейсом).
+## Визуальный стиль: чуть пониженное разрешение, жёсткий контраст, плёночное зерно (под интерфейсом).
+## Яркость и зерно берутся из настроек. Общий для игры и главного меню.
+static func add_postfx(parent: Node) -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = 1
-	add_child(layer)
+	parent.add_child(layer)
 	var rect := ColorRect.new()
 	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1119,6 +1098,7 @@ func _setup_postfx() -> void:
 	mat.shader = shader
 	rect.material = mat
 	layer.add_child(rect)
+	Settings.bind_postfx(rect, mat)
 
 
 const POSTFX_SHADER := """
@@ -1127,12 +1107,13 @@ uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
 uniform float pixel_size = 2.0;
 uniform float grain = 0.035;
 uniform float aberration = 0.35;
+uniform float brightness = 1.0;
 void fragment() {
 	// Лёгкое понижение разрешения: соседние пиксели усредняются, без узора-сетки.
 	vec2 px = SCREEN_PIXEL_SIZE * pixel_size;
 	vec2 uv = (floor(SCREEN_UV / px) + 0.5) * px;
 	vec2 off = vec2(aberration * px.x, 0.0) * (length(SCREEN_UV - 0.5) * 2.0);
-	vec3 c = vec3(texture(screen_tex, uv + off).r, texture(screen_tex, uv).g, texture(screen_tex, uv - off).b);
+	vec3 c = vec3(texture(screen_tex, uv + off).r, texture(screen_tex, uv).g, texture(screen_tex, uv - off).b) * brightness;
 	// Жёсткий контраст, холодно-зелёные тени, тёплые светлые места.
 	float l = dot(c, vec3(0.299, 0.587, 0.114));
 	c = mix(vec3(l), c, 0.78);

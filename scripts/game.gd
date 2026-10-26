@@ -20,6 +20,7 @@ var tasks: Array[Dictionary] = []
 var fear := 0.0
 var ended := false
 var notes_read := {}  # прочитанные записки (id → true), копятся за всю игру
+var pending_day := 1  # с какой смены начать, когда загрузится сцена игры
 const NOTES_TOTAL := 9
 var _said := {}
 
