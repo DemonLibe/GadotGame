@@ -433,12 +433,12 @@ func _spawn_props() -> void:
 		var cab := Hideout.new()
 		var t: int = h[0]
 		if t == -2:
-			cab.position = Vector3(2.55, Level.FLOOR_Y, h[2])
+			cab.position = Vector3(2.55, Level.FLOOR_Y, float(h[2]))
 			cab.rotation.y = deg_to_rad(-90.0)
 		else:
 			var axis := Vector3.FORWARD if t < 0 else Level.branch_dir(t)
 			var right := Vector3(-axis.z, 0.0, axis.x)
-			cab.position = level.floor_point(t, h[2], float(h[1]) * 1.05)
+			cab.position = level.floor_point(t, float(h[2]), float(h[1]) * 1.05)
 			var front := -right * float(h[1])
 			cab.rotation.y = atan2(front.x, front.z)
 		add_child(cab)
