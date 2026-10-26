@@ -1,74 +1,26 @@
 class_name Dispatcher
 extends Node
+## Голос диспетчера по рации. Реплики лежат в res://voice/lines.json, озвучка —
+## в res://voice/<id>.ogg (её генерирует workflow «Voice»: нейросетевой русский голос
+## и эффект рации). Если файла нет — синтез речи системы или браузера.
+## Субтитры идут по длине каждой реплики.
 
 ## Смена закрыта после доклада.
 signal shift_closed
-## Голос диспетчера по рации: синтез речи (русский голос системы или браузера),
-## субтитры и помехи. Перед каждой сменой — сводка о странных происшествиях,
-## во время смены — редкие вызовы.
 
 const COLOR := Color(0.65, 0.85, 1.0)
+const LINES_PATH := "res://voice/lines.json"
 
-const BRIEFINGS := [
-	[],
-	[
-		"Обходчик, приём. Говорит диспетчер.",
-		"Первая смена — без геройства. Зарядка на станции, фильтры по журналу, паутину жечь.",
-		"Ночью датчик на третьем пикете трижды фиксировал движение. Людей внизу не было.",
-		"Если услышишь в тоннеле шаги — это эхо. Просто эхо. Конец связи.",
-	],
-	[
-		"Обходчик, приём. Ночью в тоннеле что-то обрушилось — грохот слышали даже наверху.",
-		"Сходи до решётки в конце, посмотри, что там.",
-		"И ещё. Камера на станции в три сорок записала, как гаснет свет. Сам по себе. По очереди, от тоннеля к шахте.",
-		"Держи фонарь включённым. Конец связи.",
-	],
-	[
-		"Обходчик, это диспетчер. Странное дело.",
-		"Вагонетку со станции ночью кто-то откатил в тоннель. Одному её с места не сдвинуть.",
-		"Камеры ничего не записали. Только тень на секунду — и снова пусто.",
-		"Найди вагонетку и не задерживайся в штольнях.",
-		"И ещё. На столе оружейный ящик. Пистолет Макарова, шесть патронов. Патроны найдёшь и внизу, в старых ящиках.",
-		"Надеюсь, он тебе никогда не пригодится. Конец связи.",
-	],
-	[
-		"Обходчик... Слушай внимательно.",
-		"Твой предшественник, Седьмой, перед тем как пропасть, твердил, что кто-то в тоннеле считает его шаги.",
-		"Мы списали это на усталость. Сегодня ночью датчики насчитали в тоннеле два сердцебиения. Внизу никого не было.",
-		"Дальняя зарядка — во второй штольне. Если что-то увидишь — не подходи.",
-		"Пистолет снова на столе. Береги патроны. Конец связи.",
-	],
-	[
-		"Обходчик, приём... Обходчик?",
-		"Журнал на сегодня заполнял не я. И не начальник смены.",
-		"Решётка в конце тоннеля открыта. Изнутри.",
-		"Я не могу тебе приказать. Но если пойдёшь — не выключай свет. И возьми пистолет.",
-	],
-]
-
-const CALLS := {
-	2: [["Обходчик, приём. Датчик показывает в тоннеле двоих. Ты там один?", "...Ладно. Помехи, наверное. Конец связи."]],
-	3: [["Обходчик. Камера на станции сейчас показала человека у края платформы.", "Это ведь ты? ...Обходчик?"],
-		["В штольнях давление падает. Будто кто-то открывает и закрывает двери, которых там нет."]],
-	4: [["Обходчик, не оборачивайся.", "Просто иди к свету. На датчике кто-то в двух метрах за тобой."],
-		["Седьмой тоже звонил мне из тоннеля. Последний раз — из-за решётки."]],
-	5: [["...обходчик... ...ты меня слышишь?..", "...это не я сейчас говорю..."]],
-}
-
-## Ответ на доклад в конце смены.
-const CLOSINGS := [
-	[],
-	["Принял, обходчик. Первая смена закрыта.", "Отдыхай. Завтра откроем тебе ещё кусок тоннеля."],
-	["Принял. Что за ограждением — потом расскажешь. Смена закрыта."],
-	["Принял. Вагонетку... оставь, где стоит. Смена закрыта."],
-	["Принял. Обходчик... датчик всё ещё показывает двоих. Смена закрыта."],
-	["...принял..."],
-]
-
+var _lines := {}      # id → {speaker, text}
+var _briefings := {}  # "день" → [id]
+var _calls := {}      # "день" → [[id]]
+var _closings := {}   # "день" → [id]
+var _report_id := ""
 var _voice := ""
 var _closing := false
 var _last: Array = []
 var _static: AudioStreamPlayer
+var _speech: AudioStreamPlayer
 var _token := 0
 
 
@@ -77,19 +29,41 @@ func _ready() -> void:
 	_static.stream = Sfx.radio()
 	_static.volume_db = -10.0
 	add_child(_static)
+	_speech = AudioStreamPlayer.new()
+	_speech.volume_db = 2.0
+	add_child(_speech)
+	_load_lines()
+
+
+func _load_lines() -> void:
+	var data = JSON.parse_string(FileAccess.get_file_as_string(LINES_PATH))
+	if typeof(data) != TYPE_DICTIONARY:
+		push_warning("Не удалось прочитать " + LINES_PATH)
+		return
+	_lines = data["lines"]
+	_briefings = data["briefings"]
+	_calls = data["calls"]
+	_closings = data["closings"]
+	_report_id = data["report"]
 
 
 func briefing(day: int) -> void:
-	if day > 0 and day < BRIEFINGS.size():
-		speak(BRIEFINGS[day])
+	var ids: Array = _briefings.get(str(day), [])
+	if not ids.is_empty():
+		speak(ids)
 
 
 ## Неожиданный вызов посреди смены. false — на этот день вызовов нет.
 func random_call(day: int) -> bool:
-	if not CALLS.has(day):
+	var calls: Array = _calls.get(str(day), [])
+	if calls.is_empty():
 		return false
-	speak(CALLS[day].pick_random())
+	speak(calls.pick_random())
 	return true
+
+
+func closing_ids(day: int) -> Array:
+	return _closings.get(str(day), [])
 
 
 ## Доклад обходчика: все дела сделаны — диспетчер закрывает смену.
@@ -97,11 +71,12 @@ func report_shift(day: int) -> void:
 	if _closing:
 		return
 	_closing = true
-	Game.say("Обходчик: Диспетчер, приём. Все поручения выполнены.", Game.THOUGHT, 3.0)
+	stop()
 	Game.report("return")
-	await get_tree().create_timer(2.0).timeout
-	speak(CLOSINGS[clampi(day, 0, CLOSINGS.size() - 1)])
-	await get_tree().create_timer(5.0).timeout
+	await _say_line(_report_id, _token)
+	await get_tree().create_timer(0.6).timeout
+	await speak(closing_ids(day))
+	await get_tree().create_timer(1.5).timeout
 	_closing = false
 	shift_closed.emit()
 
@@ -116,23 +91,63 @@ func repeat_last() -> void:
 
 func stop() -> void:
 	_token += 1
+	_speech.stop()
 	if _tts_ready():
 		DisplayServer.tts_stop()
 
 
-func speak(lines: Array) -> void:
+## Проиграть реплики по порядку. Можно ждать через await — вернётся, когда всё сказано.
+func speak(ids: Array) -> void:
 	stop()
-	_last = lines
-	_static.play()
+	_last = ids
 	var token := _token
-	await get_tree().create_timer(0.4).timeout
+	_static.play()
+	await get_tree().create_timer(0.35).timeout
 	if token != _token:
 		return
-	if _tts_ready():
-		DisplayServer.tts_speak(" ".join(PackedStringArray(lines)), _voice, 80, 0.85, 0.95)
-	for line in lines:
-		var text: String = line
-		Game.say("Диспетчер: " + text, COLOR, clampf(text.length() * 0.07, 2.5, 8.0))
+	# Нет записанной озвучки — читает синтезатор речи, субтитры по оценке длины.
+	if not ids.is_empty() and _stream_for(ids[0]) == null and _tts_ready():
+		var texts: PackedStringArray = []
+		for id in ids:
+			texts.append(_text_of(id))
+		DisplayServer.tts_speak(" ".join(texts), _voice, 80, 0.85, 0.95)
+	for id in ids:
+		if token != _token:
+			return
+		await _say_line(id, token)
+	if token == _token:
+		_static.play()
+
+
+func _say_line(id: String, token: int) -> void:
+	var entry: Dictionary = _lines.get(id, {})
+	if entry.is_empty():
+		return
+	var text := _text_of(id)
+	var is_player: bool = entry.get("speaker", "") == "player"
+	var stream := _stream_for(id)
+	var duration := clampf(text.length() * 0.07, 2.5, 8.0)
+	if stream:
+		_speech.stream = stream
+		_speech.play()
+		duration = stream.get_length() + 0.2
+	if is_player:
+		Game.say("Обходчик: " + text, Game.THOUGHT, duration)
+	else:
+		Game.say("Диспетчер: " + text, COLOR, duration)
+	await get_tree().create_timer(duration).timeout
+
+
+func _text_of(id: String) -> String:
+	var entry: Dictionary = _lines.get(id, {})
+	return str(entry.get("text", ""))
+
+
+func _stream_for(id: String) -> AudioStream:
+	var path := "res://voice/%s.ogg" % id
+	if ResourceLoader.exists(path):
+		return load(path)
+	return null
 
 
 ## Голоса браузера загружаются не сразу — ищем русский голос при каждом обращении, пока не найдём.

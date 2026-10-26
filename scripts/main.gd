@@ -905,7 +905,7 @@ func _smoke_test() -> void:
 		await get_tree().physics_frame
 		Input.action_release("jump")
 		dispatcher.random_call(d)
-		dispatcher.speak(Dispatcher.CLOSINGS[d])
+		dispatcher.speak(dispatcher.closing_ids(d))
 		for n in get_tree().get_nodes_in_group("day_objects"):
 			var note := n as Note
 			if note:
