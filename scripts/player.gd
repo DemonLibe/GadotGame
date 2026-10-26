@@ -59,6 +59,7 @@ var selected := 0
 var input_locked := false
 var drain_mult := 1.0
 var climbing := false
+var extra_shake := 0.0  # тряска камеры от обвала и скримера
 var stamina := STAMINA_MAX
 var has_radio := false
 var has_pistol := false
@@ -443,7 +444,7 @@ func _physics_process(delta: float) -> void:
 			footstep.emit()
 	else:
 		_bob_amp = move_toward(_bob_amp, 0.0, delta * 4.0)
-	var shake := pow(Game.fear / 100.0, 2.0) * 0.02
+	var shake := pow(Game.fear / 100.0, 2.0) * 0.02 + extra_shake
 	camera.position = Vector3(cos(_bob) * 0.025, absf(sin(_bob)) * 0.04, 0) * _bob_amp \
 		+ Vector3(randf_range(-shake, shake), randf_range(-shake, shake), 0)
 

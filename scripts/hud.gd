@@ -1,5 +1,7 @@
 class_name Hud
 extends CanvasLayer
+
+signal newspaper_closed
 ## Интерфейс: поручения, шкала страха, выносливость, инвентарь с моделями предметов,
 ## батарея, подсказки, мысли героя, затемнение, виньетка страха.
 
@@ -41,6 +43,9 @@ var _note_panel: PanelContainer
 var _note_title: Label
 var _note_text: Label
 var _reading := false
+var _paper: PanelContainer
+var _scream: Label
+var _paper_open := false
 var player: Player
 var _subtitle: Label
 var _fade: ColorRect
@@ -207,6 +212,18 @@ func _ready() -> void:
 	hint.add_theme_color_override("font_color", Color(0.4, 0.35, 0.3))
 	nbox.add_child(hint)
 
+	_build_newspaper()
+	_scream = Label.new()
+	_scream.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_scream.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	_scream.add_theme_font_size_override("font_size", 46)
+	_scream.add_theme_color_override("font_color", Color(0.85, 0.05, 0.05))
+	_scream.add_theme_constant_override("outline_size", 10)
+	_scream.add_theme_color_override("font_outline_color", Color.BLACK)
+	_place(_scream, 0, 0, 1, 1, 40, 40, -40, -60)
+	_scream.visible = false
+	_root.add_child(_scream)
+
 	Game.tasks_changed.connect(_refresh_tasks)
 	Game.message.connect(_on_message)
 
@@ -357,6 +374,86 @@ func update_map(limit_z: float, branches: Array, rooms: Array, chargers: Array[V
 	_map.chargers = chargers
 
 
+## Газета в финале: «погиб ещё один обходчик».
+func _build_newspaper() -> void:
+	_paper = PanelContainer.new()
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.86, 0.83, 0.74)
+	st.set_content_margin_all(30)
+	st.shadow_color = Color(0, 0, 0, 0.7)
+	st.shadow_size = 16
+	_paper.add_theme_stylebox_override("panel", st)
+	_place(_paper, 0.5, 0.5, 0.5, 0.5, -390, -300, 390, 300)
+	_paper.rotation = deg_to_rad(-1.2)
+	_paper.visible = false
+	_root.add_child(_paper)
+	var ink := Color(0.12, 0.11, 0.1)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	_paper.add_child(box)
+	box.add_child(_paper_label("ПОДЗЕМНЫЙ ВЕСТНИК", 44, ink, HORIZONTAL_ALIGNMENT_CENTER))
+	box.add_child(_paper_label("ежедневная газета метрополитена   •   № 43   •   цена 5 коп.", 13, Color(ink, 0.8), HORIZONTAL_ALIGNMENT_CENTER))
+	var rule := ColorRect.new()
+	rule.color = ink
+	rule.custom_minimum_size = Vector2(0, 3)
+	box.add_child(rule)
+	box.add_child(_paper_label("НА ЗАКРЫТОЙ СТАНЦИИ «ТИХАЯ» ПОГИБ ЕЩЁ ОДИН ОБХОДЧИК", 26, ink, HORIZONTAL_ALIGNMENT_LEFT))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 18)
+	box.add_child(row)
+	var photo := ColorRect.new()
+	photo.color = Color(0.16, 0.15, 0.14)
+	photo.custom_minimum_size = Vector2(230, 230)
+	var cap := _paper_label("фото: вход в шахту № 3", 12, Color(0.75, 0.73, 0.68), HORIZONTAL_ALIGNMENT_CENTER)
+	cap.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	cap.position = Vector2(30, 200)
+	photo.add_child(cap)
+	row.add_child(photo)
+	var body := _paper_label("Вчера ночью на законсервированной станции «Тихая» погиб обходчик — восьмой за сорок лет. "
+		+ "По словам диспетчера, последний доклад по рации поступил в 03:12: «Все поручения выполнены». "
+		+ "Через несколько минут в тоннеле произошёл обвал.\n\n"
+		+ "Тело не найдено. Спасатели обнаружили за решёткой в конце тоннеля шесть старых касок и девять записок, написанных разными почерками.\n\n"
+		+ "Руководство метрополитена заявило, что станция будет закрыта окончательно. "
+		+ "Объявление о наборе нового обходчика — на странице 6.", 15, ink, HORIZONTAL_ALIGNMENT_LEFT)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.custom_minimum_size = Vector2(450, 0)
+	row.add_child(body)
+	box.add_child(_paper_label("E — дальше", 13, Color(ink, 0.6), HORIZONTAL_ALIGNMENT_RIGHT))
+
+
+func _paper_label(text: String, size: int, color: Color, align: HorizontalAlignment) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.horizontal_alignment = align
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	if size >= 20:
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return l
+
+
+func show_newspaper() -> void:
+	_paper.visible = true
+	_paper_open = true
+
+
+func close_newspaper() -> void:
+	if not _paper_open:
+		return
+	_paper_open = false
+	_paper.visible = false
+	newspaper_closed.emit()
+
+
+func show_scream(text: String) -> void:
+	_scream.text = text
+	_scream.visible = true
+
+
+func hide_scream() -> void:
+	_scream.visible = false
+
+
 func is_reading() -> bool:
 	return _reading
 
@@ -371,6 +468,10 @@ func show_note(title: String, text: String) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if _paper_open and (event.is_action_pressed("interact") or event.is_action_pressed("burn") or event.is_action_pressed("ui_accept")):
+		get_viewport().set_input_as_handled()
+		close_newspaper()
+		return
 	if not _reading:
 		return
 	if event.is_action_pressed("interact") or event.is_action_pressed("ui_cancel") or event.is_action_pressed("burn"):

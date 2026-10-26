@@ -118,6 +118,9 @@ var chargers: Array[Charger] = []
 var crates: Array[FilterCrate] = []
 var doors: Array[RoomDoor] = []
 var busy := false
+var collapsing := false
+var _rumble_t := 0.0
+var _rock_t := 0.0
 var state := "menu"  # menu / playing / paused
 var _drip_t := 5.0
 var _uncaptured := 0.0
@@ -197,6 +200,8 @@ func _process(delta: float) -> void:
 		_drip_t = randf_range(4.0, 11.0)
 		var pos := player.global_position + Vector3(randf_range(-2.0, 2.0), 2.5, randf_range(-10.0, 10.0))
 		Game.play_at(Sfx.drip(), pos, -6.0)
+	if collapsing and not busy:
+		_update_collapse(delta)
 	if busy or _smoke:
 		return
 	# Сорвался в шахту.
@@ -369,6 +374,7 @@ func _spawn_props() -> void:
 
 func start_day(d: int) -> void:
 	busy = true
+	collapsing = false
 	Game.day = d
 	Game.fear = 0.0
 	Game.ended = false
@@ -437,36 +443,114 @@ func panic() -> void:
 	fail_day("Страх оказался сильнее. Ты очнулся наверху и не помнишь, как поднялся.")
 
 
-## Финал пятого дня.
+## Финал пятого дня, часть 1: за решёткой тоннель начинает рушиться — бежать к станции.
 func ending() -> void:
-	if busy:
+	if collapsing or busy:
 		return
-	busy = true
-	player.input_locked = true
-	level.blackout = true
-	player.flicker(1.2)
-	Game.play_ui(Sfx.rumble(), -4.0)
-	await get_tree().create_timer(1.3).timeout
-	player.flashlight_on = false
-	Game.say("…", Game.WHISPER, 2.0)
-	await get_tree().create_timer(2.0).timeout
-	var pos := player.global_position + player.forward_flat() * 1.6
-	pos.y = Level.FLOOR_Y
-	stalker.appear(pos, "nest", 999.0)
-	player.select(0)
-	player.battery = maxf(player.battery, 20.0)
-	player.flashlight_on = true
-	player.flicker(0.4)
-	Game.play_ui(Sfx.sting(), 2.0)
-	await get_tree().create_timer(1.4).timeout
-	await hud.fade_to(1.0, 0.15).finished
+	collapsing = true
+	Game.tasks.clear()
+	Game.add_task("escape", "БЕЖАТЬ К СТАНЦИИ", 1)
 	stalker.hide_now()
-	await get_tree().create_timer(1.5).timeout
+	Game.play_ui(Sfx.rumble(), 0.0)
+	player.flicker(0.8)
+	Game.say("Тоннель рушится! Бежать! К станции, к лестнице — быстрее!", Game.THOUGHT, 5.0)
+	_rumble_t = 0.0
+	_rock_t = 0.0
+
+
+## Обвал во время бегства: камни с потолка, тряска, гул.
+func _update_collapse(delta: float) -> void:
+	player.extra_shake = 0.03
+	Game.fear = minf(Game.fear, 85.0)
+	_rumble_t -= delta
+	if _rumble_t <= 0.0:
+		_rumble_t = randf_range(2.0, 3.5)
+		Game.play_ui(Sfx.rumble(), -4.0)
+		if randf() < 0.4:
+			player.flicker(0.3)
+	_rock_t -= delta
+	if _rock_t <= 0.0:
+		_rock_t = randf_range(0.25, 0.7)
+		_drop_rock(player.global_position + Vector3(randf_range(-1.4, 1.4), 0, randf_range(-6.0, 4.0)))
+	# Добежал до станции — там его уже ждут.
+	var p := player.global_position
+	if p.y < Level.FLOOR_Y + 5.0 and p.z > -47.0:
+		_final_scene()
+
+
+func _drop_rock(pos: Vector3) -> void:
+	var rock := Geo.box(self, Vector3(pos.x, Level.FLOOR_Y + 3.0, pos.z), Vector3.ONE * randf_range(0.2, 0.5), level.m_concrete, false)
+	rock.rotation = Vector3(randf() * TAU, randf() * TAU, randf() * TAU)
+	rock.add_to_group("day_objects")
+	var tw := create_tween()
+	tw.tween_property(rock, "position:y", Level.FLOOR_Y + 0.15, 0.45).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+
+
+## Часть 2: у станции существо съедает героя. Потом газета и скример.
+func _final_scene() -> void:
+	collapsing = false
+	busy = true
+	player.extra_shake = 0.0
+	player.input_locked = true
+	# Он стоит у подножия лестницы.
+	var pos := Vector3(Level.SHAFT_X, Level.FLOOR_Y, Level.SHAFT_Z + 0.2)
+	var to := pos - player.global_position
+	player.rotation.y = atan2(-to.x, -to.z)
+	player.select(0)
+	player.flashlight_on = true
+	player.battery = maxf(player.battery, 40.0)
+	stalker.appear(pos, "nest", 999.0)
+	Game.play_ui(Sfx.sting(), 0.0)
+	await get_tree().create_timer(1.2).timeout
+	# Рывок.
+	var target := player.global_position + player.forward_flat() * 0.6
+	target.y = Level.FLOOR_Y
+	var tw := create_tween()
+	tw.tween_property(stalker, "global_position", target, 0.35).set_ease(Tween.EASE_IN)
+	await tw.finished
+	Game.play_ui(Sfx.gunshot(), 4.0)
+	Game.play_ui(Sfx.sting(), 4.0)
+	hud.set_black()
+	hud.set_ingame(false)
+	stalker.hide_now()
+	await get_tree().create_timer(2.5).timeout
+	# Газета.
+	Game.play_ui(Sfx.pickup(), -6.0)
+	hud.show_newspaper()
+	await hud.newspaper_closed
+	await get_tree().create_timer(1.0).timeout
+	# Скример.
+	await _screamer()
 	Game.ended = true
 	Game.save_day(1)
-	hud.set_ingame(false)
-	hud.show_title("HOPE LIGHT",
-		"Утром в журнале появилась новая запись:\n«Станции „Тихая“ требуется обходчик».\n\nСпасибо за игру. Нажми R, чтобы начать заново.", 0.0)
+	hud.show_title("HOPE LIGHT", "Спасибо за игру.\n\nНажми R, чтобы начать заново.", 0.0)
+
+
+func _screamer() -> void:
+	var t := Time.get_time_dict_from_system()
+	var clock := "%02d:%02d" % [t["hour"], t["minute"]]
+	var cam := player.camera
+	var face := cam.global_position - cam.global_transform.basis.z * 0.55
+	face.y -= 1.95
+	stalker.appear(face, "nest", 999.0)
+	var flash := OmniLight3D.new()
+	flash.light_color = Color(1.0, 0.95, 0.9)
+	flash.omni_range = 3.0
+	flash.light_energy = 4.0
+	add_child(flash)
+	flash.global_position = cam.global_position - cam.global_transform.basis.z * 0.2
+	hud.set_clear()
+	player.extra_shake = 0.06
+	Game.play_ui(Sfx.sting(), 6.0)
+	Game.play_ui(Sfx.hiss(), 6.0)
+	hud.show_scream("Сейчас %s. Ты ведь не спишь.\n\nЖДИ НАС.\nМЫ ИДЁМ ЗА ТОБОЙ." % clock)
+	await get_tree().create_timer(2.8).timeout
+	hud.hide_scream()
+	hud.set_black()
+	player.extra_shake = 0.0
+	stalker.hide_now()
+	flash.queue_free()
+	await get_tree().create_timer(1.5).timeout
 
 
 func _setup_vents_and_crates(d: int) -> void:
@@ -851,6 +935,11 @@ func _smoke_test() -> void:
 	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -230.0)
 	await get_tree().create_timer(1.0).timeout
 	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -252.0)
-	await get_tree().create_timer(9.0).timeout
+	await get_tree().create_timer(1.5).timeout
+	# Бегство к станции → съеден → газета → скример.
+	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -45.0)
+	await get_tree().create_timer(6.0).timeout
+	hud.close_newspaper()
+	await get_tree().create_timer(7.0).timeout
 	print("SMOKE ", "OK" if Game.ended else "FAIL: финал не сработал")
 	get_tree().quit(0 if Game.ended else 1)

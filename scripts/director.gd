@@ -49,6 +49,8 @@ func _process(delta: float) -> void:
 	_story()
 	if main.busy:
 		return
+	if main.collapsing:
+		return  # во время обвала — только бегство
 	if Game.fear >= 100.0:
 		main.panic()
 		return
