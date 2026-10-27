@@ -79,6 +79,11 @@ func _set_running(value: bool) -> void:
 	_lamp_mat.emission = c
 
 
+## Уже работает к началу смены.
+func run() -> void:
+	_set_running(true)
+
+
 ## Заглох сам (или ему «помогли»).
 func stall() -> void:
 	if not running:

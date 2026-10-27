@@ -38,15 +38,15 @@ const WEB_SPOTS := [
 	[-1, -74.0], [-1, -107.0], [0, 22.5], [-1, -162.5], [1, 19.5],
 	[-1, -192.5], [2, 21.0], [-1, -245.0], [-1, -297.5],
 ]
-const WEBS_PER_DAY := [0, 2, 4, 5, 7, 9]
+const WEBS_PER_DAY := [0, 2, 4, 5, 7, 9, 3, 6]
 # Шкафы-укрытия: [tunnel, side, along]. tunnel -2 — станция.
 const HIDEOUT_SPOTS := [
 	[-2, 1, -34.0], [-1, 1, -71.0], [-1, 1, -110.0], [-1, -1, -188.0], [-1, -1, -236.0],
 	[-1, 1, -305.0], [0, -1, 31.0], [1, 1, 45.0], [2, -1, 31.0],
 ]
 ## Генератор: сколько топлива в баке в начале смены и сколько канистр спрятано в тоннелях.
-const GEN_FUEL := [0.0, 100.0, 70.0, 60.0, 50.0, 50.0]
-const CANISTERS_PER_DAY := [0, 0, 1, 2, 2, 2]
+const GEN_FUEL := [0.0, 100.0, 70.0, 60.0, 50.0, 50.0, 100.0, 0.0]
+const CANISTERS_PER_DAY := [0, 0, 1, 2, 2, 2, 1, 0]
 ## Затопленная штольня (четвёртая смена): номер штольни и участок воды.
 const FLOOD_BRANCH := 2
 const FLOOD_FROM := 18.0
@@ -66,16 +66,21 @@ const NOTES := {
 		[-3, 0, 40.0, 0.0, "НЕ СМОТРИ ВНИЗ"]],
 	5: [[-1, -1, -318.5, 1.8, "ТВОЯ СМЕНА"],
 		[-1, 1, -117.5, 1.7, "ОН УЖЕ ЗДЕСЬ"]],
+	6: [[-1, -1, -58.0, 1.7, "ВОСЬМОЙ ВЕРНУЛСЯ"]],
+	7: [[-1, 1, -368.0, 1.7, "ПОЕЗД ЖДЁТ"], [-1, -1, -330.0, 1.5, "→ → →"]],
 }
 
 ## Карта растёт: докуда по основному тоннелю открыто в каждую смену (z ограждения)
 ## и с какой смены открыта каждая штольня.
-const DAY_LIMIT_Z := [0.0, -117.5, -197.0, -239.0, -321.5, -1000.0]
+const DAY_LIMIT_Z := [0.0, -117.5, -197.0, -239.0, -321.5, -1000.0, -321.5, -1000.0]
 const BRANCH_OPEN_DAY := [2, 3, 4]
 ## Сложность растёт: существа, коробки патронов, патроны в оружейном ящике.
-const CREATURES_PER_DAY := [0, 0, 0, 2, 4, 6]
-const AMMO_BOXES_PER_DAY := [0, 0, 0, 3, 3, 4]
-const PISTOL_ROUNDS := [0, 0, 0, 6, 4, 6]
+const CREATURES_PER_DAY := [0, 0, 0, 2, 4, 6, 0, 4]
+const AMMO_BOXES_PER_DAY := [0, 0, 0, 3, 3, 4, Game.GEAR_AMMO_BOXES, 4]
+const PISTOL_ROUNDS := [0, 0, 0, 6, 4, 6, 6, 0]
+## Седьмая смена: кусачие пауки на полу с самого начала; вагон метро за проломом (центр головного вагона).
+const BITERS_AT_START := 8
+const METRO_CAR_Z := -390.0
 
 ## Комнаты, открытые в каждую смену: [индекс комнаты (0–2 — у тоннеля, 3–5 — в конце штолен), записка].
 const ROOM_SCHEDULE := {
@@ -89,7 +94,7 @@ const ROOM_SCHEDULE := {
 const NOTE_TEXTS := {
 	"n1": ["Журнал бригады Гусева, 1979",
 		"12 марта. Прокладываем перегон к «Тихой». Грунт сухой, идём быстро, план перевыполнили. Бригадир обещал премию к майским.\n\n"
-		+ "17 марта. На двести семьдесят третьем метре щит упёрся в старую кладку. Кирпич дореволюционный, раствор чёрный, как дёготь. На схемах здесь ничего нет. Пробили — за стенкой пустота, тёплый воздух и звук, будто кто-то медленно дышит во сне.\n\n"
+		+ "17 марта. На триста двадцать третьем метре щит упёрся в старую кладку. Кирпич дореволюционный, раствор чёрный, как дёготь. На схемах здесь ничего нет. Пробили — за стенкой пустота, тёплый воздух и звук, будто кто-то медленно дышит во сне.\n\n"
 		+ "18 марта. Петров полез с фонарём и вернулся бледный. Говорит, там тоннель, старше нашего, и уходит вниз. Говорит, видел каски. Наши, жёлтые. Мы такие ещё не получали.\n\n"
 		+ "19 марта. Приезжали из управления. Велели замуровать, поставить решётку и забыть. Мы замуровали. Решётку поставили.\n\n"
 		+ "Забыть не получается. Петров перестал выключать свет дома."],
@@ -127,7 +132,7 @@ const NOTE_TEXTS := {
 	"n7": ["Акт обследования, 2001",
 		"АКТ № 14-с. Комиссия в составе трёх человек провела обследование перегона за станцией «Тихая».\n\n"
 		+ "Обнаружено: шесть касок образца 1978 года, личные вещи, фонари (все в рабочем состоянии, батареи разряжены), журнал смен с записями после даты закрытия станции. Тел не обнаружено.\n\n"
-		+ "Решётка на 273-м метре повреждена. Характер повреждений указывает на воздействие изнутри.\n\n"
+		+ "Решётка на 323-м метре повреждена. Характер повреждений указывает на воздействие изнутри.\n\n"
 		+ "Решение: станцию для пассажиров не открывать. Набор обходчиков продолжить на прежних условиях. Сведения засекретить.\n\n"
 		+ "Подпись председателя неразборчива. На обороте карандашом: «Сколько ещё?»"],
 	"n8": ["Обходчик № 7",
@@ -143,7 +148,18 @@ const NOTE_TEXTS := {
 		+ "Или останься и закрой за собой. Выбор всегда был твой — просто тебе об этом не говорили."],
 }
 
-const DAY_SUBTITLES := ["", "Станция «Тихая». Первая смена.", "Вторая смена.", "Третья смена.", "Четвёртая смена.", "Последняя смена."]
+## Концовка 2: дневник обходчика, который находится в вагоне. Последняя запись — не его.
+const DIARY := [
+	["Смена 1", "Спустился первый раз. Сто метров по лестнице — руки потом дрожали полчаса. Внизу генератор, фильтры, паутина, пауки размером с ладонь. Платят втрое. Маше хватит на операцию, если продержусь пять смен.\n\nДиспетчер вежливый. Слишком вежливый для этой работы."],
+	["Смена 2", "У ограждения что-то обрушилось, а в завале что-то шевелилось. Я сказал себе — крысы. На стене мелом: «Не оставайся без света». Почерк аккуратный, как в школьной прописи.\n\nМаша спросила по телефону, страшно ли под землёй. Я сказал — нет."],
+	["Смена 3", "Вагонетка уехала в тоннель сама. Диспетчер выдал пистолет — значит, они знают. Из темноты выползло бледное, на четвереньках. Два выстрела — и пыль.\n\nПотом пауки побежали все разом, и пришёл он. Я сидел в шкафу и не дышал. Он стоял рядом и слушал."],
+	["Смена 4", "Голос в рации иногда не его. Похож — но не его. В затопленной штольне нашёл жетон Седьмого: «Восьмой, не верь голосу». Восьмой — это я.\n\nКаждый раз, когда закрываю глаза, слышу, как он считает мои шаги."],
+	["Смена 5", "Решётка была открыта. Замок сорван изнутри. Тоннель рушился, рация кричала: «Доложи, где ты!» Я промолчал и полез наверх.\n\nВыбрался. А в журнале смен — свежая запись моим почерком: «Смена сдана. Восьмой». Я этого не писал. А снизу кто-то лез следом."],
+	["Смена 6", "Рации на столе нет. Пульт диспетчерской, оказывается, отключён с 2001 года. Кто со мной разговаривал пять ночей — не знаю и знать не хочу.\n\nСобрал пистолет, патроны, батарейки. За решёткой обвал пробил стену, и оттуда тянет тёплым воздухом. Ночью мне показалось, что там проехал поезд. Завтра пойду до конца. Маша, я вернусь."],
+	["Смена 7", "", "scrawl"],
+]
+
+const DAY_SUBTITLES := ["", "Станция «Тихая». Первая смена.", "Вторая смена.", "Третья смена.", "Четвёртая смена.", "Последняя смена.", "Шестая смена. Которой не должно было быть.", "Седьмая смена."]
 const DAY_THOUGHTS := [
 	"",
 	"Первая смена. Платят втрое — Маше нужна операция. Спуститься, завести генератор, зарядить фонарь, поменять фильтр, сжечь паутину. Ничего сложного.",
@@ -151,6 +167,8 @@ const DAY_THOUGHTS := [
 	"Плохо спал. Всю ночь казалось, что под полом кто-то ходит. Ещё три смены — и хватит на операцию.",
 	"Мой предшественник продержался неделю. Никто не говорит, куда он делся. У него тоже кто-то ждал дома?",
 	"В журнале одно поручение. Почерк не мой. И не начальника. Последняя смена, Маша. Последняя.",
+	"Я выбрался. И всё равно пришёл. Рации на столе нет, диспетчер молчит. Спокойно, как никогда. Соберу всё, что нужно, — завтра пойду до конца.",
+	"Генератор молчит, в тоннеле темно. Где-то за решёткой есть выход — я слышал там поезд. Пистолет, патроны, батарейки. Назад дороги нет.",
 ]
 
 var level: Level
@@ -500,19 +518,28 @@ func start_day(d: int) -> void:
 	# На третий день вагонетка уезжает в тоннель сама.
 	if not debug_flag("s_misc"):
 		cart.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, -155.0 if d == 3 else -40.0)
-		level.set_grate_open(d == Game.FINAL_DAY)
-		level.tunnel_lights_off = false
+		level.set_grate_open(d == Game.FINAL_DAY or d == Game.LAST_DAY)
+		level.set_breach(d == Game.LAST_DAY)
+		level.tunnel_lights_off = d == Game.LAST_DAY
 		level.blackout = false
 		stalker.hide_now()
 		hatch.set_open(false)
 	if not debug_flag("noradio"):
 		radio.reset()
+		if d > Game.FINAL_DAY:
+			radio.take_away()  # после пятой смены рации на столе нет
 	if not debug_flag("s_disp"):
 		dispatcher.stop()
 
 	if not debug_flag("s_reset"):
 		player.reset_for_day(SPAWN, SPAWN_YAW, START_BATTERY)
-	player.drain_mult = 1.0 + (d - 1) * 0.15
+	if d == Game.LAST_DAY:
+		# Что собрал в шестую смену — с собой.
+		player.has_pistol = bool(Game.gear.get("pistol", true))
+		player.ammo = int(Game.gear.get("ammo", 6))
+		player.batteries = int(Game.gear.get("batteries", Player.MAX_BATTERIES))
+		player.battery = 100.0
+	player.drain_mult = 1.0 + (mini(d, Game.FINAL_DAY) - 1) * 0.15
 	_fear_peak = 0.0
 	if d == Game.FINAL_DAY:
 		Achievements.unlock("shift5")
@@ -541,7 +568,8 @@ func start_day(d: int) -> void:
 		player.debug_look(0.0, PI / 2)
 	if not debug_flag("s_say"):
 		Game.say(DAY_THOUGHTS[d], Game.THOUGHT, 6.0)
-		Game.say("На столе шипит рация. Диспетчер ждёт.", Game.THOUGHT, 3.5)
+		if d <= Game.FINAL_DAY:
+			Game.say("На столе шипит рация. Диспетчер ждёт.", Game.THOUGHT, 3.5)
 		if d == 1:
 			Game.say("Рация в руке (4) и ЛКМ — спросить диспетчера, куда идти. Шуметь внизу не стоит: приседай (C).", Game.SYSTEM, 6.0)
 
@@ -560,7 +588,9 @@ func end_day() -> void:
 	player.input_locked = true
 	Game.play_ui(Sfx.click())
 	await hud.fade_to(1.0, 1.5).finished
-	start_day(mini(Game.day + 1, Game.FINAL_DAY))
+	if Game.day == Game.LAST_DAY - 1:
+		Game.gear = {"pistol": player.has_pistol, "ammo": player.ammo, "batteries": player.batteries}
+	start_day(mini(Game.day + 1, Game.LAST_DAY))
 
 
 ## Смена провалена (сорвался, страх взял верх) — начинается заново. Игра всегда сложная.
@@ -584,7 +614,7 @@ func panic() -> void:
 ## Финал пятого дня, часть 1: за решёткой тоннель начинает рушиться — бежать.
 ## Дальше — одна из трёх концовок:
 ##   1. доложил диспетчеру, где он, — у станции его уже ждут;
-##   2. не доложил и поднялся по лестнице — выбрался... но не один;
+##   2. не доложил и поднялся по лестнице — ещё две смены, а в седьмую — вагон метро за проломом;
 ##   3. прочитал все записки и запер решётку изнутри.
 func ending() -> void:
 	if collapsing or busy:
@@ -692,7 +722,8 @@ func _final_scene() -> void:
 	_finish("Концовка 1 из 3 — «Доклад принят»")
 
 
-## Концовка 2: не доложил и выбрался наверх. В журнале — запись его почерком.
+## Не доложил и выбрался наверх: в журнале — запись его почерком. Дальше — шестая и седьмая смены
+## и концовка 2 (вагон метро за проломом, см. ending_metro).
 func _ending_climb() -> void:
 	collapsing = false
 	busy = true
@@ -709,12 +740,10 @@ func _ending_climb() -> void:
 	await get_tree().create_timer(1.2).timeout
 	Game.play_at(Sfx.rung(), Vector3(Level.SHAFT_X, Level.ROOM_Y - 3.0, Level.SHAFT_Z), 2.0)
 	await hud.fade_to(1.0, 2.0).finished
-	hud.set_ingame(false)
-	await get_tree().create_timer(1.5).timeout
-	await _newspaper("B")
-	await _screamer()
-	Achievements.unlock("ending2")
-	_finish("Концовка 2 из 3 — «Поднялся»")
+	# Это ещё не конец: через ночь он спустится снова — собраться, а потом выбраться.
+	hud.show_title("ПОДНЯЛСЯ", "Смена сдана. Но не тобой.", 3.0)
+	await get_tree().create_timer(4.0).timeout
+	start_day(Game.LAST_DAY - 1)
 
 
 ## Концовка 3: все записки прочитаны — решётка заперта изнутри. Скримера нет.
@@ -740,6 +769,42 @@ func _ending_seal() -> void:
 	_finish("Концовка 3 из 3 — «Изнутри»")
 
 
+## Концовка 2 (седьмая смена): сел в вагон за проломом — поезд трогается. Потом дневник.
+func ending_metro() -> void:
+	if busy:
+		return
+	busy = true
+	Game.report("exit")
+	player.input_locked = true
+	stalker.hide_now()
+	for n in get_tree().get_nodes_in_group("biters"):
+		n.queue_free()
+	Game.say("Двери открыты. Внутри тепло и пусто. На сиденье — тетрадь. Моя.", Game.THOUGHT, 4.0)
+	await get_tree().create_timer(2.0).timeout
+	await hud.fade_to(1.0, 1.5).finished
+	hud.set_ingame(false)
+	# Поезд трогается и уходит в темноту.
+	var train := AudioStreamPlayer.new()
+	train.stream = Sfx.engine()
+	train.pitch_scale = 0.45
+	train.volume_db = -6.0
+	add_child(train)
+	train.play()
+	Game.play_ui(Sfx.rumble(), 0.0)
+	var tw := create_tween()
+	tw.tween_property(train, "pitch_scale", 0.8, 6.0)
+	await get_tree().create_timer(3.0).timeout
+	Game.play_ui(Sfx.rumble(), -4.0)
+	await get_tree().create_timer(3.0).timeout
+	var fade := create_tween()
+	fade.tween_property(train, "volume_db", -40.0, 2.0)
+	fade.tween_callback(train.queue_free)
+	hud.show_diary(DIARY)
+	await hud.diary_closed
+	Achievements.unlock("ending2")
+	_finish("Концовка 2 из 3 — «Я не должен был выжить»")
+
+
 func _newspaper(variant: String) -> void:
 	Game.play_ui(Sfx.pickup(), -6.0)
 	hud.show_newspaper(variant)
@@ -749,6 +814,7 @@ func _newspaper(variant: String) -> void:
 
 func _finish(which: String) -> void:
 	Game.ended = true
+	Game.gear = {}
 	Game.save_day(1)
 	hud.set_black()
 	hud.show_title("HOPE LIGHT", which + "\n\nСпасибо за игру.\nНажми R, чтобы начать заново.", 0.0)
@@ -803,7 +869,7 @@ func _setup_vents_and_crates(d: int) -> void:
 		if _reachable(CRATE_SPOTS[i][0], CRATE_SPOTS[i][1]):
 			pool.append(crates[i])
 	var spare_f := need + 1 if need > 0 else 0
-	var spare_b := 1
+	var spare_b := Player.MAX_BATTERIES if d == Game.LAST_DAY - 1 else 1
 	if d == 1:
 		crates[0].set_contents(1, 1)
 		spare_f -= 1
@@ -1058,6 +1124,9 @@ func _spawn_threats(d: int) -> void:
 		add_child(box)
 	for i in CREATURES_PER_DAY[d]:
 		spawn_crawler(_random_floor_spot(60.0))
+	if d == Game.LAST_DAY:
+		for i in BITERS_AT_START:
+			spawn_biter(_random_floor_spot(50.0))
 
 
 func spawn_crawler(pos: Vector3) -> Crawler:
@@ -1071,9 +1140,20 @@ func spawn_crawler(pos: Vector3) -> Crawler:
 	return c
 
 
+func spawn_biter(pos: Vector3) -> Biter:
+	var b := Biter.new()
+	b.player = player
+	b.level = level
+	b.position = pos + Vector3(0, 0.1, 0)
+	add_child(b)
+	return b
+
+
 ## Генератор: заглушен, в баке — сколько осталось. Канистры спрятаны в тоннелях.
 func _setup_power(d: int) -> void:
 	generator.reset(GEN_FUEL[d])
+	if d == Game.LAST_DAY - 1:
+		generator.run()  # шестая смена — тихая: свет горит с самого начала
 	for i in CANISTERS_PER_DAY[d]:
 		var can := Pickup.new()
 		can.kind = "fuel"
@@ -1128,6 +1208,11 @@ func _spawn_task_devices(d: int) -> void:
 		token.kind = "token"
 		token.position = room["center"] + (room["basis"] as Basis) * Vector3(0.2, 0.0, -0.3)
 		add_child(token)
+	if d == Game.LAST_DAY:
+		var car := MetroCar.new()
+		car.main = self
+		car.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, METRO_CAR_Z)
+		add_child(car)
 	if d == Game.FINAL_DAY:
 		var lock := GrateLock.new()
 		lock.main = self
@@ -1221,7 +1306,7 @@ void fragment() {
 func _smoke_test() -> void:
 	state = "playing"
 	hud.set_ingame(true)
-	for d in range(1, Game.FINAL_DAY + 1):
+	for d in range(1, Game.LAST_DAY + 1):
 		start_day(d)
 		await get_tree().create_timer(5.5).timeout
 		hatch.hold_interact(player, 2.0)
@@ -1232,7 +1317,7 @@ func _smoke_test() -> void:
 		hatch.interact(player)
 		await get_tree().create_timer(0.5).timeout
 		player.stop_climb(Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -140.0))
-		for ev in ["footsteps", "sighting", "behind", "lamps", "whisper", "regrow", "interfere", "crawler", "hunt"]:
+		for ev in ["footsteps", "sighting", "behind", "lamps", "whisper", "regrow", "interfere", "crawler", "hunt", "swarm"]:
 			director._run(ev)
 		# Генератор: запуск (со второй попытки, если чихнул), заправка, остановка.
 		generator.hold_interact(player, 2.0)
@@ -1310,14 +1395,19 @@ func _smoke_test() -> void:
 				cr.hit()
 				cr.hit()
 				cr.hit()
+		for n in get_tree().get_nodes_in_group("biters"):
+			(n as Biter).hit()
 		player.take_damage(10.0)
 		doors[0].interact(player)
 		player.global_position = level.rooms[0]["center"] + Vector3(0, 0.1, 0)
 		await get_tree().physics_frame
 		cart.interact(player)
-		journal.interact(player)
+		if d != Game.LAST_DAY - 1:
+			journal.interact(player)  # в шестую смену журнал закрыл бы смену — это проверяется ниже
 		await get_tree().create_timer(1.5).timeout
 		stalker.hide_now()
+	start_day(Game.FINAL_DAY)
+	await get_tree().create_timer(5.5).timeout
 	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, Level.GRATE_Z + 2.0)
 	await get_tree().create_timer(1.0).timeout
 	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, Level.GRATE_Z - 28.0)
@@ -1348,15 +1438,46 @@ func _smoke_test() -> void:
 	hud.close_newspaper()
 	await get_tree().create_timer(1.5).timeout
 	ok = ok and Game.ended
-	# Концовка 2: не доложил, поднялся наверх.
+	# Концовка 2: не доложил, поднялся наверх → шестая смена (собраться) → седьмая (вагон метро).
 	start_day(5)
 	await get_tree().create_timer(5.5).timeout
 	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, Level.GRATE_Z - 28.0)
 	await get_tree().create_timer(1.0).timeout
 	player.global_position = SPAWN
-	await get_tree().create_timer(10.0).timeout
-	hud.close_newspaper()
-	await get_tree().create_timer(6.0).timeout
+	await get_tree().create_timer(14.0).timeout
+	ok = ok and Game.day == Game.LAST_DAY - 1 and not Game.ended
+	await get_tree().create_timer(5.5).timeout
+	for n in get_tree().get_nodes_in_group("day_objects"):
+		var pickup := n as Pickup
+		if pickup:
+			pickup.interact(player)
+	for c in crates:
+		c.interact(player)
+	player.global_position = SPAWN
+	journal.get_prompt(player)
+	journal.interact(player)
+	await get_tree().create_timer(8.0).timeout
+	ok = ok and Game.day == Game.LAST_DAY and player.has_pistol and player.ammo > 0
+	await get_tree().create_timer(1.0).timeout
+	journal.interact(player)
+	for ev in ["swarm", "hunt", "crawler"]:
+		player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -200.0)
+		director._run(ev)
+	await get_tree().create_timer(2.0).timeout
+	player.hold("pistol")
+	player.use_item()
+	stalker.hide_now()
+	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, METRO_CAR_Z + MetroCar.CAR_LEN / 2.0 + 1.5)
+	await get_tree().physics_frame
+	for n in get_tree().get_nodes_in_group("day_objects"):
+		var car := n as MetroCar
+		if car:
+			car.get_prompt(player)
+			car.interact(player)
+	await get_tree().create_timer(12.0).timeout
+	for i in DIARY.size():
+		hud.next_diary_page()
+	await get_tree().create_timer(1.0).timeout
 	Game.ended = ok and Game.ended
 	print("SMOKE ", "OK" if Game.ended else "FAIL: финал не сработал")
 	get_tree().quit(0 if Game.ended else 1)

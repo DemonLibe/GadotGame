@@ -63,5 +63,7 @@ func interact(player) -> void:
 	batteries -= took_b
 	player.filters += took_f
 	player.batteries += took_b
+	if took_b > 0:
+		Game.report("gear:battery", took_b)
 	_refresh()
 	Game.play_at(Sfx.pickup(), global_position, -6.0)

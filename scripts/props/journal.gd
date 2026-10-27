@@ -24,10 +24,24 @@ func _ready() -> void:
 func get_prompt(_player) -> String:
 	if Game.ended:
 		return ""
+	if Game.day == Game.LAST_DAY - 1 and Game.all_done():
+		return "Журнал смен — E: отметиться"
 	return "Журнал смен — E: что осталось сделать"
 
 
 func interact(_player) -> void:
+	# После пятой смены докладывать некому: смену закрывает запись в журнале.
+	if Game.day == Game.LAST_DAY:
+		Game.say("Не до журнала. Надо выбираться — через тоннель, до конца.", Game.THOUGHT, 4.0)
+		return
+	if Game.day == Game.LAST_DAY - 1:
+		if Game.all_done():
+			Game.report("return")
+			Game.say("«Смена сдана. Восьмой». На этот раз — моей рукой.", Game.THOUGHT, 4.0)
+			Game.end_day_requested.emit()
+		else:
+			Game.say("Ещё не всё собрано: " + Game.remaining_text() + ".", Game.SYSTEM, 5.0)
+		return
 	if Game.all_done():
 		Game.say("Всё сделано. Осталось доложить диспетчеру по рации (рацию в руки — ЛКМ).", Game.SYSTEM, 5.0)
 	else:
