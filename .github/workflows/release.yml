@@ -79,8 +79,14 @@ jobs:
           Три концовки, девять записок, всегда высокая сложность. Лучше играть в наушниках.
           NOTES
           sed -i 's/^          //' notes.md
+          # Что нового в версии — из .github/release-notes/<тег>.md, если такой файл есть.
+          if [ -f ".github/release-notes/${TAG}.md" ]; then
+            { cat ".github/release-notes/${TAG}.md"; echo; echo "---"; echo; cat notes.md; } > notes_full.md
+            mv notes_full.md notes.md
+          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file notes.md
           else
             gh release create "$TAG" dist/* --title "Hope Light ${TAG}" --notes-file notes.md --target "${GITHUB_SHA}"
           fi
