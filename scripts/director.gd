@@ -40,7 +40,9 @@ func start_day(d: int) -> void:
 		2: _budget = {"footsteps": 1, "sighting": 1, "radio": 1}
 		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1, "radio": 1, "crawler": 1, "interfere": 1, "hunt": 1}
 		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1, "radio": 1, "crawler": 2, "interfere": 2, "hunt": 2}
-		_: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1, "crawler": 3, "interfere": 1, "hunt": 3}
+		5: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1, "crawler": 3, "interfere": 1, "hunt": 3}
+		6: _budget = {}  # тихая смена: ничего
+		_: _budget = {"behind": 1, "whisper": 2, "crawler": 2, "swarm": 6, "hunt": 4}
 
 
 func _process(delta: float) -> void:
@@ -88,7 +90,9 @@ func _update_fear(delta: float) -> void:
 	if lit:
 		Game.add_fear(-delta * (6.0 if pos.z > Level.TUN_Z0 or pos.y > Level.ROOM_Y - 1.0 else 2.5))
 	else:
-		Game.add_fear(delta * (3.5 + Game.day * 1.2))
+		# Шестая смена — тихая, страх копится как в первую.
+		var d := 1 if Game.day == Game.LAST_DAY - 1 else Game.day
+		Game.add_fear(delta * (3.5 + d * 1.2))
 		Game.say_once("dark", "Темно... Слишком темно. Нужен свет.")
 	if stalker.visible and stalker.global_position.distance_to(pos) < 12.0:
 		Game.add_fear(delta * 4.0)
@@ -178,6 +182,8 @@ func _run(ev: String) -> bool:
 			return _interfere()
 		"hunt":
 			return _hunt()
+		"swarm":
+			return _swarm()
 	return false
 
 
@@ -221,7 +227,7 @@ func _hunt() -> bool:
 	Game.play_at(Sfx.scuttle(), pos + Vector3(0, 2.0, 0), 4.0)
 	get_tree().create_timer(1.2).timeout.connect(func(): Game.play_at(Sfx.scuttle(), p.lerp(pos, 0.5) + Vector3(0, 2.0, 0), 2.0))
 	Game.say("Пауки... бегут. Все разом — оттуда. Он идёт. Нужен шкаф. Быстро.", Game.THOUGHT, 4.0)
-	var delay: float = [0.0, 0.0, 0.0, 7.0, 5.5, 4.0][clampi(Game.day, 0, 5)]
+	var delay: float = [0.0, 0.0, 0.0, 7.0, 5.5, 4.0, 4.0, 3.0][clampi(Game.day, 0, Game.LAST_DAY)]
 	get_tree().create_timer(delay).timeout.connect(func(): _hunt_arrive(pos))
 	return true
 
@@ -293,6 +299,22 @@ func _crawler_arrive(pos: Vector3) -> void:
 	c.state = "investigate"
 	c._goal = player.global_position
 	Game.play_at(Sfx.hiss(), pos + Vector3(0, 0.5, 0), 2.0)
+
+
+## Седьмая смена: из темноты впереди по проходу набегает стая кусачих пауков.
+func _swarm() -> bool:
+	var p := player.global_position
+	var axis := level.axis_at(p)
+	var sgn := 1.0 if player.forward_flat().dot(axis) >= 0.0 else -1.0
+	var pos := p + axis * sgn * randf_range(14.0, 20.0)
+	pos.y = Level.FLOOR_Y
+	if not level.is_walkable(pos) or pos.z > Level.TUN_Z0 - 8.0:
+		return false
+	Game.play_at(Sfx.scuttle(), pos + Vector3(0, 1.0, 0), 4.0)
+	Game.say_once("swarm", "Пауки... на полу. Много. И они бегут не от меня — ко мне.", Game.THOUGHT, 4.0)
+	for i in randi_range(3, 5):
+		main.spawn_biter(pos + axis * randf_range(-2.0, 2.0) + Vector3(randf_range(-0.8, 0.8), 0, randf_range(-0.8, 0.8)))
+	return true
 
 
 ## «Он» вмешивается в работу: выдёргивает зарядку, двигает ящик, захлопывает дверь, глушит генератор.

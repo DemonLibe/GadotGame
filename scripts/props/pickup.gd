@@ -62,7 +62,10 @@ func interact(player) -> void:
 		return
 	if kind == "pistol":
 		player.has_pistol = true
+		Game.report("gear:pistol")
 		Game.say("Пистолет Макарова. Тяжёлый. Пусть так и останется в кобуре.", Game.THOUGHT, 4.0)
+	else:
+		Game.report("gear:ammo")
 	player.ammo += amount
 	Game.play_at(Sfx.pickup(), global_position, -6.0)
 	queue_free()

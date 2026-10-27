@@ -17,6 +17,7 @@ const HUNT := {
 	3: {"walk": 1.4, "run": 2.6, "length": 45.0, "search": 8.0, "sight": [6.0, 18.0], "light": "flee", "sniff": 0.25, "hear": 1.0},
 	4: {"walk": 1.9, "run": 3.5, "length": 70.0, "search": 14.0, "sight": [8.0, 22.0], "light": "slow", "sniff": 0.45, "hear": 1.3},
 	5: {"walk": 2.4, "run": 4.5, "length": 100.0, "search": 22.0, "sight": [10.0, 26.0], "light": "ignore", "sniff": 0.7, "hear": 1.6},
+	7: {"walk": 2.7, "run": 4.8, "length": 110.0, "search": 26.0, "sight": [11.0, 28.0], "light": "ignore", "sniff": 0.8, "hear": 1.8},
 }
 const CATCH_RANGE := 1.2
 
@@ -125,7 +126,7 @@ func hide_now() -> void:
 
 ## Охота: появиться в pos и искать обходчика. day — номер смены (3–5), от него зависит злость.
 func hunt(pos: Vector3, day: int) -> void:
-	_cfg = HUNT[clampi(day, 3, 5)]
+	_cfg = HUNT[day] if HUNT.has(day) else HUNT[clampi(day, 3, 5)]
 	appear(pos, "hunt", float(_cfg["length"]))
 	add_to_group("creatures")  # пауки разбегаются и от него
 	_goal = player.global_position

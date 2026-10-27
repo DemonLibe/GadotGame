@@ -2,6 +2,7 @@ class_name Hud
 extends CanvasLayer
 
 signal newspaper_closed
+signal diary_closed
 ## Интерфейс: поручения, шкала страха, выносливость, инвентарь с моделями предметов,
 ## батарея, подсказки, мысли героя, затемнение, виньетка страха.
 
@@ -50,6 +51,14 @@ var _paper_head: Label
 var _paper_body: Label
 var _paper_cap: Label
 var _status: Label
+var _diary: PanelContainer
+var _diary_title: Label
+var _diary_body: Label
+var _diary_foot: Label
+var _diary_scrawl: Control
+var _diary_cry: Label
+var _diary_pages: Array = []
+var _diary_i := -1
 var _toast: Label
 var _toast_t := 0.0
 var _scream: Label
@@ -230,6 +239,7 @@ func _ready() -> void:
 	nbox.add_child(hint)
 
 	_build_newspaper()
+	_build_diary()
 	_scream = Label.new()
 	_scream.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_scream.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
@@ -344,6 +354,11 @@ func _process(delta: float) -> void:
 	_subtitle.modulate.a = clampf(_sub_left * 2.0, 0.0, 1.0)
 	_toast_t -= delta
 	_toast.modulate.a = clampf(_toast_t, 0.0, 1.0)
+	if _diary_scrawl.is_visible_in_tree():
+		# Последняя запись дрожит, будто её пишут прямо сейчас.
+		_diary_cry.rotation = deg_to_rad(-4.0 + randf_range(-0.6, 0.6))
+		_diary_cry.pivot_offset = _diary_cry.size / 2.0
+		_diary_cry.position = (_diary_scrawl.size - _diary_cry.size) / 2.0 + Vector2(randf_range(-1.5, 1.5), randf_range(-1.5, 1.5))
 	for m in _slot_icons:
 		m.rotate_y(delta * 0.6)
 
@@ -462,6 +477,111 @@ func _build_newspaper() -> void:
 	box.add_child(_paper_label("E — дальше", 13, Color(ink, 0.6), HORIZONTAL_ALIGNMENT_RIGHT))
 
 
+## Дневник обходчика (концовка 2): по странице на смену. Последняя — каракули и символы.
+func _build_diary() -> void:
+	_diary = PanelContainer.new()
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.83, 0.8, 0.69)
+	st.set_content_margin_all(34)
+	st.border_width_left = 10
+	st.border_color = Color(0.35, 0.2, 0.15)
+	st.shadow_color = Color(0, 0, 0, 0.7)
+	st.shadow_size = 16
+	_diary.add_theme_stylebox_override("panel", st)
+	_place(_diary, 0.5, 0.5, 0.5, 0.5, -370, -290, 370, 290)
+	_diary.rotation = deg_to_rad(0.8)
+	_diary.visible = false
+	_root.add_child(_diary)
+	var ink := Color(0.13, 0.16, 0.36)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 14)
+	_diary.add_child(box)
+	_diary_title = _paper_label("", 28, ink, HORIZONTAL_ALIGNMENT_LEFT)
+	box.add_child(_diary_title)
+	_diary_body = _paper_label("", 18, ink, HORIZONTAL_ALIGNMENT_LEFT)
+	_diary_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_diary_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(_diary_body)
+	_diary_foot = _paper_label("", 13, Color(ink, 0.6), HORIZONTAL_ALIGNMENT_RIGHT)
+	box.add_child(_diary_foot)
+	# Каракули поверх страницы.
+	_diary_scrawl = Control.new()
+	_diary_scrawl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_diary_scrawl.clip_contents = true
+	_diary_scrawl.draw.connect(_draw_scrawl)
+	_diary.add_child(_diary_scrawl)
+	_diary_cry = _paper_label("Я НЕ ДОЛЖЕН БЫЛ ВЫЖИТЬ", 44, Color(0.42, 0.04, 0.02), HORIZONTAL_ALIGNMENT_CENTER)
+	_diary_cry.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_diary_scrawl.add_child(_diary_cry)
+
+
+func show_diary(pages: Array) -> void:
+	_diary_pages = pages
+	_diary_i = 0
+	_show_diary_page()
+	_diary.visible = true
+
+
+func _show_diary_page() -> void:
+	var page: Array = _diary_pages[_diary_i]
+	var scrawl := page.size() > 2
+	_diary_title.text = page[0]
+	_diary_body.text = page[1]
+	_diary_scrawl.visible = scrawl
+	_diary_scrawl.queue_redraw()
+	var last := _diary_i == _diary_pages.size() - 1
+	_diary_foot.text = "%d / %d     E — %s" % [_diary_i + 1, _diary_pages.size(), "закрыть" if last else "дальше"]
+	if scrawl:
+		Game.play_ui(Sfx.whisper(), -4.0)
+		Game.play_ui(Sfx.sting(), -8.0)
+
+
+## E на странице дневника: дальше, а с последней — закрыть.
+func next_diary_page() -> void:
+	if not _diary.visible:
+		return
+	_diary_i += 1
+	Game.play_ui(Sfx.click(), -10.0)
+	if _diary_i < _diary_pages.size():
+		_show_diary_page()
+		return
+	_diary.visible = false
+	diary_closed.emit()
+
+
+## Последняя запись: символы, перевёрнутые и зеркальные буквы, восьмёрки и каракули поверх всего.
+func _draw_scrawl() -> void:
+	var c := _diary_scrawl
+	var font := c.get_theme_default_font()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 8
+	var glyphs := "ЖЩЪЫЭЮЯΨΩΔΣλψωжыъфщ#ЁЬЧ"
+	var ink := Color(0.13, 0.16, 0.36)
+	var blood := Color(0.42, 0.04, 0.02)
+	for i in 70:
+		var s := ""
+		for k in rng.randi_range(1, 4):
+			s += glyphs[rng.randi_range(0, glyphs.length() - 1)]
+		var pos := Vector2(rng.randf_range(10.0, c.size.x - 40.0), rng.randf_range(50.0, c.size.y - 20.0))
+		var flip := -1.0 if rng.randf() < 0.4 else 1.0
+		c.draw_set_transform(pos, rng.randf_range(-0.9, 0.9), Vector2(flip * rng.randf_range(0.8, 1.5), rng.randf_range(0.8, 1.3)))
+		var col := ink if rng.randf() < 0.7 else blood
+		c.draw_string(font, Vector2.ZERO, s, HORIZONTAL_ALIGNMENT_LEFT, -1, rng.randi_range(14, 34), Color(col, rng.randf_range(0.45, 0.9)))
+	# Строки восьмёрок, будто кто-то считал.
+	for row in 3:
+		c.draw_set_transform(Vector2(20.0, 70.0 + row * 150.0), rng.randf_range(-0.05, 0.05), Vector2.ONE)
+		c.draw_string(font, Vector2.ZERO, "8 8 8 8 8 8 8 8 8 8 8 8 8 8", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(ink, 0.35))
+	c.draw_set_transform(Vector2.ZERO)
+	# Каракули: рваные линии, нажим то сильнее, то слабее.
+	for i in 16:
+		var pts := PackedVector2Array()
+		var p := Vector2(rng.randf_range(0.0, c.size.x), rng.randf_range(40.0, c.size.y))
+		for k in rng.randi_range(10, 28):
+			pts.append(p)
+			p += Vector2(rng.randf_range(-22.0, 22.0), rng.randf_range(-14.0, 14.0))
+		c.draw_polyline(pts, Color(ink if i % 3 else blood, rng.randf_range(0.4, 0.8)), rng.randf_range(1.0, 2.6))
+
+
 func _paper_label(text: String, size: int, color: Color, align: HorizontalAlignment) -> Label:
 	var l := Label.new()
 	l.text = text
@@ -485,7 +605,7 @@ var _newspapers := {
 		+ "В журнале смен его рукой сделана последняя запись: «Смена сдана. Восьмой».\n\n"
 		+ "Соседи рассказывают, что ночью у его подъезда слышали скрежет — будто по асфальту ползло что-то тяжёлое.\n\n"
 		+ "Дочь пропавшего, Маша, каждый вечер ждёт отца у окна. Пульт диспетчерской станции отключён с 2001 года."],
-	"C": ["ТОННЕЛЬ ЗА СТАНЦИЕЙ «ТИХАЯ» ЗАМУРОВАН ИЗНУТРИ", "фото: решётка, 273-й метр",
+	"C": ["ТОННЕЛЬ ЗА СТАНЦИЕЙ «ТИХАЯ» ЗАМУРОВАН ИЗНУТРИ", "фото: решётка, 323-й метр",
 		"Спасатели не смогли открыть решётку в конце тоннеля: она заперта изнутри, на замок обходчика. "
 		+ "За решёткой тишина. Обвал прекратился сам.\n\n"
 		+ "Впервые за сорок лет датчики станции не фиксируют никакого движения. Набор обходчиков прекращён.\n\n"
@@ -534,6 +654,10 @@ func show_note(title: String, text: String) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if _diary.visible and (event.is_action_pressed("interact") or event.is_action_pressed("burn") or event.is_action_pressed("ui_accept")):
+		get_viewport().set_input_as_handled()
+		next_diary_page()
+		return
 	if _paper_open and (event.is_action_pressed("interact") or event.is_action_pressed("burn") or event.is_action_pressed("ui_accept")):
 		get_viewport().set_input_as_handled()
 		close_newspaper()

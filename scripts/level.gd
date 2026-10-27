@@ -11,7 +11,8 @@ const TUN_H := 3.2
 const LEFT_X := -0.5         # TUN_CX - TUN_HW
 const RIGHT_X := 2.9         # TUN_CX + TUN_HW
 const TUN_Z0 := -50.0        # портал тоннеля на станции
-const TUN_Z1 := -372.5       # тупик
+const TUN_Z1 := -372.5       # тупик (до седьмой смены — глухая стена)
+const METRO_Z1 := -425.0     # за стеной — старый перегон метро, где стоит вагон (седьмая смена)
 const GRATE_Z := -323.0      # решётка
 const PICKET_STEP := 25.0    # пикеты (таблички «ПК n») по основному тоннелю
 const RAIL_TILE := 2.0       # длина звена пути
@@ -50,6 +51,9 @@ var tunnel_lights_off := false
 var power_on := true  # генератор на станции: без него лампы в тоннелях не горят
 var blackout := false
 var grate: Node3D
+var _end_wall: MeshInstance3D   # глухая стена тупика
+var _breach: Node3D             # пролом на её месте (седьмая смена)
+var _main_seg := 0              # индекс основного тоннеля в _segments
 var rooms: Array[Dictionary] = []  # {center, basis, door}: basis +Z смотрит из комнаты к двери
 var _segments: Array[Dictionary] = []  # оси проходов {a, b, dir} в XZ — для событий
 
@@ -93,6 +97,7 @@ func build() -> void:
 	_build_rails()
 	_build_grate()
 	_build_nest_decor()
+	_build_breach()
 
 
 func _process(delta: float) -> void:
@@ -285,6 +290,16 @@ func map_segments() -> Array[Dictionary]:
 
 func set_grate_open(open: bool) -> void:
 	grate.rotation.y = deg_to_rad(85.0) if open else 0.0
+
+
+## Седьмая смена: обвал пятой ночи проломил стену тупика — за ней старый перегон метро.
+func set_breach(open: bool) -> void:
+	_end_wall.visible = not open
+	(_end_wall.get_child(0) as StaticBody3D).collision_layer = 0 if open else 1
+	_breach.visible = open
+	for body in _breach.find_children("*", "StaticBody3D", true, false):
+		(body as StaticBody3D).collision_layer = 1 if open else 0
+	_segments[_main_seg]["b"] = Vector2(TUN_CX, METRO_Z1 + 1.0 if open else TUN_Z1)
 
 
 # --- Комната с люком ---------------------------------------------------------
@@ -542,10 +557,13 @@ func _build_main_tunnel() -> void:
 	for h in holes:
 		_main_segment(zc, h[0])
 		zc = h[1]
-	_main_segment(zc, TUN_Z1)
+	# Труба идёт и за тупиком — до старого перегона; пока стена цела, туда не попасть.
+	_main_segment(zc, METRO_Z1)
 	for r in SIDE_ROOMS:
 		_build_side_room(r)
-	Geo.box(self, Vector3(TUN_CX, TUBE_CY, TUN_Z1 - 0.15), Vector3(TUBE_R * 2 + 0.4, TUBE_R * 2 + 0.4, 0.3), m_concrete)
+	_end_wall = Geo.box(self, Vector3(TUN_CX, TUBE_CY, TUN_Z1 - 0.15), Vector3(TUBE_R * 2 + 0.4, TUBE_R * 2 + 0.4, 0.3), m_concrete)
+	Geo.box(self, Vector3(TUN_CX, TUBE_CY, METRO_Z1 - 0.15), Vector3(TUBE_R * 2 + 0.4, TUBE_R * 2 + 0.4, 0.3), m_concrete)
+	_main_seg = _segments.size()
 	_segments.append({"a": Vector2(TUN_CX, TUN_Z0), "b": Vector2(TUN_CX, TUN_Z1), "dir": Vector3.FORWARD})
 	# Светильники в сетках на стене через 12 м, попеременно слева и справа. Часть разбита.
 	var i := 0
@@ -812,7 +830,7 @@ func _build_rails() -> void:
 	var basis := Basis(Vector3.UP, PI / 2) * Basis.from_scale(Vector3(RAIL_TILE / 2.0, 1.2, 1.15))
 	var cover := ProcTex.flat(Color(0.25, 0.2, 0.14), 0.9)
 	var z_a := -29.0
-	var z_end := GRATE_Z - 30.0
+	var z_end := METRO_Z1 + 1.0
 	while z_a > z_end + 0.01:
 		var z_b := maxf(z_a - CHUNK, z_end)
 		var length := z_a - z_b
@@ -868,6 +886,30 @@ func _build_nest_decor() -> void:
 	# Кости тех, кто ушёл за решётку раньше.
 	for p in [Vector3(1.0, 0, GRATE_Z - 9.0), Vector3(2.2, 0, GRATE_Z - 17.0), Vector3(0.4, 0, GRATE_Z - 26.0)]:
 		Remains.bone_pile(self, Vector3(p.x, FLOOR_Y, p.z), randf() * TAU, randf_range(0.8, 1.1))
+
+
+## Пролом в стене тупика: обломки кольца по краям, старая кирпичная кладка, завал вдоль стен.
+## Посередине — проход в человеческий рост.
+func _build_breach() -> void:
+	_breach = Node3D.new()
+	add_child(_breach)
+	var z := TUN_Z1 - 0.15
+	var brick := ProcTex.flat(Color(0.32, 0.16, 0.11), 0.95)
+	for side in [-1.0, 1.0]:
+		# Уцелевшие куски стены по бокам и сверху.
+		Geo.box(_breach, Vector3(TUN_CX + side * 1.55, TUBE_CY - 0.3, z), Vector3(1.4, 3.6, 0.3), m_concrete, true,
+			Basis(Vector3.FORWARD, side * 0.06))
+		# Завал вдоль стен: бетон и кирпич.
+		for k in 5:
+			var p := Vector3(TUN_CX + side * randf_range(0.9, 1.5), FLOOR_Y + randf_range(0.1, 0.3), z + randf_range(-2.5, 2.5))
+			var size := Vector3.ONE * randf_range(0.25, 0.6)
+			Geo.box(_breach, p, size, m_concrete if k % 2 == 0 else brick, false,
+				Basis.from_euler(Vector3(randf() * TAU, randf() * TAU, randf() * TAU)))
+	Geo.box(_breach, Vector3(TUN_CX, TUBE_CY + 1.6, z), Vector3(2.0, 1.2, 0.3), m_concrete, true, Basis(Vector3.FORWARD, 0.1))
+	# За проломом — кладка старше тоннеля (её помнят записки бригады 1979 года).
+	for side in [-1.0, 1.0]:
+		Geo.box(_breach, Vector3(TUN_CX + side * 1.25, FLOOR_Y + 1.0, z - 0.6), Vector3(0.6, 2.0, 0.5), brick, false)
+	_breach.visible = false
 
 
 ## Тоннельный светильник в сетке на стене. inward — куда смотрит (внутрь тоннеля).

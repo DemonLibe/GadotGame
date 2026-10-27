@@ -10,6 +10,9 @@ signal noise_made(pos: Vector3, radius: float)
 signal seal_requested
 
 const FINAL_DAY := 5
+## Кто поднялся в пятую смену, не докладывая, спускается ещё дважды: шестая — собраться, седьмая — выбраться.
+const LAST_DAY := 7
+const GEAR_AMMO_BOXES := 4
 const THOUGHT := Color(0.93, 0.91, 0.84)
 const WHISPER := Color(0.62, 0.64, 0.75)
 const SYSTEM := Color(0.6, 0.86, 0.6)
@@ -21,6 +24,7 @@ var fear := 0.0
 var ended := false
 var notes_read := {}  # прочитанные записки (id → true), копятся за всю игру
 var pending_day := 1  # с какой смены начать, когда загрузится сцена игры
+var gear := {}  # что собрано в шестую смену и взято в седьмую: pistol, ammo, batteries
 const NOTES_TOTAL := 9
 var _said := {}
 
@@ -35,6 +39,19 @@ func _ready() -> void:
 func build_tasks(d: int) -> void:
 	tasks.clear()
 	_said.clear()
+	match d:
+		6:
+			# Тихая смена: собрать всё, что понадобится завтра.
+			_task("gear:pistol", "Забрать пистолет из оружейного ящика", 1)
+			_task("gear:ammo", "Собрать коробки с патронами в тоннелях", GEAR_AMMO_BOXES)
+			_task("gear:battery", "Запасти батарейки для фонаря", Player.MAX_BATTERIES)
+			_task("return", "Подняться и отметиться в журнале смен", 1)
+			tasks_changed.emit()
+			return
+		7:
+			_task("exit", "Найти выход из тоннеля", 1)
+			tasks_changed.emit()
+			return
 	_task("radio", "Забрать рацию со стола", 1)
 	_task("generator", "Запустить генератор на станции", 1)
 	match d:
@@ -142,6 +159,7 @@ func save_day(d: int) -> void:
 	var cf := ConfigFile.new()
 	cf.set_value("progress", "day", d)
 	cf.set_value("progress", "notes", notes_read.keys())
+	cf.set_value("progress", "gear", gear)
 	cf.save(SAVE_PATH)
 
 
@@ -151,7 +169,8 @@ func load_day() -> int:
 		return 1
 	for k in cf.get_value("progress", "notes", []):
 		notes_read[str(k)] = true
-	return clampi(int(cf.get_value("progress", "day", 1)), 1, FINAL_DAY)
+	gear = cf.get_value("progress", "gear", {})
+	return clampi(int(cf.get_value("progress", "day", 1)), 1, LAST_DAY)
 
 
 # --- Реплики и страх -------------------------------------------------------

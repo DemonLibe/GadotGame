@@ -32,6 +32,13 @@ func reset() -> void:
 		_hiss.play()
 
 
+## После пятой смены рации на столе нет.
+func take_away() -> void:
+	visible = false
+	collision_layer = 0
+	_hiss.stop()
+
+
 func _process(delta: float) -> void:
 	if not visible:
 		return
