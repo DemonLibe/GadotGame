@@ -37,7 +37,7 @@
 3. Нажми **F5**.
 
 Почти всё генерируется кодом: геометрия тоннеля, текстуры (бетон, паутина) и все звуки.
-Готовые модели — только у вагонетки, рельсов, пауков, ползунов и «Другого» (папка `models/`, см. «Модели»).
+Готовые модели — у вагонетки, рельсов, пауков, ползунов, «Другого», останков и предметов (папка `models/`, см. «Модели»).
 
 ## Управление
 
@@ -169,30 +169,35 @@ scripts/
   sfx.gd               процедурные звуки
   map_view.gd          бумажная карта
   props/               рация, люк, лестница, двери, останки, записки, ограждения, ползуны, пистолет и патроны, паутина, вентблок, ящик, зарядка, журнал, вагонетка, паук, находки (find.gd)
-models/                модели (CC0), уменьшенные текстуры к ним, настройки импорта (*.import)
+models/                модели с OpenGameArt, уменьшенные текстуры к ним, настройки импорта (*.import)
   mine/                вагонетка и звено пути
-  alien_bug/           пауки и ползуны
-  quaternius/          «Другой»
+  alien_bug/           ползуны
+  spider/              пауки (.glb из .blend, анимации разрезаны на клипы)
+  angler/              «Другой» (.glb из .blend, анимации сделаны для игры)
+  bones/               части скелетов для останков и кучи костей
   items/               предметы в руках и в слотах (.glb вырезаны из наборов, текстуры уменьшены)
 ```
 
 ## Модели
 
-Все модели — с [OpenGameArt](https://opengameart.org) под лицензией
-[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (общественное достояние, указание автора не обязательно).
-Godot импортирует FBX и glTF сам, Blender не нужен. Текстуры уменьшены и сведены к урезанной палитре,
+Все модели — с [OpenGameArt](https://opengameart.org). Почти все — под лицензией
+[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (общественное достояние, указание автора не обязательно);
+паук и «Другой» — под лицензиями с указанием автора (столбец «Лицензия»).
+Godot импортирует FBX, OBJ и glTF сам; паук и «Другой» были в `.blend` — их один раз перевели в `.glb` в Blender. Текстуры уменьшены и сведены к урезанной палитре,
 материалы задаёт код (`ProcTex.model_skin`).
 
-| Где в игре | Файлы | Набор | Автор |
-|---|---|---|---|
-| Вагонетка, звенья пути | `models/mine/` | [Mine Object collection](https://opengameart.org/content/mine-object-collection) | loafbrr_1 |
-| Пауки, ползуны | `models/alien_bug/` | [Alien Bug Animated](https://opengameart.org/content/alien-bug-animated) | CDmir |
-| «Другой» | `models/quaternius/` | [LowPoly Animated Monsters](https://opengameart.org/content/lowpoly-animated-monsters) | Quaternius |
-| Баллон горелки, канистра | `models/items/propane.glb`, `jerrycan.glb` | [Containers Pack](https://opengameart.org/content/containers-pack) | loafbrr_1 |
-| Пистолет | `models/items/pistol.glb` | [Pistol](https://opengameart.org/content/pistol-5) | loafbrr_1 |
-| Батарейка, аккумулятор | `models/items/battery.glb` | [Lowpoly Survival Item Pack](https://opengameart.org/content/lowpoly-survival-item-pack) | artie31 |
-| Рация | `models/items/radio.glb` | [Radio](https://opengameart.org/content/radio-0) | laleksic |
-| Таблетки | `models/items/pill.glb` | [Pills 3D models](https://opengameart.org/content/pills-3d-models) | mxc2 |
+| Где в игре | Файлы | Набор | Автор | Лицензия |
+|---|---|---|---|---|
+| Вагонетка, звенья пути | `models/mine/` | [Mine Object collection](https://opengameart.org/content/mine-object-collection) | loafbrr_1 | CC0 |
+| Ползуны | `models/alien_bug/` | [Alien Bug Animated](https://opengameart.org/content/alien-bug-animated) | CDmir | CC0 |
+| Пауки | `models/spider/` | [Low Poly Spider (Glest)](https://opengameart.org/content/low-poly-spider-glest) | Wciow, John.d.h | [CC-BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) — изменённая модель (`spider.glb`) распространяется на тех же условиях |
+| «Другой» | `models/angler/` | [Angler Man 3D](https://opengameart.org/content/angler-man-3d) | piacenti | [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) — анимации добавлены для игры |
+| Останки, кучи костей | `models/bones/` | [3D Dungeon Debris — Skull and Bones](https://opengameart.org/content/3d-dungeon-debris-skull-and-bones) | Paul Wortmann | CC0 |
+| Баллон горелки, канистра | `models/items/propane.glb`, `jerrycan.glb` | [Containers Pack](https://opengameart.org/content/containers-pack) | loafbrr_1 | CC0 |
+| Пистолет | `models/items/pistol.glb` | [Pistol](https://opengameart.org/content/pistol-5) | loafbrr_1 | CC0 |
+| Батарейка, аккумулятор | `models/items/battery.glb` | [Lowpoly Survival Item Pack](https://opengameart.org/content/lowpoly-survival-item-pack) | artie31 | CC0 |
+| Рация | `models/items/radio.glb` | [Radio](https://opengameart.org/content/radio-0) | laleksic | CC0 |
+| Таблетки | `models/items/pill.glb` | [Pills 3D models](https://opengameart.org/content/pills-3d-models) | mxc2 | CC0 |
 
 Из больших наборов в репозиторий взяты только нужные объекты: Godot вырезал их и сохранил в `.glb`
 (без материалов). Фильтр, карта, рефлектор и утка — свои модели из примитивов: подходящих CC0 не нашлось.

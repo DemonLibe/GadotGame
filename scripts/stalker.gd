@@ -27,8 +27,6 @@ var _life := 0.0
 var _lit := 0.0
 var _seen := 0.0
 var _anim: AnimationPlayer
-var _head: BoneAttachment3D
-var _eyes: Node3D
 # Охота.
 var _cfg: Dictionary = {}
 var _goal := Vector3.ZERO
@@ -38,36 +36,71 @@ var _search := 0.0
 var _lit_hunt := 0.0
 var _player_hid := false  # за эту охоту обходчик прятался в шкафу
 
-const IDLE := "SkeletonArmature|Skeleton_Idle"
-const RUN := "SkeletonArmature|Skeleton_Running"
-const ATTACK := "SkeletonArmature|Skeleton_Attack"
-const EYES := Vector3(0, 0.14, -0.2)  # глазницы относительно кости головы
+const IDLE := "Idle"
+const RUN := "Run"
+const ATTACK := "Attack"
+const SCALE := 0.6
+## Скример: середина морды над полом и с какого расстояния он влезает в кадр целиком.
+const EYE_HEIGHT := 1.65
+const SCREAM_DIST := 1.3
+const LURE := Vector3(0, 2.1, -0.4)  # огонёк приманки (модель повёрнута лицом в -Z узла)
+const FEET := 1.37  # начало модели — в тазу, ступни на 2.29 ниже (×SCALE): поднимаем на пол
 
 
 func _ready() -> void:
 	visible = false
 	Game.noise_made.connect(_on_noise)
-	var skin := StandardMaterial3D.new()
-	skin.albedo_color = Color(0.02, 0.02, 0.02)
-	skin.roughness = 1.0
+	# Модель: Angler Man (piacenti, CC-BY 3.0) — человек с головой рыбы-удильщика.
+	# Анимации (ожидание, бег, удар) сделаны для игры. Смотрит в +Z — разворачиваем.
+	var model := Geo.model(self, "res://models/angler/angler.glb", null, Vector3(0, FEET, 0), Basis(Vector3.UP, PI).scaled(Vector3.ONE * SCALE))
+	var skin := ProcTex.model_skin("res://models/angler/angler_albedo.png", Color(0.55, 0.5, 0.5), 0.9)
 	skin.rim_enabled = true
-	skin.rim = 0.5
-	skin.rim_tint = 0.0
-	# Модель: Skeleton из LowPoly Animated Monsters (Quaternius, CC0) — чёрный, вытянутый,
-	# ростом выше человека. Смотрит в +Z — разворачиваем.
-	var model := Geo.model(self, "res://models/quaternius/Skeleton.fbx", skin, Vector3.ZERO, Basis(Vector3.UP, PI).scaled(Vector3(0.36, 0.44, 0.36)))
+	skin.rim = 0.4
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		# Поверхности: тело, глаза, кончик приманки. В GL Compatibility скиннинговая модель
+		# с разными материалами на поверхностях перестаёт освещаться точечными светильниками —
+		# поэтому тело целиком в одном материале, а светящиеся глаза и приманка — во второй
+		# копии той же модели (чуть раздутой), где тело невидимо.
+		var m := mi as MeshInstance3D
+		m.material_override = skin
+		if m.mesh.get_surface_count() < 3:
+			continue
+		var glow_mesh := m.duplicate() as MeshInstance3D
+		glow_mesh.material_override = null
+		glow_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		glow_mesh.set_surface_override_material(0, _hidden())
+		glow_mesh.set_surface_override_material(1, _glow(Color(0.62, 0.6, 0.46)))
+		glow_mesh.set_surface_override_material(2, _glow(Color(1.0, 0.78, 0.45)))
+		m.add_sibling(glow_mesh)
+	# Приманка светит: тёплый огонёк над головой — видно издалека, в темноте он сам выдаёт себя.
+	var glow := OmniLight3D.new()
+	glow.light_color = Color(1.0, 0.7, 0.35)
+	glow.light_energy = 0.8
+	glow.omni_range = 2.5
+	glow.shadow_enabled = false
+	glow.position = LURE
+	add_child(glow)
 	_anim = Geo.model_anim(model, [IDLE, RUN])
 	_anim.play(IDLE)
 	_anim.seek(randf() * 2.0)
-	# Светящиеся глаза идут за костью головы (сама кость в масштабе модели — к ней не цепляем).
-	_head = BoneAttachment3D.new()
-	_head.bone_name = "Head"
-	model.find_child("Skeleton3D", true, false).add_child(_head)
-	_eyes = Node3D.new()
-	add_child(_eyes)
-	var eye := ProcTex.emissive(Color(0.85, 0.82, 0.7), 1.6)
-	Geo.sphere(_eyes, Vector3(-0.12, 0, 0), 0.02, eye)
-	Geo.sphere(_eyes, Vector3(0.12, 0, 0), 0.02, eye)
+
+
+## Светится сам, без освещения; grow — чтобы не мерцал поверх той же поверхности тела.
+static func _glow(color: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = color
+	m.grow = true
+	m.grow_amount = 0.01
+	return m
+
+
+static func _hidden() -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.albedo_color = Color(0, 0, 0, 0)
+	return m
 
 
 ## mode: "sighting" — далеко в луче, "behind" — за спиной, "watch" — наблюдает, "nest" — финал.
@@ -130,11 +163,9 @@ func _process(delta: float) -> void:
 	if not visible or player == null:
 		return
 	if mode == "hunt":
-		_eyes.position = to_local(_head.global_position) + EYES
 		_hunt_update(delta)
 		return
 	_face_player()
-	_eyes.position = to_local(_head.global_position) + EYES
 	_life -= delta
 	var head := global_position + Vector3(0, 1.7, 0)
 	var dist := player.global_position.distance_to(global_position)

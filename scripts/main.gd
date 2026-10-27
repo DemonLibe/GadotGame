@@ -758,8 +758,8 @@ func _screamer() -> void:
 	var t := Time.get_time_dict_from_system()
 	var clock := "%02d:%02d" % [t["hour"], t["minute"]]
 	var cam := player.camera
-	var face := cam.global_position - cam.global_transform.basis.z * 0.55
-	face.y -= 1.95
+	var face := cam.global_position - cam.global_transform.basis.z * Stalker.SCREAM_DIST
+	face.y -= Stalker.EYE_HEIGHT
 	stalker.appear(face, "nest", 999.0)
 	var flash := OmniLight3D.new()
 	flash.light_color = Color(1.0, 0.95, 0.9)

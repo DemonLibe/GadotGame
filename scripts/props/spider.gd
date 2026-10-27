@@ -27,10 +27,13 @@ func _ready() -> void:
 	add_to_group("day_objects")
 	add_to_group("spiders")
 	global_position = Vector3(wall_x, floor_y + randf_range(0.6, 2.6), home_z)
-	# Модель: Alien Bug Animated (CDmir, CC0), уменьшенная до паука. Смотрит в +Z — разворачиваем.
-	var skin := ProcTex.model_skin("res://models/alien_bug/bug_albedo.png", Color(0.2, 0.17, 0.15), 0.55)
-	var model := Geo.model(self, "res://models/alien_bug/alien-bug.glb", skin, Vector3.ZERO, Basis(Vector3.UP, PI).scaled(Vector3.ONE * 0.38))
-	_anim = Geo.model_anim(model, ["Idle", "Run"])
+	# Модель: Low Poly Spider (Wciow, John.d.h; CC-BY-SA 3.0) с анимациями из Glest.
+	# Смотрит в +Z — разворачиваем.
+	var skin := ProcTex.flat(Color(0.09, 0.07, 0.06), 0.55)
+	skin.rim_enabled = true
+	skin.rim = 0.25
+	var model := Geo.model(self, "res://models/spider/spider.glb", skin, Vector3.ZERO, Basis(Vector3.UP, PI).scaled(Vector3.ONE * 0.26))
+	_anim = Geo.model_anim(model, ["Idle", "Walk"])
 	_anim.play("Idle")
 	# Невидимая «мишень» для луча взаимодействия (слой 2).
 	var area := Area3D.new()
@@ -131,8 +134,8 @@ func _process(delta: float) -> void:
 			global_position += to / dist * minf(speed * delta, dist)
 			_orient(to)
 			moving = true
-	if _anim.current_animation != "Attack_000":
-		_anim.play("Run" if moving else "Idle", 0.15)
+	if _anim.current_animation != "Attack":
+		_anim.play("Walk" if moving else "Idle", 0.15)
 		_anim.speed_scale = clampf(speed * 2.0, 1.0, 3.0) if moving else 1.0
 
 	_weave -= delta
@@ -140,5 +143,5 @@ func _process(delta: float) -> void:
 		_weave = randf_range(45.0, 90.0)
 		if _webs_made < 2 and main:
 			_webs_made += 1
-			_anim.play("Attack_000", 0.1)  # выпускает нить
+			_anim.play("Attack", 0.1)  # выпускает нить
 			main.spawn_small_web(global_position + normal * 0.5, 1.0)

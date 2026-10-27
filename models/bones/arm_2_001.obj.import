@@ -1,0 +1,22 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://dk28aa0oq2k5c"
+path="res://.godot/imported/arm_2_001.obj-7af233f8599626705b413ef89770ce24.mesh"
+
+[deps]
+
+files=["res://.godot/imported/arm_2_001.obj-7af233f8599626705b413ef89770ce24.mesh"]
+
+source_file="res://models/bones/arm_2_001.obj"
+dest_files=["res://.godot/imported/arm_2_001.obj-7af233f8599626705b413ef89770ce24.mesh", "res://.godot/imported/arm_2_001.obj-7af233f8599626705b413ef89770ce24.mesh"]
+
+[params]
+
+generate_tangents=true
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+optimize_mesh=true
+force_disable_mesh_compression=false

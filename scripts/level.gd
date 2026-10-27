@@ -865,6 +865,9 @@ func _build_nest_decor() -> void:
 		(helmet.mesh as SphereMesh).is_hemisphere = true
 		helmet.rotation = Vector3(randf_range(-0.6, 0.6), randf() * TAU, randf_range(-0.6, 0.6))
 	Geo.box(self, Vector3(1.6, FLOOR_Y + 0.1, -348.5), Vector3(0.15, 0.2, 0.25), m_metal, false)
+	# Кости тех, кто ушёл за решётку раньше.
+	for p in [Vector3(1.0, 0, GRATE_Z - 9.0), Vector3(2.2, 0, GRATE_Z - 17.0), Vector3(0.4, 0, GRATE_Z - 26.0)]:
+		Remains.bone_pile(self, Vector3(p.x, FLOOR_Y, p.z), randf() * TAU, randf_range(0.8, 1.1))
 
 
 ## Тоннельный светильник в сетке на стене. inward — куда смотрит (внутрь тоннеля).
