@@ -22,6 +22,7 @@ func _ready() -> void:
 	_slider("master", "Общая громкость", 0.0, 1.0, 0.05, _percent)
 	_slider("voice", "Голос диспетчера", 0.0, 1.0, 0.05, _percent)
 	_slider("ambience", "Гул подземелья", 0.0, 1.0, 0.05, _percent)
+	_slider("music", "Музыка в меню", 0.0, 1.0, 0.05, _percent)
 	_heading("Изображение")
 	_slider("fov", "Поле зрения", 55.0, 100.0, 1.0, func(v): return "%d°" % int(v))
 	_slider("brightness", "Яркость", 0.6, 1.6, 0.05, _percent)

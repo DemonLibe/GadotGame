@@ -36,8 +36,9 @@
 2. В менеджере проектов нажми **Import** и выбери `project.godot`.
 3. Нажми **F5**.
 
-Почти всё генерируется кодом: геометрия тоннеля, текстуры (бетон, паутина) и все звуки.
-Готовые модели — только у вагонетки, рельсов, пауков, ползунов и «Другого» (папка `models/`, см. «Модели»).
+Почти всё генерируется кодом: геометрия тоннеля, текстуры (бетон, паутина) и большая часть звуков.
+Гул, капель, шаги, стоны, крик, пауки и музыка меню — записи с OpenGameArt (папка `sounds/`, см. «Звуки и музыка»).
+Готовые модели — у вагонетки, рельсов, пауков, ползунов, «Другого», останков и предметов (папка `models/`, см. «Модели»).
 
 ## Управление
 
@@ -106,9 +107,9 @@
   общий прогресс, фильтр «все / получены / не получены», карточки со значком, датой получения
   или полоской прогресса, скрытые — «Скрытое достижение», внизу — коллекция находок.
   Новое достижение всплывает справа сверху. Хранятся в `user://achievements.cfg` отдельно от прогресса.
-- **Эмбиент.** Гул, сквозняк (в шахте громче), тёмный пэд, который нарастает вместе со страхом,
-  а при сильном страхе — тревожный диссонанс; где-то в тоннеле то стонет металл, то лязгает,
-  то скрипит, то осыпается. Всё синтезируется кодом; громкость — «Гул подземелья» в настройках.
+- **Эмбиент.** Гул, сквозняк (в шахте громче), капель внизу, тёмный пэд, который нарастает вместе со страхом,
+  а при сильном страхе — тревожный диссонанс; где-то в тоннеле то стонет, то лязгает,
+  то скрипит, то осыпается. Громкость — «Гул подземелья» в настройках. В главном меню играет музыка.
 - **Пауки** безобидны: ползают по стенам, убегают от огня и плетут новую паутину.
 - **Фильтры.** Забитый вентблок горит красным. Запасные фильтры и редкие батарейки лежат
   в ящиках по тоннелю и штольням. Унести можно 3 фильтра и 2 батарейки. Чтобы поменять фильтр,
@@ -128,7 +129,7 @@
 - **Меню.** Главное меню — отдельная сцена (`scenes/main_menu.tscn`) с тоннелем и мигающей лампой на фоне:
   продолжение с последней смены (прогресс сохраняется), новая игра, настройки, управление. Пауза по Esc.
 - **Настройки** (в главном меню и в паузе, сохраняются в `user://settings.cfg`): чувствительность мыши,
-  инверсия по вертикали, общая громкость, голос диспетчера, гул подземелья, поле зрения, яркость,
+  инверсия по вертикали, общая громкость, голос диспетчера, гул подземелья, музыка в меню, поле зрения, яркость,
   плёночное зерно, полноэкранный режим.
 - **Смена** заканчивается, когда все поручения выполнены и ты доложил диспетчеру по рации
   (рацию в руки — ЛКМ). Подниматься по лестнице не нужно.
@@ -166,39 +167,64 @@ scripts/
   hud.gd               интерфейс
   geo.gd               построение примитивов, загрузка моделей из models/
   proc_tex.gd          процедурные текстуры (тюбинги, плитка, гранит, щебень, краска) и частицы
-  sfx.gd               процедурные звуки
+  sfx.gd               звуки: записи из sounds/, остальные синтезируются
   map_view.gd          бумажная карта
   props/               рация, люк, лестница, двери, останки, записки, ограждения, ползуны, пистолет и патроны, паутина, вентблок, ящик, зарядка, журнал, вагонетка, паук, находки (find.gd)
-models/                модели (CC0), уменьшенные текстуры к ним, настройки импорта (*.import)
+sounds/                звуки и музыка с OpenGameArt (CC0), сведены в моно OGG
+models/                модели с OpenGameArt, уменьшенные текстуры к ним, настройки импорта (*.import)
   mine/                вагонетка и звено пути
-  alien_bug/           пауки и ползуны
-  quaternius/          «Другой»
+  alien_bug/           ползуны
+  spider/              пауки (.glb из .blend, анимации разрезаны на клипы)
+  angler/              «Другой» (.glb из .blend, анимации сделаны для игры)
+  bones/               части скелетов для останков и кучи костей
   items/               предметы в руках и в слотах (.glb вырезаны из наборов, текстуры уменьшены)
 ```
 
 ## Модели
 
-Все модели — с [OpenGameArt](https://opengameart.org) под лицензией
-[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (общественное достояние, указание автора не обязательно).
-Godot импортирует FBX и glTF сам, Blender не нужен. Текстуры уменьшены и сведены к урезанной палитре,
+Все модели — с [OpenGameArt](https://opengameart.org). Почти все — под лицензией
+[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (общественное достояние, указание автора не обязательно);
+паук и «Другой» — под лицензиями с указанием автора (столбец «Лицензия»).
+Godot импортирует FBX, OBJ и glTF сам; паук и «Другой» были в `.blend` — их один раз перевели в `.glb` в Blender. Текстуры уменьшены и сведены к урезанной палитре,
 материалы задаёт код (`ProcTex.model_skin`).
 
-| Где в игре | Файлы | Набор | Автор |
-|---|---|---|---|
-| Вагонетка, звенья пути | `models/mine/` | [Mine Object collection](https://opengameart.org/content/mine-object-collection) | loafbrr_1 |
-| Пауки, ползуны | `models/alien_bug/` | [Alien Bug Animated](https://opengameart.org/content/alien-bug-animated) | CDmir |
-| «Другой» | `models/quaternius/` | [LowPoly Animated Monsters](https://opengameart.org/content/lowpoly-animated-monsters) | Quaternius |
-| Баллон горелки, канистра | `models/items/propane.glb`, `jerrycan.glb` | [Containers Pack](https://opengameart.org/content/containers-pack) | loafbrr_1 |
-| Пистолет | `models/items/pistol.glb` | [Pistol](https://opengameart.org/content/pistol-5) | loafbrr_1 |
-| Батарейка, аккумулятор | `models/items/battery.glb` | [Lowpoly Survival Item Pack](https://opengameart.org/content/lowpoly-survival-item-pack) | artie31 |
-| Рация | `models/items/radio.glb` | [Radio](https://opengameart.org/content/radio-0) | laleksic |
-| Таблетки | `models/items/pill.glb` | [Pills 3D models](https://opengameart.org/content/pills-3d-models) | mxc2 |
+| Где в игре | Файлы | Набор | Автор | Лицензия |
+|---|---|---|---|---|
+| Вагонетка, звенья пути | `models/mine/` | [Mine Object collection](https://opengameart.org/content/mine-object-collection) | loafbrr_1 | CC0 |
+| Ползуны | `models/alien_bug/` | [Alien Bug Animated](https://opengameart.org/content/alien-bug-animated) | CDmir | CC0 |
+| Пауки | `models/spider/` | [Low Poly Spider (Glest)](https://opengameart.org/content/low-poly-spider-glest) | Wciow, John.d.h | [CC-BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) — изменённая модель (`spider.glb`) распространяется на тех же условиях |
+| «Другой» | `models/angler/` | [Angler Man 3D](https://opengameart.org/content/angler-man-3d) | piacenti | [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) — анимации добавлены для игры |
+| Останки, кучи костей | `models/bones/` | [3D Dungeon Debris — Skull and Bones](https://opengameart.org/content/3d-dungeon-debris-skull-and-bones) | Paul Wortmann | CC0 |
+| Баллон горелки, канистра | `models/items/propane.glb`, `jerrycan.glb` | [Containers Pack](https://opengameart.org/content/containers-pack) | loafbrr_1 | CC0 |
+| Пистолет | `models/items/pistol.glb` | [Pistol](https://opengameart.org/content/pistol-5) | loafbrr_1 | CC0 |
+| Батарейка, аккумулятор | `models/items/battery.glb` | [Lowpoly Survival Item Pack](https://opengameart.org/content/lowpoly-survival-item-pack) | artie31 | CC0 |
+| Рация | `models/items/radio.glb` | [Radio](https://opengameart.org/content/radio-0) | laleksic | CC0 |
+| Таблетки | `models/items/pill.glb` | [Pills 3D models](https://opengameart.org/content/pills-3d-models) | mxc2 | CC0 |
 
 Из больших наборов в репозиторий взяты только нужные объекты: Godot вырезал их и сохранил в `.glb`
 (без материалов). Фильтр, карта, рефлектор и утка — свои модели из примитивов: подходящих CC0 не нашлось.
 
+## Звуки и музыка
+
+Записи — с [OpenGameArt](https://opengameart.org), все под лицензией
+[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). Они переведены в моно OGG и сведены по громкости
+с синтезированными звуками; `Sfx` берёт запись из `sounds/`, если она есть, а остальное синтезирует как раньше
+(лязг, щелчки, шёпот, рация, сердце, горелка и т. д.).
+
+| Где в игре | Файлы | Источник | Автор |
+|---|---|---|---|
+| Гул подземелья | `drone.ogg` | [Loopable Dungeon Ambience](https://opengameart.org/content/loopable-dungeon-ambience) | JaggedStone |
+| Капель в тоннелях | `drips.ogg` | [Dripping water loop](https://opengameart.org/content/dripping-water-loop) | qubodup |
+| Тёмный пэд | `pad.ogg` | [Dark Ambience Loop](https://opengameart.org/content/dark-ambience-loop) | Iwan Gabovitch (qubodup) |
+| Далёкие стоны | `groan_*.ogg` | [Ghost Monster Voice Moaning & Growling](https://opengameart.org/content/ghost-monster-voice-moaning-growling) | qubodup |
+| Крик скримера | `scream.ogg` | [Horror scream1](https://opengameart.org/content/horror-scream1) | Vinrax |
+| Шипение ползуна и «Другого» | `hiss.ogg` | [Insect or alien scream](https://opengameart.org/content/insect-or-alien-scream) | qubodup |
+| Пауки | `scuttle_*.ogg` | [80 CC0 creature SFX](https://opengameart.org/content/80-cc0-creature-sfx) | rubberduck |
+| Шаги, скрип дверей и люка | `step_*.ogg`, `creak_*.ogg` | [50 RPG sound effects](https://opengameart.org/content/50-rpg-sound-effects) | Kenney |
+| Музыка главного меню | `music_intro.ogg`, `music_loop.ogg` | [At the End of Hope](https://opengameart.org/content/at-the-end-of-hope) | Emma_MA |
+
 ## Что дальше
 
 - Заменить процедурные текстуры на фото.
-- Добавить настоящие звуки и озвучку мыслей героя.
+- Записи для оставшихся синтезированных звуков, озвучка мыслей героя.
 - Больше типов поручений и ответвлений тоннеля.
