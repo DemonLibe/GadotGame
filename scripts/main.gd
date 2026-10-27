@@ -5,6 +5,8 @@ extends Node3D
 
 const SPAWN := Vector3(Level.SHAFT_X + 1.6, Level.ROOM_Y + 0.1, Level.SHAFT_Z + 2.4)
 const SPAWN_YAW := 0.588  # atan2(1.6, 2.4) — лицом к люку
+## После провала смена начинается заново уже внизу — у подножия лестницы, лицом к тоннелю.
+const BOTTOM_SPAWN := Vector3(Level.SHAFT_X + 0.5, Level.FLOOR_Y + 0.05, Level.SHAFT_Z - 2.0)
 const START_BATTERY := 50.0
 const MENU_SCENE := "res://scenes/main_menu.tscn"
 
@@ -483,7 +485,8 @@ func _spawn_props() -> void:
 
 # --- Смена дня ---------------------------------------------------------------
 
-func start_day(d: int) -> void:
+## retry — смена начинается заново после провала: обходчик уже внизу, рация при нём.
+func start_day(d: int, retry := false) -> void:
 	busy = true
 	collapsing = false
 	Game.day = d
@@ -539,6 +542,14 @@ func start_day(d: int) -> void:
 		player.ammo = int(Game.gear.get("ammo", 6))
 		player.batteries = int(Game.gear.get("batteries", Player.MAX_BATTERIES))
 		player.battery = 100.0
+	if retry:
+		player.global_position = BOTTOM_SPAWN
+		player.rotation.y = 0.0
+		hatch.set_open(true)
+		if d <= Game.FINAL_DAY:
+			radio.take_away()
+			player.has_radio = true
+			Game.report("radio")
 	player.drain_mult = 1.0 + (mini(d, Game.FINAL_DAY) - 1) * 0.15
 	_fear_peak = 0.0
 	if d == Game.FINAL_DAY:
@@ -566,7 +577,9 @@ func start_day(d: int) -> void:
 		player.debug_look(0.0, PI)
 	if debug_flag("lookleft"):
 		player.debug_look(0.0, PI / 2)
-	if not debug_flag("s_say"):
+	if retry:
+		Game.say("Снова внизу. Голова гудит. Ещё раз — и осторожнее.", Game.THOUGHT, 4.0)
+	elif not debug_flag("s_say"):
 		Game.say(DAY_THOUGHTS[d], Game.THOUGHT, 6.0)
 		if d <= Game.FINAL_DAY:
 			Game.say("На столе шипит рация. Диспетчер ждёт.", Game.THOUGHT, 3.5)
@@ -602,13 +615,13 @@ func fail_day(reason: String) -> void:
 	stalker.hide_now()
 	Game.play_ui(Sfx.sting(), 0.0)
 	await hud.fade_to(1.0, 0.5).finished
-	hud.show_title("СМЕНА ПРОВАЛЕНА", reason + "\n\nСмена начнётся заново.", 2.5)
+	hud.show_title("СМЕНА ПРОВАЛЕНА", reason + "\n\nСмена начнётся заново — уже внизу.", 2.5)
 	await get_tree().create_timer(4.0).timeout
-	start_day(Game.day)
+	start_day(Game.day, true)
 
 
 func panic() -> void:
-	fail_day("Страх оказался сильнее. Ты очнулся наверху и не помнишь, как поднялся.")
+	fail_day("Страх оказался сильнее. Ты очнулся у лестницы и не помнишь, сколько пролежал.")
 
 
 ## Финал пятого дня, часть 1: за решёткой тоннель начинает рушиться — бежать.
@@ -1406,6 +1419,22 @@ func _smoke_test() -> void:
 			journal.interact(player)  # в шестую смену журнал закрыл бы смену — это проверяется ниже
 		await get_tree().create_timer(1.5).timeout
 		stalker.hide_now()
+	# Провал смены: начинается заново уже внизу, с рацией.
+	start_day(3)
+	await get_tree().create_timer(5.5).timeout
+	fail_day("смоук")
+	await get_tree().create_timer(10.5).timeout
+	var retry_ok := player.global_position.y < Level.FLOOR_Y + 5.0 and player.has_radio and not busy
+	# Охота: спрятался в шкаф — «Другой» постоит и уйдёт.
+	var hide_cab: Hideout = get_tree().get_nodes_in_group("hideouts")[1]
+	player.global_position = hide_cab.global_position + Vector3(0, 0.1, 0)
+	hide_cab.interact(player)
+	stalker.hunt(player.global_position + Vector3(0, 0, -10.0), 3)
+	await get_tree().create_timer(Stalker.HIDE_VANISH + 1.5).timeout
+	var hide_ok := player.hiding and not stalker.visible
+	hide_cab.interact(player)
+	if not (retry_ok and hide_ok):
+		print("SMOKE FAIL: провал смены внизу — %s, шкаф от «Другого» — %s" % [retry_ok, hide_ok])
 	start_day(Game.FINAL_DAY)
 	await get_tree().create_timer(5.5).timeout
 	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, Level.GRATE_Z + 2.0)
@@ -1419,7 +1448,7 @@ func _smoke_test() -> void:
 	await get_tree().create_timer(6.0).timeout
 	hud.close_newspaper()
 	await get_tree().create_timer(7.0).timeout
-	var ok := Game.ended
+	var ok := Game.ended and retry_ok and hide_ok
 	# Концовка 3: все записки, засов решётки изнутри.
 	start_day(5)
 	await get_tree().create_timer(5.5).timeout

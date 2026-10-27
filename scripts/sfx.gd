@@ -10,8 +10,9 @@ const SOUNDS := "res://sounds/"
 const RECORDED := {
 	"drone": 1, "pad": 1, "drips": 1, "scream": 1, "hiss": 1,
 	"scuttle": 4, "groan": 5, "step": 10, "creak": 3,
+	"stalker_growl": 4, "stalker_roar": 2, "threat": 1,
 }
-const LOOPED := ["drone", "pad", "drips"]
+const LOOPED := ["drone", "pad", "drips", "threat"]
 
 static var _cache := {}
 
@@ -136,6 +137,20 @@ static func radio() -> AudioStream:
 
 static func radio_loop() -> AudioStream:
 	return _stream("radio_loop")
+
+
+## «Другой»: ворчание, пока он ищет, и рёв, когда заметил (только записью).
+static func stalker_growl() -> AudioStream:
+	return _stream("stalker_growl")
+
+
+static func stalker_roar() -> AudioStream:
+	return _stream("stalker_roar")
+
+
+## Тревожная петля: «Другой» приближается.
+static func threat() -> AudioStream:
+	return _stream("threat")
 
 
 ## Капель в тоннеле — петля (только записью).
