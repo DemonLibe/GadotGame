@@ -22,9 +22,19 @@ var _echo_left := 0
 var _hb := 0.0
 var _flags := {}
 var _hunt_pending := false
+## Охоты «Другого» идут по своему таймеру, а не из общего списка событий: [от, до] секунд между охотами
+## (считаются только в тоннелях и пока его нет). Первая — раньше.
+const HUNT_EVERY := {3: [75.0, 105.0], 4: [60.0, 90.0], 5: [45.0, 70.0], 7: [35.0, 55.0]}
+var _hunt_t := 0.0
+var _threat: AudioStreamPlayer  # тревожная петля: он идёт
 
 
 func _ready() -> void:
+	_threat = AudioStreamPlayer.new()
+	_threat.stream = Sfx.threat()
+	_threat.bus = "Ambience"
+	_threat.volume_db = -60.0
+	add_child(_threat)
 	player.footstep.connect(_on_step)
 	stalker.vanished.connect(_on_vanished)
 	stalker.caught.connect(_on_caught)
@@ -35,17 +45,24 @@ func start_day(d: int) -> void:
 	_hunt_pending = false
 	_echo_left = 0
 	_cooldown = randf_range(20.0, 35.0)
+	_hunt_t = _next_hunt(d) * 0.6
 	match d:
 		1: _budget = {}
 		2: _budget = {"footsteps": 1, "sighting": 1, "radio": 1}
-		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1, "radio": 1, "crawler": 1, "interfere": 1, "hunt": 1}
-		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1, "radio": 1, "crawler": 2, "interfere": 2, "hunt": 2}
-		5: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1, "crawler": 3, "interfere": 1, "hunt": 3}
+		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1, "radio": 1, "crawler": 1, "interfere": 1}
+		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1, "radio": 1, "crawler": 2, "interfere": 2}
+		5: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1, "crawler": 3, "interfere": 1}
 		6: _budget = {}  # тихая смена: ничего
-		_: _budget = {"behind": 1, "whisper": 2, "crawler": 2, "swarm": 6, "hunt": 4}
+		_: _budget = {"behind": 1, "whisper": 2, "crawler": 2, "swarm": 6}
+
+
+func _next_hunt(d: int) -> float:
+	var r: Array = HUNT_EVERY.get(d, [0.0, 0.0])
+	return randf_range(float(r[0]), float(r[1]))
 
 
 func _process(delta: float) -> void:
+	_update_threat(delta)
 	if main.busy:
 		return
 	main.hud.set_fear(Game.fear / Achievements.fear_max())
@@ -61,6 +78,11 @@ func _process(delta: float) -> void:
 		return
 	if player.global_position.z > Level.TUN_Z0 - 4.0 or player.global_position.y > Level.FLOOR_Y + 5.0:
 		return  # события только в тоннелях
+	if HUNT_EVERY.has(Game.day) and not stalker.visible and not _hunt_pending:
+		_hunt_t -= delta
+		if _hunt_t <= 0.0:
+			_hunt_t = _next_hunt(Game.day) if _hunt() else 5.0
+			return
 	_cooldown -= delta
 	if _cooldown > 0.0 or stalker.visible:
 		return
@@ -76,6 +98,25 @@ func _process(delta: float) -> void:
 		_cooldown = randf_range(35.0, 60.0) - Game.day * 4.0
 	else:
 		_cooldown = 4.0
+
+
+## Тревожная петля: тихо, когда пауки только побежали, громче, чем ближе он, во весь голос — когда гонится.
+func _update_threat(delta: float) -> void:
+	var target := -60.0
+	if stalker.visible and stalker.mode == "hunt":
+		var d := stalker.global_position.distance_to(player.global_position)
+		target = lerpf(-4.0, -22.0, clampf((d - 4.0) / 36.0, 0.0, 1.0))
+		if stalker.is_chasing():
+			target = 0.0
+	elif _hunt_pending:
+		target = -18.0
+	if main.busy and not stalker.visible:
+		target = -60.0
+	if target > -55.0 and not _threat.playing:
+		_threat.play()
+	_threat.volume_db = move_toward(_threat.volume_db, target, delta * (20.0 if target > _threat.volume_db else 8.0))
+	if _threat.playing and _threat.volume_db <= -59.0:
+		_threat.stop()
 
 
 # --- Страх -------------------------------------------------------------------
@@ -414,10 +455,11 @@ func _on_vanished(m: String, seen: bool) -> void:
 				Game.play_ui(Sfx.sting(), -10.0)
 				Game.say_once("saw", "Там... кто-то стоял. В самом конце луча.")
 		"hunt":
+			_hunt_t = _next_hunt(Game.day)  # ушёл — на время
 			if seen:
 				Game.say_once("hunt_light", "Ушёл из луча... Не убит — просто ушёл. Он вернётся.", Game.THOUGHT, 3.5)
 			elif stalker.player_hid_during_hunt():
-				Game.say_once("hunt_hid", "Ушёл. Я пересидел его. Сердце колотится так, что он должен был услышать.", Game.THOUGHT, 4.0)
+				Game.say_once("hunt_hid", "Постоял у шкафа — и ушёл. Пересидел. На время.", Game.THOUGHT, 4.0)
 				Achievements.unlock("hid")
 			else:
 				Game.say_once("hunt_gone", "Тихо. Он ушёл... или ждёт.", Game.WHISPER, 3.0)
