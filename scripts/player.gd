@@ -270,8 +270,9 @@ func make_model(item: String) -> Node3D:
 			Geo.box(root, Vector3(0.0, 0.0, 0.025), Vector3(0.012, 0.16, 0.002), ink, false)
 			Geo.box(root, Vector3(-0.06, -0.03, 0.02), Vector3(0.09, 0.008, 0.002), ink, false)
 		"pistol":
-			# Pistol (loafbrr_1, CC0): ствол вдоль модели по X — поворачиваем вперёд (-Z).
-			Geo.model_fit(root, "res://models/items/pistol.glb", ProcTex.model_skin("res://models/items/pistol_albedo.png", Color(0.7, 0.7, 0.74), 0.4, 0.7), 0.22, Vector3(-0.05, 0.0, 0.02), Basis(Vector3.UP, PI / 2 + 0.25))
+			# Pistol (loafbrr_1, CC0): ствол вдоль модели по X — поворачиваем вперёд (-Z), почти точно в прицел,
+			# чтобы в руке он был виден сзади, вдоль ствола, а не боком.
+			Geo.model_fit(root, "res://models/items/pistol.glb", ProcTex.model_skin("res://models/items/pistol_albedo.png", Color(0.7, 0.7, 0.74), 0.4, 0.7), 0.19, Vector3(-0.06, -0.03, 0.04), Basis(Vector3.UP, PI / 2 + 0.06) * Basis(Vector3.RIGHT, 0.04))
 		"canister":
 			# Jerry can из Containers Pack (loafbrr_1, CC0).
 			Geo.model_fit(root, "res://models/items/jerrycan.glb", ProcTex.model_skin("res://models/items/jerrycan_albedo.png", Color(0.8, 0.7, 0.68), 0.5, 0.3), 0.26, Vector3(0, -0.13, 0))

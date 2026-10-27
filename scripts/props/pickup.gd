@@ -14,9 +14,9 @@ func _ready() -> void:
 			var case := ProcTex.flat(Color(0.22, 0.26, 0.2), 0.7, 0.3)
 			Geo.box(self, Vector3(0, 0.05, 0), Vector3(0.4, 0.1, 0.26), case, false)
 			Geo.box(self, Vector3(0, 0.105, 0), Vector3(0.36, 0.01, 0.22), ProcTex.flat(Color(0.1, 0.1, 0.1), 1.0), false)
-			var gun := ProcTex.flat(Color(0.12, 0.12, 0.13), 0.35, 0.8)
-			Geo.box(self, Vector3(-0.02, 0.125, 0), Vector3(0.18, 0.03, 0.035), gun, false)
-			Geo.box(self, Vector3(0.06, 0.125, 0.05), Vector3(0.05, 0.025, 0.09), gun, false)
+			# В ящике лежит настоящий пистолет (Pistol, loafbrr_1, CC0) — на боку, стволом вдоль ящика.
+			var skin := ProcTex.model_skin("res://models/items/pistol_albedo.png", Color(0.7, 0.7, 0.74), 0.4, 0.7)
+			Geo.model_fit(self, "res://models/items/pistol.glb", skin, 0.22, Vector3(0, 0.11, 0), Basis(Vector3.RIGHT, -PI / 2))
 			Geo.collider_box(self, Vector3(0.42, 0.16, 0.3), Vector3(0, 0.08, 0))
 		"fuel":
 			var red := ProcTex.flat(Color(0.6, 0.08, 0.06), 0.5, 0.3)
