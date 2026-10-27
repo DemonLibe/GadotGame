@@ -19,6 +19,8 @@ var _anim: AnimationPlayer
 var _scan := 0.0
 var _alarm := 0.0       # чует существо — удирает
 var _flee_from := Vector3.ZERO
+var _flee_speed := 2.0
+var _vanish := -1.0     # > 0 — убегает и через столько секунд пропадает
 
 
 func _ready() -> void:
@@ -61,6 +63,15 @@ func _orient(dir: Vector3) -> void:
 	global_transform.basis = Basis.looking_at(d.normalized(), normal)
 
 
+## Бежать прочь от from и пропасть: так пауки предупреждают, откуда идёт «Другой».
+func flee_and_vanish(from: Vector3, after: float, speed := 3.2) -> void:
+	alarm(from)
+	_alarm = after + 1.0
+	_flee_speed = speed
+	_vanish = after
+	_weave = 1000.0
+
+
 ## Разбежаться: что-то идёт со стороны from.
 func alarm(from: Vector3) -> void:
 	if _alarm <= 0.0 and randf() < 0.5:
@@ -71,6 +82,14 @@ func alarm(from: Vector3) -> void:
 
 func _process(delta: float) -> void:
 	var speed := 0.35
+	if _vanish > 0.0:
+		_vanish -= delta
+		if _vanish <= 0.0:
+			var tw := create_tween()
+			tw.tween_property(self, "scale", Vector3.ONE * 0.01, 0.4)
+			tw.tween_callback(queue_free)
+			set_process(false)
+			return
 	_scan -= delta
 	if _scan <= 0.0:
 		_scan = 0.5
@@ -88,7 +107,7 @@ func _process(delta: float) -> void:
 			dir = 1.0
 		_target = Vector3(wall_x, clampf(global_position.y + 0.3, floor_y + 0.4, floor_y + 2.9), global_position.z + dir * 2.0)
 		_wait = 0.0
-		speed = 2.0
+		speed = _flee_speed
 	if player and player.is_burning() and player.global_position.distance_to(global_position) < 3.5:
 		var away := signf(global_position.z - player.global_position.z)
 		if away == 0.0:

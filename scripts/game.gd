@@ -173,7 +173,7 @@ func make_noise(pos: Vector3, radius: float) -> void:
 
 
 func add_fear(amount: float) -> void:
-	fear = clampf(fear + amount, 0.0, 100.0)
+	fear = clampf(fear + amount, 0.0, Achievements.fear_max())
 
 
 # --- Звук ------------------------------------------------------------------

@@ -84,6 +84,7 @@ func _die() -> void:
 	collision_layer = 0
 	_heat = 0.8
 	Game.report("webs")
+	Achievements.add_count("webs", 1, "pyro", 30)
 	var tw := create_tween()
 	tw.tween_property(_mat, "albedo_color:a", 0.0, 0.4)
 	tw.tween_interval(1.0)

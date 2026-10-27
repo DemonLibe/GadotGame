@@ -11,8 +11,9 @@ const TUN_H := 3.2
 const LEFT_X := -0.5         # TUN_CX - TUN_HW
 const RIGHT_X := 2.9         # TUN_CX + TUN_HW
 const TUN_Z0 := -50.0        # портал тоннеля на станции
-const TUN_Z1 := -265.0       # тупик
-const GRATE_Z := -232.0      # решётка
+const TUN_Z1 := -372.5       # тупик
+const GRATE_Z := -323.0      # решётка
+const PICKET_STEP := 25.0    # пикеты (таблички «ПК n») по основному тоннелю
 const RAIL_TILE := 2.0       # длина звена пути
 const CHUNK := 14.0          # длина куска геометрии (лимит ламп на объект в браузере)
 const TUBE_R := 2.1          # радиус трубы тоннеля
@@ -26,9 +27,9 @@ const ROOM_D := 3.4
 const ROOM_H := 2.6
 ## Комнаты сбоку от основного тоннеля (ещё по одной — в конце каждой штольни).
 const SIDE_ROOMS := [
-	{"z": -72.0, "side": 1},
-	{"z": -128.0, "side": -1},
-	{"z": -185.0, "side": 1},
+	{"z": -83.0, "side": 1},
+	{"z": -167.0, "side": -1},
+	{"z": -252.5, "side": 1},
 ]
 
 const SHAFT_X := -1.6        # центр шахты
@@ -39,9 +40,9 @@ const ROOM_Y := 85.0         # пол комнаты с люком
 ## Развилки: z точки ответвления на оси, сторона (-1 — налево, если идти вглубь),
 ## угол от оси тоннеля (острый — штольня уходит вперёд-вбок), длина.
 const BRANCHES := [
-	{"z": -105.0, "side": -1, "angle": 35.0, "length": 46.0, "name": "ШТОЛЬНЯ 1"},
-	{"z": -160.0, "side": 1, "angle": 40.0, "length": 56.0, "name": "ШТОЛЬНЯ 2"},
-	{"z": -200.0, "side": -1, "angle": 30.0, "length": 40.0, "name": "ШТОЛЬНЯ 3"},
+	{"z": -132.5, "side": -1, "angle": 35.0, "length": 64.5, "name": "ШТОЛЬНЯ 1"},
+	{"z": -215.0, "side": 1, "angle": 40.0, "length": 78.5, "name": "ШТОЛЬНЯ 2"},
+	{"z": -275.0, "side": -1, "angle": 30.0, "length": 56.0, "name": "ШТОЛЬНЯ 3"},
 ]
 
 var lamps: Array[Dictionary] = []
@@ -169,6 +170,34 @@ func is_walkable(p: Vector3) -> bool:
 	if Rect2(-3.0, -50.0, 6.0, 20.0).has_point(Vector2(p.x, p.z)):
 		return true
 	return _nearest_segment(p).get("dist", INF) < TUN_HW
+
+
+## Следующая точка пути из from в to: если они в разных проходах — сначала к развилке.
+## Проходы: 0 — станция и основной тоннель, 1..3 — штольни.
+func next_waypoint(from: Vector3, to: Vector3) -> Vector3:
+	var a := _segment_index(from)
+	var b := _segment_index(to)
+	if a == b:
+		return to
+	var junction: Vector2 = _segments[a]["a"] if a > 0 else _segments[b]["a"]
+	var j := Vector3(junction.x, from.y, junction.y)
+	if from.distance_to(j) < 0.6:
+		return to  # уже на развилке
+	return j
+
+
+func _segment_index(p: Vector3) -> int:
+	if Rect2(-3.0, -50.0, 6.0, 20.0).has_point(Vector2(p.x, p.z)):
+		return 0
+	var q := Vector2(p.x, p.z)
+	var best := 0
+	var best_d := INF
+	for i in _segments.size():
+		var d := q.distance_to(Geometry2D.get_closest_point_to_segment(q, _segments[i]["a"] as Vector2, _segments[i]["b"] as Vector2))
+		if d < best_d:
+			best_d = d
+			best = i
+	return best
 
 
 ## Направление прохода, в котором стоит точка (основной тоннель или штольня).
@@ -536,8 +565,17 @@ func _build_main_tunnel() -> void:
 		z -= 12.0
 		i += 1
 	# Пикеты.
-	for k in [1, 3, 4]:
-		var mz: float = TUN_Z0 - 40.0 * k
+	for k in range(1, 12):
+		var mz: float = TUN_Z0 - PICKET_STEP * k
+		if mz < GRATE_Z + 2.0:
+			break
+		var blocked := false
+		for r in SIDE_ROOMS:
+			blocked = blocked or (int(r["side"]) == 1 and absf(mz - float(r["z"])) < ROOM_SECTION + 1.0)
+		for b in BRANCHES:
+			blocked = blocked or (int(b["side"]) == 1 and absf(mz - float(b["z"])) < JUNCTION_MAIN + 1.0)
+		if blocked:
+			continue
 		var ly := FLOOR_Y + 1.6
 		Geo.label(self, Vector3(wall_x(1, ly, 0.03), ly, mz), "ПК %d" % k, -90, 48, Color(0.95, 0.95, 0.9), true)
 
@@ -819,14 +857,14 @@ func _build_grate() -> void:
 ## За решёткой — каски прежних обходчиков. Видны сквозь прутья уже на 2-й день.
 func _build_nest_decor() -> void:
 	var yellow := ProcTex.flat(Color(0.75, 0.6, 0.1), 0.5)
-	var spots := [Vector3(0.2, 0, -237), Vector3(2.3, 0, -239.5), Vector3(0.9, 0, -243), Vector3(1.8, 0, -247),
-		Vector3(0.1, 0, -251), Vector3(2.5, 0, -254), Vector3(1.3, 0, -258)]
+	var spots := [Vector3(0.2, 0, -330.5), Vector3(2.3, 0, -334.0), Vector3(0.9, 0, -339.5), Vector3(1.8, 0, -345.5),
+		Vector3(0.1, 0, -351.5), Vector3(2.5, 0, -356.0), Vector3(1.3, 0, -362.0)]
 	for p in spots:
 		var pos: Vector3 = p
 		var helmet := Geo.sphere(self, Vector3(pos.x, FLOOR_Y, pos.z), 0.16, yellow)
 		(helmet.mesh as SphereMesh).is_hemisphere = true
 		helmet.rotation = Vector3(randf_range(-0.6, 0.6), randf() * TAU, randf_range(-0.6, 0.6))
-	Geo.box(self, Vector3(1.6, FLOOR_Y + 0.1, -249), Vector3(0.15, 0.2, 0.25), m_metal, false)
+	Geo.box(self, Vector3(1.6, FLOOR_Y + 0.1, -348.5), Vector3(0.15, 0.2, 0.25), m_metal, false)
 
 
 ## Тоннельный светильник в сетке на стене. inward — куда смотрит (внутрь тоннеля).

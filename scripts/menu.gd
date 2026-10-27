@@ -13,8 +13,8 @@ const CONTROLS := "WASD — идти        Shift — бежать        Мыш
 	+ "C / Ctrl — присесть        Space — прыжок, в шкафу — задержать дыхание\n" \
 	+ "E — действие (удерживать: люк, генератор, зарядка, фильтр)\n" \
 	+ "W / S на лестнице — вверх / вниз\n" \
-	+ "1–8 или колесо мыши — предмет в руках\n" \
-	+ "ЛКМ — использовать предмет        F — фонарь        Esc — пауза"
+	+ "1–7 или колесо мыши — предмет в руках (та же клавиша — убрать)\n" \
+	+ "ЛКМ — использовать предмет        F — налобный фонарь        Esc — пауза"
 const AMBER := Color(1.0, 0.75, 0.3)
 
 var _bg: ColorRect
@@ -22,6 +22,7 @@ var _title: Label
 var _sub: Label
 var _buttons: VBoxContainer
 var _controls: Label
+var _achievements: Label
 var _box: VBoxContainer
 var _settings: SettingsPanel
 var _bg_alpha := 0.6
@@ -58,6 +59,8 @@ func _ready() -> void:
 	box.add_child(_buttons)
 	_controls = _label(box, 17, Color(0.85, 0.83, 0.78))
 	_controls.text = CONTROLS
+	_achievements = _label(box, 15, Color(0.85, 0.83, 0.78))
+	_achievements.visible = false
 
 	_settings = SettingsPanel.new()
 	_settings.visible = false
@@ -79,6 +82,7 @@ func show_main(saved_day: int) -> void:
 	_button("Новая игра", func(): new_game.emit())
 	_button("Настройки", open_settings)
 	_button("Управление", _toggle_controls)
+	_button("Достижения", _toggle_achievements)
 	if not OS.has_feature("web"):
 		_button("Выход", func(): quit.emit())
 	_focus_first()
@@ -94,6 +98,7 @@ func show_pause() -> void:
 	_button("Продолжить", func(): resume.emit())
 	_button("Настройки", open_settings)
 	_button("Управление", _toggle_controls)
+	_button("Достижения", _toggle_achievements)
 	_button("В главное меню", func(): main_menu.emit())
 	_focus_first()
 
@@ -141,6 +146,24 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _toggle_controls() -> void:
 	_controls.visible = not _controls.visible
+	_achievements.visible = false
+
+
+## Список достижений: полученные — янтарной галочкой, скрытые — «???».
+func _toggle_achievements() -> void:
+	_achievements.visible = not _achievements.visible
+	_controls.visible = false
+	if not _achievements.visible:
+		return
+	var lines: PackedStringArray = []
+	var entries: Array = Achievements.entries()
+	var got := 0
+	for e in entries:
+		if e["got"]:
+			got += 1
+		lines.append(("✔ " if e["got"] else "·  ") + str(e["title"]) + " — " + str(e["text"]))
+	lines.insert(0, "Получено %d из %d   ·   находок: %d из %d\n" % [got, entries.size(), Achievements.finds_count(), Achievements.FINDS.size()])
+	_achievements.text = "\n".join(lines)
 
 
 func _close_settings() -> void:
@@ -154,6 +177,7 @@ func _show_box() -> void:
 	_settings.visible = false
 	_box.visible = true
 	_controls.visible = false
+	_achievements.visible = false
 	_clear()
 
 

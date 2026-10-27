@@ -99,6 +99,11 @@ static func pump() -> AudioStreamWAV:
 	return _stream("pump")
 
 
+## Крик для скримера: резкий, рваный, с перегрузом.
+static func scream() -> AudioStreamWAV:
+	return _stream("scream")
+
+
 static func radio() -> AudioStreamWAV:
 	return _stream("radio")
 
@@ -136,6 +141,7 @@ static func _stream(key: String) -> AudioStreamWAV:
 		"sparks": w = _make_sparks()
 		"scuttle": w = _make_scuttle()
 		"pump": w = _make_pump()
+		"scream": w = _make_scream()
 		_: w = _make_pickup()
 	_cache[key] = w
 	return w
@@ -467,3 +473,27 @@ static func _make_pump() -> AudioStreamWAV:
 		var stroke := sin(PI * cyc) * (0.6 + 0.4 * sin(TAU * 3.0 * t))
 		s[i] = clampf(lp * 4.0 * stroke + 0.15 * sin(TAU * 70.0 * t) * stroke, -1.0, 1.0)
 	return _wav(s, true)
+
+
+# Скример: визг из нескольких расстроенных «пил», тон рывками ползёт вверх и дрожит,
+# поверх — хрип (шум) и удар в начале. Перегруз мягким ограничителем — чтобы било по ушам.
+static func _make_scream() -> AudioStreamWAV:
+	var dur := 2.8
+	var s := _buf(dur)
+	var phases := [0.0, 0.0, 0.0, 0.0]
+	var detune := [1.0, 1.013, 0.987, 2.01]
+	var lp := 0.0
+	for i in s.size():
+		var t := float(i) / RATE
+		var base := 520.0 + 380.0 * minf(t / 0.35, 1.0) + 90.0 * sin(TAU * 6.5 * t) + 60.0 * sin(TAU * 13.0 * t + 1.3)
+		var v := 0.0
+		for k in phases.size():
+			phases[k] = fmod(phases[k] + base * detune[k] / RATE, 1.0)
+			v += (2.0 * phases[k] - 1.0) * (0.5 if k == 3 else 1.0)
+		var n := randf_range(-1.0, 1.0)
+		lp += 0.35 * (n - lp)
+		v += lp * 2.2
+		v += sin(TAU * 55.0 * t) * 3.0 * exp(-t * 6.0)  # удар
+		var env := minf(t * 80.0, 1.0) * minf((dur - t) * 2.5, 1.0)
+		s[i] = tanh(v * 0.9) * env * 0.95
+	return _wav(s)
