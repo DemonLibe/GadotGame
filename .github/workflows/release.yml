@@ -69,7 +69,7 @@ jobs:
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           cat > notes.md <<'NOTES'
-          Хоррор от первого лица: пять ночных смен обходчика станции «Тихая».
+          Хоррор от первого лица: ночные смены обходчика станции «Тихая».
 
           **Скачать:**
           - Windows — `HopeLight-windows.zip`, распаковать и запустить `HopeLight.exe` (SmartScreen: «Подробнее» → «Выполнить в любом случае»).
