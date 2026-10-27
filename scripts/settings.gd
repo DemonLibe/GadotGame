@@ -12,12 +12,13 @@ const DEFAULTS := {
 	"master": 0.8,        # громкость 0..1
 	"voice": 1.0,         # голос диспетчера и рация
 	"ambience": 1.0,      # гул подземелья
+	"music": 0.7,         # музыка главного меню
 	"brightness": 1.0,
 	"grain": true,        # плёночное зерно
 	"fullscreen": false,
 	"ui_scale": 1.0,      # масштаб интерфейса поверх подстройки под разрешение
 }
-const BUSES := ["Voice", "Ambience"]
+const BUSES := ["Voice", "Ambience", "Music"]
 
 ## Не записывать на диск (смоук-тест).
 var persist := true
@@ -71,6 +72,7 @@ func _apply(window: bool) -> void:
 	_set_volume("Master", float(_values["master"]))
 	_set_volume("Voice", float(_values["voice"]))
 	_set_volume("Ambience", float(_values["ambience"]))
+	_set_volume("Music", float(_values["music"]))
 	# Интерфейс растягивается вместе с окном (display/window/stretch), а это — добавочный множитель.
 	get_tree().root.content_scale_factor = float(_values["ui_scale"])
 	if window and DisplayServer.get_name() != "headless":

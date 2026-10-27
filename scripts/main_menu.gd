@@ -23,6 +23,16 @@ func _ready() -> void:
 		Main.add_postfx(self)
 
 	add_child(Ambience.new())  # гул, сквозняк, тёмный пэд и редкий далёкий стон
+	# Музыка: «At the End of Hope» (Emma_MA, CC0) — вступление, потом петля.
+	var music := AudioStreamPlayer.new()
+	music.stream = Sfx.music_intro()
+	music.bus = "Music"
+	music.volume_db = -8.0
+	music.finished.connect(func():
+		music.stream = Sfx.music_loop()
+		music.play())
+	add_child(music)
+	music.play()
 
 	menu = Menu.new()
 	add_child(menu)

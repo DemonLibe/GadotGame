@@ -1,12 +1,13 @@
 class_name Ambience
 extends Node
 ## Звуковой фон (шина Ambience — громкость «Гул подземелья» в настройках):
-## гул, сквозняк, тёмный пэд, который растёт вместе со страхом, тревожный пэд при сильном страхе
+## гул, сквозняк, капель (внизу), тёмный пэд, который растёт вместе со страхом, тревожный пэд при сильном страхе
 ## и редкие далёкие звуки тоннеля — стон металла, лязг, скрип, осыпь — с разных сторон.
 
 var player: Player  # в главном меню — null, там только фон
 var _drone: AudioStreamPlayer
 var _wind: AudioStreamPlayer
+var _drips: AudioStreamPlayer
 var _pad: AudioStreamPlayer
 var _tense: AudioStreamPlayer
 var _next := 6.0
@@ -15,6 +16,7 @@ var _next := 6.0
 func _ready() -> void:
 	_drone = _loop(Sfx.drone(), -14.0)
 	_wind = _loop(Sfx.wind(), -24.0)
+	_drips = _loop(Sfx.drips(), -60.0)
 	_pad = _loop(Sfx.pad(), -22.0)
 	_tense = _loop(Sfx.pad_tense(), -60.0)
 	_next = randf_range(5.0, 10.0)
@@ -41,10 +43,12 @@ func _process(delta: float) -> void:
 	# Целевая громкость слоёв (дБ): внизу — гуще, в шахте — сквозняк, наверху — тише.
 	var drone := -14.0 if below or player == null else -22.0
 	var wind := -20.0 if below else (-11.0 if climbing else -30.0)
+	var drips := -14.0 if below else -60.0
 	var pad := lerpf(-24.0, -11.0, fear) if below else (-18.0 if player == null else -28.0)
 	var tense := -60.0 if fear < 0.4 else lerpf(-32.0, -12.0, (fear - 0.4) / 0.6)
 	_fade(_drone, drone, delta)
 	_fade(_wind, wind, delta)
+	_fade(_drips, drips, delta)
 	_fade(_pad, pad, delta)
 	_fade(_tense, tense, delta)
 	# Редкие далёкие звуки.

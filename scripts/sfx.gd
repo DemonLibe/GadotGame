@@ -1,136 +1,164 @@
 class_name Sfx
 extends RefCounted
-## Процедурные звуки: гул тоннеля, шаги, капли, шёпот, удары. Генерируются один раз и кешируются.
+## Звуки: гул тоннеля, шаги, капли, шёпот, удары. Генерируются один раз и кешируются.
+## Если в sounds/ есть запись (с OpenGameArt, CC0) — играет она, иначе звук синтезируется.
 
 const RATE := 22050
+const SOUNDS := "res://sounds/"
+## Записи: ключ → сколько вариантов (sounds/<ключ>.ogg или <ключ>_1.ogg … <ключ>_N.ogg;
+## из нескольких при каждом проигрывании берётся случайный).
+const RECORDED := {
+	"drone": 1, "pad": 1, "drips": 1, "scream": 1, "hiss": 1,
+	"scuttle": 4, "groan": 5, "step": 10, "creak": 3,
+}
+const LOOPED := ["drone", "pad", "drips"]
 
 static var _cache := {}
 
 
-static func drone() -> AudioStreamWAV:
+static func drone() -> AudioStream:
 	return _stream("drone")
 
 
-static func step() -> AudioStreamWAV:
+static func step() -> AudioStream:
 	return _stream("step")
 
 
-static func drip() -> AudioStreamWAV:
+static func drip() -> AudioStream:
 	return _stream("drip")
 
 
-static func sting() -> AudioStreamWAV:
+static func sting() -> AudioStream:
 	return _stream("sting")
 
 
-static func whisper() -> AudioStreamWAV:
+static func whisper() -> AudioStream:
 	return _stream("whisper")
 
 
-static func hum() -> AudioStreamWAV:
+static func hum() -> AudioStream:
 	return _stream("hum")
 
 
-static func clank() -> AudioStreamWAV:
+static func clank() -> AudioStream:
 	return _stream("clank")
 
 
-static func click() -> AudioStreamWAV:
+static func click() -> AudioStream:
 	return _stream("click")
 
 
-static func rumble() -> AudioStreamWAV:
+static func rumble() -> AudioStream:
 	return _stream("rumble")
 
 
-static func heartbeat() -> AudioStreamWAV:
+static func heartbeat() -> AudioStream:
 	return _stream("heartbeat")
 
 
-static func flame() -> AudioStreamWAV:
+static func flame() -> AudioStream:
 	return _stream("flame")
 
 
-static func pickup() -> AudioStreamWAV:
+static func pickup() -> AudioStream:
 	return _stream("pickup")
 
 
-static func creak() -> AudioStreamWAV:
+static func creak() -> AudioStream:
 	return _stream("creak")
 
 
-static func rung() -> AudioStreamWAV:
+static func rung() -> AudioStream:
 	return _stream("rung")
 
 
-static func rain() -> AudioStreamWAV:
+static func rain() -> AudioStream:
 	return _stream("rain")
 
 
-static func tick() -> AudioStreamWAV:
+static func tick() -> AudioStream:
 	return _stream("tick")
 
 
-static func gunshot() -> AudioStreamWAV:
+static func gunshot() -> AudioStream:
 	return _stream("gunshot")
 
 
-static func hiss() -> AudioStreamWAV:
+static func hiss() -> AudioStream:
 	return _stream("hiss")
 
 
-static func gasp() -> AudioStreamWAV:
+static func gasp() -> AudioStream:
 	return _stream("gasp")
 
 
-static func engine() -> AudioStreamWAV:
+static func engine() -> AudioStream:
 	return _stream("engine")
 
 
-static func sparks() -> AudioStreamWAV:
+static func sparks() -> AudioStream:
 	return _stream("sparks")
 
 
-static func scuttle() -> AudioStreamWAV:
+static func scuttle() -> AudioStream:
 	return _stream("scuttle")
 
 
-static func pump() -> AudioStreamWAV:
+static func pump() -> AudioStream:
 	return _stream("pump")
 
 
 ## Эмбиент: сквозняк в тоннеле, тёмный пэд, тревожный пэд (при сильном страхе), стон металла вдали.
-static func wind() -> AudioStreamWAV:
+static func wind() -> AudioStream:
 	return _stream("wind")
 
 
-static func pad() -> AudioStreamWAV:
+static func pad() -> AudioStream:
 	return _stream("pad")
 
 
-static func pad_tense() -> AudioStreamWAV:
+static func pad_tense() -> AudioStream:
 	return _stream("pad_tense")
 
 
-static func groan() -> AudioStreamWAV:
+static func groan() -> AudioStream:
 	return _stream("groan")
 
 
 ## Крик для скримера: резкий, рваный, с перегрузом.
-static func scream() -> AudioStreamWAV:
+static func scream() -> AudioStream:
 	return _stream("scream")
 
 
-static func radio() -> AudioStreamWAV:
+static func radio() -> AudioStream:
 	return _stream("radio")
 
 
-static func radio_loop() -> AudioStreamWAV:
+static func radio_loop() -> AudioStream:
 	return _stream("radio_loop")
 
 
-static func _stream(key: String) -> AudioStreamWAV:
+## Капель в тоннеле — петля (только записью).
+static func drips() -> AudioStream:
+	return _stream("drips")
+
+
+## Музыка главного меню: вступление и петля.
+static func music_intro() -> AudioStream:
+	return load(SOUNDS + "music_intro.ogg")
+
+
+static func music_loop() -> AudioStream:
+	var m: AudioStreamOggVorbis = load(SOUNDS + "music_loop.ogg")
+	m.loop = true
+	return m
+
+
+static func _stream(key: String) -> AudioStream:
 	if _cache.has(key):
+		return _cache[key]
+	if RECORDED.has(key):
+		_cache[key] = _recorded(key)
 		return _cache[key]
 	var w: AudioStreamWAV
 	match key:
@@ -166,6 +194,18 @@ static func _stream(key: String) -> AudioStreamWAV:
 		_: w = _make_pickup()
 	_cache[key] = w
 	return w
+
+
+static func _recorded(key: String) -> AudioStream:
+	var n: int = RECORDED[key]
+	if n == 1:
+		var one: AudioStreamOggVorbis = load(SOUNDS + key + ".ogg")
+		one.loop = key in LOOPED
+		return one
+	var r := AudioStreamRandomizer.new()
+	for i in n:
+		r.add_stream(-1, load(SOUNDS + "%s_%d.ogg" % [key, i + 1]))
+	return r
 
 
 static func _buf(seconds: float) -> PackedFloat32Array:
