@@ -21,11 +21,6 @@ const VENT_SPOTS := [
 	[1, -1, 53.0, "В-5"],
 	[2, 1, 45.0, "В-6"],
 ]
-# Зарядки: [tunnel, side, along, id]
-const CHARGER_SPOTS := [
-	[-2, 0, -34.5, "station"],
-	[1, 1, 73.0, "far"],
-]
 # Ящики: [tunnel, along, смещение поперёк]
 const CRATE_SPOTS := [
 	[-2, -46.5, 0.0],
@@ -52,6 +47,15 @@ const CANISTERS_PER_DAY := [0, 0, 1, 2, 2, 2, 1, 0]
 ## Затопленная штольня (четвёртая смена): номер штольни и участок воды.
 const FLOOD_BRANCH := 2
 const FLOOD_FROM := 18.0
+# Места на стенах для поручений из пула (щиток, задвижки, ретрансляторы, точки осмотра): [tunnel, side, along].
+const WALL_TASK_SPOTS := [
+	[-1, 1, -62.0], [-1, -1, -88.0], [-1, 1, -104.0], [-1, 1, -146.0], [-1, -1, -158.0],
+	[-1, 1, -190.0], [-1, -1, -205.0], [-1, 1, -228.0], [-1, -1, -262.0], [-1, 1, -288.0], [-1, -1, -300.0],
+	[0, 1, 25.0], [0, -1, 48.0], [1, -1, 28.0], [1, 1, 60.0], [2, 1, 25.0], [2, -1, 40.0],
+]
+## Щиток четвёртой смены — во второй штольне (о нём говорит диспетчер).
+const FUSE_DAY4 := [1, 1, 73.0]
+const RELAY_BOX := Vector3(-2.2, Level.FLOOR_Y, -38.5)
 # Где искрит кабель на третьей смене: [side, z].
 const CABLE_SPOTS := [[-1, -101.0], [1, -152.0], [1, -185.0]]
 const LETTER := ["Письмо от Маши",
@@ -82,6 +86,8 @@ const AMMO_BOXES_PER_DAY := [0, 0, 0, 3, 3, 4, Game.GEAR_AMMO_BOXES, 4]
 const PISTOL_ROUNDS := [0, 0, 0, 6, 4, 6, 6, 0]
 ## Седьмая смена: кусачие пауки на полу с самого начала; вагон метро за проломом (центр головного вагона).
 const BITERS_AT_START := 8
+## Коробки с болтами по тоннелю — каждую смену.
+const BOLT_BOXES := 4
 const METRO_CAR_Z := -390.0
 
 ## Комнаты, открытые в каждую смену: [индекс комнаты (0–2 — у тоннеля, 3–5 — в конце штолен), записка].
@@ -117,7 +123,7 @@ const NOTE_TEXTS := {
 		+ "Он учится. Я записываю, чтобы не сойти с ума:\n"
 		+ "сначала были шаги;\n"
 		+ "потом голоса — моим голосом, из штольни;\n"
-		+ "потом вещи — дверь, зарядка, ящики;\n"
+		+ "потом вещи — дверь, генератор, ящики;\n"
 		+ "потом — мы.\n\n"
 		+ "Я не знаю, что значит последний пункт. Но он написан не моей рукой."],
 	"n5": ["Обходчик № 4, последняя запись",
@@ -128,7 +134,7 @@ const NOTE_TEXTS := {
 		+ "Завтра не спущусь."],
 	"n6": ["Обходчик № 6",
 		"Седьмой — это не номер смены. Нас было семеро. Я нашёл список в столе диспетчерской, под газетой: семь фамилий, у шести стоят галочки. Последняя — пустая. Место для восьмого.\n\n"
-		+ "Каждый следующий — его новая пара глаз. Он смотрит нами. Поэтому он знает, где шкафы, где зарядка, где ты прячешь батарейки.\n\n"
+		+ "Каждый следующий — его новая пара глаз. Он смотрит нами. Поэтому он знает, где шкафы, где генератор, где ты прячешь батарейки.\n\n"
 		+ "Вчера я видел Пятого. Он полз по третьей штольне, в своей каске, бледный, как те. Он узнал меня. Он улыбнулся.\n\n"
 		+ "Я оставлю это здесь, где темнее всего. Сюда он заходит реже: тут нечего забирать."],
 	"n7": ["Акт обследования, 2001",
@@ -150,6 +156,13 @@ const NOTE_TEXTS := {
 		+ "Или останься и закрой за собой. Выбор всегда был твой — просто тебе об этом не говорили."],
 }
 
+## Звонки на мёртвый телефон наверху: [id озвучки (голос Маши) или "", субтитр] — по одному на снятие трубки.
+const PHONE_CALLS := {
+	5: [["m_phone_0", "Папа? Папа, ты где? Ты же дома... Я тебя вижу в окне. Ты стоишь во дворе и смотришь на меня."],
+		["", "…В трубке кто-то дышит. Медленно. В такт моему дыханию."]],
+	7: [["m_phone_7", "Папа... Ты уже три дня дома. Но это не ты. Он не разговаривает. Он только смотрит."]],
+}
+
 ## Концовка 2: дневник обходчика, который находится в вагоне. Последняя запись — не его.
 const DIARY := [
 	["Смена 1", "Спустился первый раз. Сто метров по лестнице — руки потом дрожали полчаса. Внизу генератор, фильтры, паутина, пауки размером с ладонь. Платят втрое. Маше хватит на операцию, если продержусь пять смен.\n\nДиспетчер вежливый. Слишком вежливый для этой работы."],
@@ -164,7 +177,7 @@ const DIARY := [
 const DAY_SUBTITLES := ["", "Станция «Тихая». Первая смена.", "Вторая смена.", "Третья смена.", "Четвёртая смена.", "Последняя смена.", "Шестая смена. Которой не должно было быть.", "Седьмая смена."]
 const DAY_THOUGHTS := [
 	"",
-	"Первая смена. Платят втрое — Маше нужна операция. Спуститься, завести генератор, зарядить фонарь, поменять фильтр, сжечь паутину. Ничего сложного.",
+	"Первая смена. Платят втрое — Маше нужна операция. Спуститься, завести генератор, фонарь с динамо — сядет, подкручу, поменять фильтр, сжечь паутину. Ничего сложного.",
 	"Вчера внизу что-то обрушилось. Маша спросила по телефону, страшно ли под землёй. Сказал — нет.",
 	"Плохо спал. Всю ночь казалось, что под полом кто-то ходит. Ещё три смены — и хватит на операцию.",
 	"Мой предшественник продержался неделю. Никто не говорит, куда он делся. У него тоже кто-то ждал дома?",
@@ -186,10 +199,11 @@ var dispatcher: Dispatcher
 var ladder: Ladder
 var cart: Cart
 var vents: Array[Vent] = []
-var chargers: Array[Charger] = []
 var crates: Array[FilterCrate] = []
 var doors: Array[RoomDoor] = []
 var generator: Generator
+var ambience: Ambience
+var phone: WallPhone
 var pump: TaskDevice
 var _reported := false   # в финале доложил диспетчеру, где он
 var _station_t := 0.0
@@ -205,6 +219,8 @@ var _grace := 0.0
 var _smoke := false
 var _debug_log := false
 var _fear_peak := 0.0  # для достижения «Холодная голова»
+var _used_spots: Array = []
+var _photo_reveal := -1  # на каком снимке проявится «он»
 var _debug_t := 0.0
 
 
@@ -237,6 +253,7 @@ func _ready() -> void:
 	dispatcher = Dispatcher.new()
 	add_child(dispatcher)
 	player.dispatcher = dispatcher
+	dispatcher.player = player
 	radio.dispatcher = dispatcher
 	dispatcher.shift_closed.connect(end_day)
 	dispatcher.collapse_reported.connect(func(): _reported = true)
@@ -254,7 +271,7 @@ func _ready() -> void:
 	director.level = level
 	add_child(director)
 
-	var ambience := Ambience.new()
+	ambience = Ambience.new()
 	ambience.player = player
 	add_child(ambience)
 
@@ -427,6 +444,11 @@ func _spawn_props() -> void:
 	hatch.position = Vector3(Level.SHAFT_X, Level.ROOM_Y, Level.SHAFT_Z - Level.SHAFT_HALF)
 	add_child(hatch)
 
+	# Телефон на стене у журнала: линия мёртвая — но он звонит.
+	phone = WallPhone.new()
+	phone.position = Vector3(Level.SHAFT_X + 3.45, Level.ROOM_Y + 1.45, Level.SHAFT_Z + 0.9)
+	phone.rotation.y = deg_to_rad(-90.0)
+	add_child(phone)
 	journal = Journal.new()
 	journal.position = Vector3(Level.SHAFT_X + 2.9, Level.ROOM_Y, Level.SHAFT_Z - 1.6)
 	journal.rotation.y = deg_to_rad(90.0)
@@ -444,12 +466,6 @@ func _spawn_props() -> void:
 		v.transform = _mount(s[0], s[1], s[2], fy + 1.4)
 		add_child(v)
 		vents.append(v)
-	for s in CHARGER_SPOTS:
-		var c := Charger.new()
-		c.charger_id = s[3]
-		c.transform = _mount(s[0], s[1], s[2], fy + 1.2)
-		add_child(c)
-		chargers.append(c)
 	for s in CRATE_SPOTS:
 		var crate := FilterCrate.new()
 		crate.position = _floor(s[0], s[1], s[2])
@@ -524,6 +540,8 @@ func start_day(d: int, retry := false) -> void:
 		level.set_grate_open(d == Game.FINAL_DAY or d == Game.LAST_DAY)
 		level.set_breach(d == Game.LAST_DAY)
 		level.tunnel_lights_off = d == Game.LAST_DAY
+		level.reset_pickets()
+		phone.stop()
 		level.blackout = false
 		stalker.hide_now()
 		hatch.set_open(false)
@@ -554,8 +572,6 @@ func start_day(d: int, retry := false) -> void:
 	_fear_peak = 0.0
 	if d == Game.FINAL_DAY:
 		Achievements.unlock("shift5")
-	for c in chargers:
-		c.reset()
 	player.input_locked = true
 
 	if not debug_flag("s_dir"):
@@ -577,6 +593,11 @@ func start_day(d: int, retry := false) -> void:
 		player.debug_look(0.0, PI)
 	if debug_flag("lookleft"):
 		player.debug_look(0.0, PI / 2)
+	if not retry and PHONE_CALLS.has(d):
+		# Звонок с поверхности — пока обходчик ещё наверху.
+		get_tree().create_timer(8.0).timeout.connect(func():
+			if Game.day == d and player.global_position.y > Level.ROOM_Y - 2.0:
+				phone.ring(PHONE_CALLS[d]))
 	if retry:
 		Game.say("Снова внизу. Голова гудит. Ещё раз — и осторожнее.", Game.THOUGHT, 4.0)
 	elif not debug_flag("s_say"):
@@ -996,11 +1017,17 @@ func _spawn_notes(d: int) -> void:
 		if day > d:
 			continue
 		for n in NOTES[day]:
-			var tr := _mount(n[0], n[1], n[2], Level.FLOOR_Y + float(n[3]))
-			var l := Geo.label(self, tr.origin, n[4], 0.0, 72, Color(0.85, 0.83, 0.78, 0.85), true, 0.0035)
-			l.basis = tr.basis
-			l.rotate_object_local(Vector3.FORWARD, randf_range(-0.06, 0.06))
-			l.add_to_group("day_objects")
+			write_chalk(n[0], n[1], n[2], float(n[3]), n[4])
+
+
+## Надпись мелом на стене (пропадает со сменой).
+func write_chalk(tunnel: int, side: int, along: float, height: float, text: String) -> Label3D:
+	var tr := _mount(tunnel, side, along, Level.FLOOR_Y + height)
+	var l := Geo.label(self, tr.origin, text, 0.0, 72, Color(0.85, 0.83, 0.78, 0.85), true, 0.0035)
+	l.basis = tr.basis
+	l.rotate_object_local(Vector3.FORWARD, randf_range(-0.06, 0.06))
+	l.add_to_group("day_objects")
+	return l
 
 
 # --- Доступ, комнаты, угрозы -------------------------------------------------
@@ -1034,14 +1061,10 @@ func _setup_access(d: int) -> void:
 			f.position = level.floor_point(i, Level.JUNCTION_BRANCH + 1.0)
 			f.rotation.y = level.cross_yaw(i)
 			add_child(f)
-	var charger_spots: Array[Vector3] = []
-	for i in chargers.size():
-		if _reachable(CHARGER_SPOTS[i][0], CHARGER_SPOTS[i][2]):
-			charger_spots.append(chargers[i].global_position)
 	var rooms_open: Array = []
 	for r in ROOM_SCHEDULE.get(d, []):
 		rooms_open.append(r[0])
-	hud.update_map(limit, open, rooms_open, charger_spots)
+	hud.update_map(limit, open, rooms_open)
 
 
 ## Каждую смену открыты другие комнаты: в них останки и записки прежних обходчиков.
@@ -1135,6 +1158,13 @@ func _spawn_threats(d: int) -> void:
 		box.position = _random_floor_spot(30.0)
 		box.rotation.y = randf() * TAU
 		add_child(box)
+	for i in BOLT_BOXES:
+		var bolts := Pickup.new()
+		bolts.kind = "bolts"
+		bolts.amount = 3
+		bolts.position = _random_floor_spot(15.0)
+		bolts.rotation.y = randf() * TAU
+		add_child(bolts)
 	for i in CREATURES_PER_DAY[d]:
 		spawn_crawler(_random_floor_spot(60.0))
 	if d == Game.LAST_DAY:
@@ -1215,6 +1245,42 @@ func _spawn_task_devices(d: int) -> void:
 			Vector3(3.6, 0.02, flood_len), mat, false, Basis(Vector3.UP, atan2(axis.x, axis.z)))
 		water.add_to_group("day_objects")
 		pump.water = water
+	_used_spots = []
+	var marks: Array = []  # для карты: [позиция, подпись]
+	if Game.has_open_task("fuse"):
+		var spot: Array = FUSE_DAY4 if d == 4 else _pick_wall_spots(1)[0]
+		var box := _wall_device("fuse", spot, 1)
+		marks.append([box.global_position, "Щ"])
+		var fuse := Pickup.new()
+		fuse.kind = "fuse"
+		var rooms: Array = ROOM_SCHEDULE.get(d, [])
+		fuse.position = _room_spot(rooms.pick_random()[0], Vector3(1.1, 0, 0.9)) if not rooms.is_empty() else _random_floor_spot(30.0)
+		add_child(fuse)
+	if Game.has_open_task("valves"):
+		var i := 1
+		for spot in _pick_wall_spots(3, 15.0):
+			marks.append([_wall_device("valve", spot, i).global_position, "З-%d" % i])
+			i += 1
+	if Game.has_open_task("relay"):
+		var i := 1
+		for spot in _pick_wall_spots(3, 20.0):
+			marks.append([_wall_device("relay", spot, i).global_position, "Р"])
+			i += 1
+		var crate := Pickup.new()
+		crate.kind = "relays"
+		crate.amount = 3
+		crate.position = RELAY_BOX
+		crate.rotation.y = PI / 2
+		add_child(crate)
+	if Game.has_open_task("photo"):
+		var i := 1
+		for spot in _pick_wall_spots(3, 15.0):
+			marks.append([_wall_device("photo", spot, i).global_position, "ТО-%d" % i])
+			i += 1
+		_photo_reveal = randi_range(1, 3) if randf() < 0.75 else -1
+	if Game.has_open_task("cartpush"):
+		marks.append([Vector3(Level.TUN_CX, Level.FLOOR_Y, Cart.PUSH_TO), "ПК 2"])
+	hud.set_map_marks(marks)
 	if Game.has_open_task("token"):
 		var room: Dictionary = level.rooms[5]
 		var token := Pickup.new()
@@ -1231,6 +1297,64 @@ func _spawn_task_devices(d: int) -> void:
 		lock.main = self
 		lock.transform = level.wall_mount(-1, 1, Level.GRATE_Z - 0.5, Level.FLOOR_Y + 1.1)
 		add_child(lock)
+
+
+## Свободные места на стенах для поручений: открытые сегодня, не занятые, не ближе min_gap друг к другу.
+func _pick_wall_spots(n: int, min_gap := 12.0) -> Array:
+	var cand: Array = []
+	for s in WALL_TASK_SPOTS:
+		if _reachable(s[0], s[2]) and not _used_spots.has(s):
+			cand.append(s)
+	cand.shuffle()
+	var out: Array = []
+	for s in cand:
+		if out.size() >= n:
+			break
+		var p := _mount(s[0], s[1], s[2], Level.FLOOR_Y).origin
+		var ok := true
+		for o in out:
+			ok = ok and _mount(o[0], o[1], o[2], Level.FLOOR_Y).origin.distance_to(p) >= min_gap
+		if ok:
+			out.append(s)
+	_used_spots.append_array(out)
+	return out
+
+
+func _wall_device(kind: String, spot: Array, index: int) -> TaskDevice:
+	var dev := TaskDevice.new()
+	dev.kind = kind
+	dev.index = index
+	dev.main = self
+	dev.transform = _mount(spot[0], spot[1], spot[2], Level.FLOOR_Y + 1.4)
+	add_child(dev)
+	return dev
+
+
+## Снимок точки осмотра: на одном из них проявляется «он» — вплотную к объективу.
+## Он стоит ровно один кадр — тот, что попадает на снимок. Глазами его не увидеть.
+func take_photo(spot: TaskDevice) -> void:
+	var reveal := spot.index == _photo_reveal and not stalker.visible
+	if reveal:
+		var pos := player.global_position + player.forward_flat() * 1.2  # вплотную к объективу
+		pos.y = Level.FLOOR_Y
+		reveal = level.is_walkable(pos)
+		if reveal:
+			stalker.appear(pos, "photo", 1.0)
+	hud.visible = false
+	await RenderingServer.frame_post_draw
+	var img := get_viewport().get_texture().get_image()
+	if reveal:
+		stalker.hide_now()
+	hud.visible = true
+	hud.camera_flash()
+	Game.play_ui(Sfx.click(), 0.0)
+	Game.make_noise(player.global_position, 8.0)
+	if img != null and not img.is_empty():
+		hud.show_photo(img)
+	if reveal:
+		Game.add_fear(20.0)
+		Game.play_ui(Sfx.sting(), -6.0)
+		Game.say("На снимке... кто-то стоит. Прямо передо мной. Там, где никого нет.", Game.THOUGHT, 5.0)
 
 
 ## Вода в затопленной штольне замедляет и хлюпает.
@@ -1330,8 +1454,13 @@ func _smoke_test() -> void:
 		hatch.interact(player)
 		await get_tree().create_timer(0.5).timeout
 		player.stop_climb(Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -140.0))
-		for ev in ["footsteps", "sighting", "behind", "lamps", "whisper", "regrow", "interfere", "crawler", "hunt", "swarm"]:
+		for ev in ["footsteps", "sighting", "behind", "lamps", "whisper", "regrow", "interfere", "crawler", "hunt", "swarm",
+				"masha", "double", "silence", "picket", "name"]:
 			director._run(ev)
+		if PHONE_CALLS.has(d):
+			phone.ring(PHONE_CALLS[d])
+			phone.interact(player)
+			phone.interact(player)
 		# Генератор: запуск (со второй попытки, если чихнул), заправка, остановка.
 		generator.hold_interact(player, 2.0)
 		generator.hold_interact(player, 2.0)
@@ -1349,6 +1478,9 @@ func _smoke_test() -> void:
 		await get_tree().physics_frame
 		Input.action_release("crouch")
 		Game.make_noise(player.global_position, 50.0)
+		player.fuses = 1
+		player.relays = 3
+		player.throw_bolt()
 		for n in get_tree().get_nodes_in_group("day_objects"):
 			var dev := n as TaskDevice
 			if dev:
@@ -1357,8 +1489,12 @@ func _smoke_test() -> void:
 				dev.hold_interact(player, 5.0)
 		await get_tree().create_timer(0.3).timeout
 		generator.hold_interact(player, 2.0)
-		chargers[0].unplug()
-		chargers[0].interact(player)
+		# Ручка динамо: заряд растёт, задача первой смены засчитывается.
+		player.battery = 10.0
+		Input.action_press("crank")
+		await get_tree().create_timer(1.0).timeout
+		Input.action_release("crank")
+		await get_tree().process_frame
 		doors[0].set_open(true)
 		doors[0].slam()
 		doors[0].interact(player)
@@ -1415,6 +1551,7 @@ func _smoke_test() -> void:
 		player.global_position = level.rooms[0]["center"] + Vector3(0, 0.1, 0)
 		await get_tree().physics_frame
 		cart.interact(player)
+		cart.hold_interact(player, 200.0)
 		if d != Game.LAST_DAY - 1:
 			journal.interact(player)  # в шестую смену журнал закрыл бы смену — это проверяется ниже
 		await get_tree().create_timer(1.5).timeout

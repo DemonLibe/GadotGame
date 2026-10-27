@@ -54,6 +54,7 @@ var grate: Node3D
 var _end_wall: MeshInstance3D   # глухая стена тупика
 var _breach: Node3D             # пролом на её месте (седьмая смена)
 var _main_seg := 0              # индекс основного тоннеля в _segments
+var pickets: Array[Label3D] = []  # таблички «ПК n» (номер может «поменяться», пока стоишь спиной)
 var rooms: Array[Dictionary] = []  # {center, basis, door}: basis +Z смотрит из комнаты к двери
 var _segments: Array[Dictionary] = []  # оси проходов {a, b, dir} в XZ — для событий
 
@@ -286,6 +287,12 @@ func cross_yaw(tunnel: int) -> float:
 ## Оси проходов для схемы на карте: [{a, b}] в XZ.
 func map_segments() -> Array[Dictionary]:
 	return _segments
+
+
+## Новая смена — таблички пикетов снова со своими номерами.
+func reset_pickets() -> void:
+	for pk in pickets:
+		pk.text = "ПК %d" % int(pk.get_meta("number"))
 
 
 func set_grate_open(open: bool) -> void:
@@ -595,7 +602,9 @@ func _build_main_tunnel() -> void:
 		if blocked:
 			continue
 		var ly := FLOOR_Y + 1.6
-		Geo.label(self, Vector3(wall_x(1, ly, 0.03), ly, mz), "ПК %d" % k, -90, 48, Color(0.95, 0.95, 0.9), true)
+		var pk := Geo.label(self, Vector3(wall_x(1, ly, 0.03), ly, mz), "ПК %d" % k, -90, 48, Color(0.95, 0.95, 0.9), true)
+		pk.set_meta("number", k)
+		pickets.append(pk)
 
 
 ## Общая «начинка» прямого куска трубы в локальных координатах (ось по -Z, пол на y = 0).

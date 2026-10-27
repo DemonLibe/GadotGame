@@ -1,6 +1,6 @@
 class_name MapView
 extends Control
-## Бумажная схема линии: открытые сегодня проходы, станция, шахта, комнаты, зарядки и «вы здесь».
+## Бумажная схема линии: открытые сегодня проходы, станция, шахта, комнаты и «вы здесь».
 
 const BOUNDS := Rect2(-52.0, -380.0, 112.0, 356.0)  # мир: x, z, ширина, глубина
 const PAPER := Color(0.86, 0.82, 0.7)
@@ -11,8 +11,8 @@ var level: Level
 var player: Node3D
 var limit_z := -1000.0          # дальше по основному тоннелю сегодня не пройти
 var open_branches: Array = []   # индексы открытых штолен
+var marks: Array = []           # места поручений: [позиция, подпись]
 var open_rooms: Array = []      # индексы открытых комнат
-var chargers: Array[Vector3] = []
 
 
 func _process(_delta: float) -> void:
@@ -68,14 +68,20 @@ func _draw() -> void:
 		var pb := _to_map(Vector2(e.x, e.z))
 		draw_line(pa, pb, Color(INK, 0.75), w * 0.8)
 		draw_string(font, pb + Vector2(-20, 16), str(br["name"]).to_lower(), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK)
-	# Комнаты, зарядки.
+	# Комнаты.
 	for ri in open_rooms:
 		var c: Vector3 = level.rooms[ri]["center"]
 		var p := _to_map(Vector2(c.x, c.z))
 		draw_rect(Rect2(p - Vector2(5, 5), Vector2(10, 10)), INK, false, 1.5)
 		draw_string(font, p + Vector2(-3, 4), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK)
-	for c in chargers:
-		draw_circle(_to_map(Vector2(c.x, c.z)), 4.0, Color(0.1, 0.5, 0.2))
+	# Места поручений — крестик и подпись.
+	for m in marks:
+		var mp: Vector3 = m[0]
+		var q := _to_map(Vector2(mp.x, mp.z))
+		var red := Color(0.6, 0.1, 0.05)
+		draw_line(q + Vector2(-4, -4), q + Vector2(4, 4), red, 2.0)
+		draw_line(q + Vector2(-4, 4), q + Vector2(4, -4), red, 2.0)
+		draw_string(font, q + Vector2(6, 4), str(m[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, red)
 	# Вы здесь.
 	if player and player.global_position.y < Level.FLOOR_Y + 6.0:
 		var pp := _to_map(Vector2(player.global_position.x, player.global_position.z))
@@ -83,4 +89,4 @@ func _draw() -> void:
 		var dir := Vector2(f.x, -f.z).normalized()
 		var side := Vector2(-dir.y, dir.x)
 		draw_colored_polygon(PackedVector2Array([pp + dir * 9, pp - dir * 5 + side * 5, pp - dir * 5 - side * 5]), Color(0.75, 0.1, 0.05))
-	draw_string(font, Vector2(PAD, size.y - 12), "красный — вы, зелёный — зарядка, ? — комната", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(INK, 0.8))
+	draw_string(font, Vector2(PAD, size.y - 12), "красный — вы, × — поручение, ? — комната", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(INK, 0.8))

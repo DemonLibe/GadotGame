@@ -59,6 +59,10 @@ var _diary_scrawl: Control
 var _diary_cry: Label
 var _diary_pages: Array = []
 var _diary_i := -1
+var _flash: ColorRect
+var _photo: PanelContainer
+var _photo_tex: TextureRect
+var _photo_t := 0.0
 var _toast: Label
 var _toast_t := 0.0
 var _scream: Label
@@ -240,6 +244,7 @@ func _ready() -> void:
 
 	_build_newspaper()
 	_build_diary()
+	_build_photo()
 	_scream = Label.new()
 	_scream.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_scream.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
@@ -354,6 +359,10 @@ func _process(delta: float) -> void:
 	_subtitle.modulate.a = clampf(_sub_left * 2.0, 0.0, 1.0)
 	_toast_t -= delta
 	_toast.modulate.a = clampf(_toast_t, 0.0, 1.0)
+	_flash.color.a = move_toward(_flash.color.a, 0.0, delta * 2.5)
+	_photo_t -= delta
+	_photo.modulate.a = clampf(_photo_t, 0.0, 1.0)
+	_photo.visible = _photo_t > 0.0
 	if _diary_scrawl.is_visible_in_tree():
 		# Последняя запись дрожит, будто её пишут прямо сейчас.
 		_diary_cry.rotation = deg_to_rad(-4.0 + randf_range(-0.6, 0.6))
@@ -426,11 +435,10 @@ func setup_map(level: Level, who: Node3D) -> void:
 	_map.player = who
 
 
-func update_map(limit_z: float, branches: Array, rooms: Array, chargers: Array[Vector3]) -> void:
+func update_map(limit_z: float, branches: Array, rooms: Array) -> void:
 	_map.limit_z = limit_z
 	_map.open_branches = branches
 	_map.open_rooms = rooms
-	_map.chargers = chargers
 
 
 ## Газета в финале: «погиб ещё один обходчик».
@@ -475,6 +483,63 @@ func _build_newspaper() -> void:
 	body.custom_minimum_size = Vector2(450, 0)
 	row.add_child(body)
 	box.add_child(_paper_label("E — дальше", 13, Color(ink, 0.6), HORIZONTAL_ALIGNMENT_RIGHT))
+
+
+## Вспышка фотоаппарата и снимок-«полароид» в углу экрана.
+func _build_photo() -> void:
+	_flash = ColorRect.new()
+	_flash.color = Color(1, 1, 1, 0)
+	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_root.add_child(_flash)
+	_photo = PanelContainer.new()
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.92, 0.9, 0.84)
+	st.content_margin_left = 10
+	st.content_margin_right = 10
+	st.content_margin_top = 10
+	st.content_margin_bottom = 34
+	st.shadow_color = Color(0, 0, 0, 0.6)
+	st.shadow_size = 10
+	_photo.add_theme_stylebox_override("panel", st)
+	_place(_photo, 1.0, 1.0, 1.0, 1.0, -330, -450, -40, -220)
+	_photo.rotation = deg_to_rad(3.0)
+	_photo.visible = false
+	_root.add_child(_photo)
+	_photo_tex = TextureRect.new()
+	_photo_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_photo_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	# Снимок старой камерой: выцветший, зернистый, с тёмными краями.
+	var sh := Shader.new()
+	sh.code = """
+shader_type canvas_item;
+void fragment() {
+	vec3 c = texture(TEXTURE, UV).rgb;
+	float l = dot(c, vec3(0.3, 0.59, 0.11));
+	vec3 sepia = vec3(l * 1.15, l * 1.02, l * 0.82);
+	float v = 1.0 - smoothstep(0.35, 0.8, length(UV - 0.5));
+	float n = fract(sin(dot(UV * 700.0, vec2(12.9898, 78.233))) * 43758.5453);
+	COLOR = vec4(sepia * mix(0.45, 1.25, v) + (n - 0.5) * 0.08, 1.0);
+}
+"""
+	var mat := ShaderMaterial.new()
+	mat.shader = sh
+	_photo_tex.material = mat
+	_photo.add_child(_photo_tex)
+
+
+func camera_flash() -> void:
+	_flash.color.a = 0.95
+
+
+func show_photo(img: Image) -> void:
+	_photo_tex.texture = ImageTexture.create_from_image(img)
+	_photo_t = 6.0
+	_photo.visible = true
+
+
+func set_map_marks(marks: Array) -> void:
+	_map.marks = marks
 
 
 ## Дневник обходчика (концовка 2): по странице на смену. Последняя — каракули и символы.

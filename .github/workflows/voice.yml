@@ -39,13 +39,13 @@ jobs:
         run: |
           mkdir -p models
           base="https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU"
-          for v in dmitri denis; do
+          for v in dmitri denis irina; do
             wget -q -O "models/ru_RU-$v-medium.onnx" "$base/$v/medium/ru_RU-$v-medium.onnx"
             wget -q -O "models/ru_RU-$v-medium.onnx.json" "$base/$v/medium/ru_RU-$v-medium.onnx.json"
           done
 
       - name: Generate voice lines
-        run: python tools/voice/generate.py models/ru_RU-dmitri-medium.onnx models/ru_RU-denis-medium.onnx
+        run: python tools/voice/generate.py models/ru_RU-dmitri-medium.onnx models/ru_RU-denis-medium.onnx models/ru_RU-irina-medium.onnx
 
       - name: Commit voice files
         id: commit
