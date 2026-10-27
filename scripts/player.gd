@@ -24,10 +24,10 @@ const GRAVITY := 12.0
 const MOUSE_SENS := 0.0022
 const MAX_FILTERS := 3
 const MAX_BATTERIES := 2
-const DRAIN_PER_SEC := 100.0 / 240.0    # полный заряд — 4 минуты
+const DRAIN_PER_SEC := 100.0 / 300.0    # полный заряд — 5 минут
 ## Ручка динамо (R): процентов в секунду (с находкой «аккумулятор» — быстрее) и сколько метров слышно треск.
-const CRANK_RATE := 1.2
-const CRANK_RATE_CELL := 1.6
+const CRANK_RATE := 100.0 / 45.0       # полный заряд ручкой — 45 секунд
+const CRANK_RATE_CELL := 100.0 / 35.0  # с находкой «аккумулятор» — 35
 const NOISE_CRANK := 12.0
 const NOISE_CRANK_CELL := 8.0
 const NOISE_CRANK_HIDDEN := 4.0

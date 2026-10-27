@@ -528,7 +528,7 @@ func start_day(d: int, retry := false) -> void:
 	if not debug_flag("norooms"):
 		_setup_rooms(d)
 	_spawn_finds(d)
-	_spawn_threats(d)
+	_spawn_threats(d, retry)
 	_setup_power(d)
 	_spawn_task_devices(d)
 	_reported = false
@@ -568,6 +568,9 @@ func start_day(d: int, retry := false) -> void:
 			radio.take_away()
 			player.has_radio = true
 			Game.report("radio")
+			if PISTOL_ROUNDS[d] > 0:
+				player.has_pistol = true
+				player.ammo = PISTOL_ROUNDS[d]
 	player.drain_mult = 1.0 + (mini(d, Game.FINAL_DAY) - 1) * 0.15
 	_fear_peak = 0.0
 	if d == Game.FINAL_DAY:
@@ -1143,8 +1146,9 @@ func _spawn_note(id: String, pos: Vector3) -> void:
 
 
 ## С третьей ночи: оружейный ящик на столе, патроны в тоннелях, существа в темноте.
-func _spawn_threats(d: int) -> void:
-	if PISTOL_ROUNDS[d] > 0:
+## После провала (retry) обходчик начинает внизу — пистолет тогда сразу при нём, ящика наверху нет.
+func _spawn_threats(d: int, retry := false) -> void:
+	if PISTOL_ROUNDS[d] > 0 and not (retry and d <= Game.FINAL_DAY):
 		var gun := Pickup.new()
 		gun.kind = "pistol"
 		gun.amount = PISTOL_ROUNDS[d]
@@ -1561,7 +1565,7 @@ func _smoke_test() -> void:
 	await get_tree().create_timer(5.5).timeout
 	fail_day("смоук")
 	await get_tree().create_timer(10.5).timeout
-	var retry_ok := player.global_position.y < Level.FLOOR_Y + 5.0 and player.has_radio and not busy
+	var retry_ok := player.global_position.y < Level.FLOOR_Y + 5.0 and player.has_radio and player.has_pistol and not busy
 	# Охота: спрятался в шкаф — «Другой» постоит и уйдёт.
 	var hide_cab: Hideout = get_tree().get_nodes_in_group("hideouts")[1]
 	player.global_position = hide_cab.global_position + Vector3(0, 0.1, 0)
