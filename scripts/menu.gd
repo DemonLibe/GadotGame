@@ -22,7 +22,7 @@ var _title: Label
 var _sub: Label
 var _buttons: VBoxContainer
 var _controls: Label
-var _achievements: Label
+var _ach: AchievementsPanel
 var _box: VBoxContainer
 var _settings: SettingsPanel
 var _bg_alpha := 0.6
@@ -59,13 +59,14 @@ func _ready() -> void:
 	box.add_child(_buttons)
 	_controls = _label(box, 17, Color(0.85, 0.83, 0.78))
 	_controls.text = CONTROLS
-	_achievements = _label(box, 15, Color(0.85, 0.83, 0.78))
-	_achievements.visible = false
 
 	_settings = SettingsPanel.new()
 	_settings.visible = false
 	center.add_child(_settings)
 	_settings.closed.connect(_close_settings)
+	_ach = AchievementsPanel.new()
+	center.add_child(_ach)
+	_ach.closed.connect(_close_achievements)
 	visible = false
 
 
@@ -82,7 +83,7 @@ func show_main(saved_day: int) -> void:
 	_button("Новая игра", func(): new_game.emit())
 	_button("Настройки", open_settings)
 	_button("Управление", _toggle_controls)
-	_button("Достижения", _toggle_achievements)
+	_button("Достижения", open_achievements)
 	if not OS.has_feature("web"):
 		_button("Выход", func(): quit.emit())
 	_focus_first()
@@ -98,7 +99,7 @@ func show_pause() -> void:
 	_button("Продолжить", func(): resume.emit())
 	_button("Настройки", open_settings)
 	_button("Управление", _toggle_controls)
-	_button("Достижения", _toggle_achievements)
+	_button("Достижения", open_achievements)
 	_button("В главное меню", func(): main_menu.emit())
 	_focus_first()
 
@@ -124,6 +125,7 @@ func hide_all() -> void:
 	_mode = ""
 	visible = false
 	_settings.visible = false
+	_ach.visible = false
 
 
 func _process(delta: float) -> void:
@@ -139,31 +141,32 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if visible and _mode == "pause" and not _settings.visible and event.is_action_pressed("ui_cancel"):
+	if visible and _mode == "pause" and not _settings.visible and not _ach.visible and event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
 		resume.emit()
 
 
 func _toggle_controls() -> void:
 	_controls.visible = not _controls.visible
-	_achievements.visible = false
 
 
-## Список достижений: полученные — янтарной галочкой, скрытые — «???».
-func _toggle_achievements() -> void:
-	_achievements.visible = not _achievements.visible
-	_controls.visible = false
-	if not _achievements.visible:
-		return
-	var lines: PackedStringArray = []
-	var entries: Array = Achievements.entries()
-	var got := 0
-	for e in entries:
-		if e["got"]:
-			got += 1
-		lines.append(("✔ " if e["got"] else "·  ") + str(e["title"]) + " — " + str(e["text"]))
-	lines.insert(0, "Получено %d из %d   ·   находок: %d из %d\n" % [got, entries.size(), Achievements.finds_count(), Achievements.FINDS.size()])
-	_achievements.text = "\n".join(lines)
+## Экран достижений — вместо кнопок, как настройки.
+func open_achievements() -> void:
+	_box.visible = false
+	_bg_alpha = _bg.color.a
+	_bg.color.a = maxf(_bg_alpha, 0.85)
+	_ach.open()
+
+
+func is_achievements_open() -> bool:
+	return _ach.visible
+
+
+func _close_achievements() -> void:
+	_ach.visible = false
+	_bg.color.a = _bg_alpha
+	_box.visible = true
+	_focus_first()
 
 
 func _close_settings() -> void:
@@ -177,7 +180,7 @@ func _show_box() -> void:
 	_settings.visible = false
 	_box.visible = true
 	_controls.visible = false
-	_achievements.visible = false
+	_ach.visible = false
 	_clear()
 
 

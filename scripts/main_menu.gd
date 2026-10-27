@@ -22,12 +22,7 @@ func _ready() -> void:
 	if not Main.debug_flag("nofx"):
 		Main.add_postfx(self)
 
-	var ambience := AudioStreamPlayer.new()
-	ambience.stream = Sfx.drone()
-	ambience.volume_db = -12.0
-	ambience.bus = "Ambience"
-	add_child(ambience)
-	ambience.play()
+	add_child(Ambience.new())  # гул, сквозняк, тёмный пэд и редкий далёкий стон
 
 	menu = Menu.new()
 	add_child(menu)
@@ -192,6 +187,19 @@ func _smoke_test() -> void:
 	await get_tree().process_frame
 	ok = ok and is_equal_approx(_camera.fov, float(Settings.DEFAULTS["fov"]))
 	print("SMOKE menu: настройки ", "OK" if ok else "FAIL")
+	if not ok:
+		get_tree().quit(1)
+		return
+	# Экран достижений открывается и закрывается.
+	menu.hide_all()
+	menu.show_main(1)
+	menu.open_achievements()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	ok = menu.is_achievements_open()
+	menu._close_achievements()
+	ok = ok and not menu.is_achievements_open()
+	print("SMOKE menu: достижения ", "OK" if ok else "FAIL")
 	if not ok:
 		get_tree().quit(1)
 		return
