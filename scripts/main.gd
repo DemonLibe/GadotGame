@@ -234,12 +234,9 @@ func _ready() -> void:
 	director.level = level
 	add_child(director)
 
-	var ambience := AudioStreamPlayer.new()
-	ambience.stream = Sfx.drone()
-	ambience.volume_db = -14.0
-	ambience.bus = "Ambience"
+	var ambience := Ambience.new()
+	ambience.player = player
 	add_child(ambience)
-	ambience.play()
 
 	menu = Menu.new()
 	add_child(menu)

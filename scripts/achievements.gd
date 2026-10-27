@@ -7,26 +7,26 @@ signal found(id: String)
 
 const SAVE_PATH := "user://achievements.cfg"
 
-## id: [название, описание, скрытое — описание не показывается, пока не получено]
+## id: [название, описание, скрытое — описание не показывается, пока не получено, значок]
 const LIST := {
-	"shift1": ["Первая смена", "Отработать первую смену.", false],
-	"shift5": ["Последняя смена", "Дожить до пятой смены.", false],
-	"ending1": ["Доклад принят", "Концовка: доложить диспетчеру, где ты.", false],
-	"ending2": ["Поднялся", "Концовка: выбраться наверх, не докладывая.", false],
-	"ending3": ["Изнутри", "Концовка: запереть решётку изнутри.", true],
-	"archivist": ["Архивариус", "Прочитать все записки прежних обходчиков.", false],
-	"masha": ["Фонарик для папы", "Прочитать письмо Маши.", false],
-	"pyro": ["Поджигатель", "Сжечь 30 паутин (за всё время).", false],
-	"hunter": ["Пыль к пыли", "Уничтожить ползуна.", false],
-	"hid": ["Тише воды", "Пересидеть охоту «Другого» в шкафу.", false],
-	"quiet": ["Тихоня", "Отработать смену, ни разу не побежав.", false],
-	"brave": ["Холодная голова", "Отработать смену, не дав страху подняться выше половины.", false],
-	"lens": ["Дальний свет", "Найти рефлектор для фонаря.", false],
-	"cell": ["Запасливый", "Найти аккумулятор повышенной ёмкости.", false],
-	"pills": ["Крепкие нервы", "Найти все три упаковки успокоительного.", false],
-	"duck": ["Резиновый друг", "???", true],
-	"sponjik": ["Vibe check", "???", true],
-	"collector": ["Коллекционер", "Найти все находки в тоннелях.", false],
+	"shift1": ["Первая смена", "Отработать первую смену.", false, "moon"],
+	"shift5": ["Последняя смена", "Дожить до пятой смены.", false, "moon"],
+	"ending1": ["Доклад принят", "Концовка: доложить диспетчеру, где ты.", false, "door"],
+	"ending2": ["Поднялся", "Концовка: выбраться наверх, не докладывая.", false, "door"],
+	"ending3": ["Изнутри", "Концовка: запереть решётку изнутри.", true, "door"],
+	"archivist": ["Архивариус", "Прочитать все записки прежних обходчиков.", false, "note"],
+	"masha": ["Фонарик для папы", "Прочитать письмо Маши.", false, "note"],
+	"pyro": ["Поджигатель", "Сжечь 30 паутин (за всё время).", false, "flame"],
+	"hunter": ["Пыль к пыли", "Уничтожить ползуна.", false, "cross"],
+	"hid": ["Тише воды", "Пересидеть охоту «Другого» в шкафу.", false, "cabinet"],
+	"quiet": ["Тихоня", "Отработать смену, ни разу не побежав.", false, "steps"],
+	"brave": ["Холодная голова", "Отработать смену, не дав страху подняться выше половины.", false, "heart"],
+	"lens": ["Дальний свет", "Найти рефлектор для фонаря.", false, "lamp"],
+	"cell": ["Запасливый", "Найти аккумулятор повышенной ёмкости.", false, "battery"],
+	"pills": ["Крепкие нервы", "Найти все три упаковки успокоительного.", false, "pill"],
+	"duck": ["Резиновый друг", "Найти резиновую утку там, где ей точно не место.", true, "duck"],
+	"sponjik": ["Vibe check", "Найти подпись автора на стене станции.", true, "chalk"],
+	"collector": ["Коллекционер", "Найти все находки в тоннелях.", false, "star"],
 }
 
 ## Находки в тоннелях: id → [смена, с которой лежит, название, что даёт].
@@ -44,6 +44,7 @@ const FEAR_PER_PILLS := 15.0
 var _got := {}      # id достижения → true
 var _finds := {}    # id находки → true
 var _counters := {} # накопительные счётчики (паутина и т. п.)
+var _dates := {}    # id достижения → время получения (unix)
 
 
 func _ready() -> void:
@@ -55,6 +56,7 @@ func _ready() -> void:
 		for k in cf.get_value("a", "finds", []):
 			_finds[str(k)] = true
 		_counters = cf.get_value("a", "counters", {})
+		_dates = cf.get_value("a", "dates", {})
 
 
 func _save() -> void:
@@ -62,6 +64,7 @@ func _save() -> void:
 	cf.set_value("a", "got", _got.keys())
 	cf.set_value("a", "finds", _finds.keys())
 	cf.set_value("a", "counters", _counters)
+	cf.set_value("a", "dates", _dates)
 	cf.save(SAVE_PATH)
 
 
@@ -73,6 +76,7 @@ func unlock(id: String) -> void:
 	if _got.has(id) or not LIST.has(id):
 		return
 	_got[id] = true
+	_dates[id] = int(Time.get_unix_time_from_system())
 	_save()
 	unlocked.emit(id, str(LIST[id][0]))
 
@@ -127,11 +131,50 @@ func fear_max() -> float:
 	return 100.0 + FEAR_PER_PILLS * pills_found()
 
 
-## Для экрана в меню: [{title, text, got}].
+## Прогресс накопительных достижений: [сколько, из скольки] или [] у остальных.
+func progress(id: String) -> Array:
+	match id:
+		"pyro":
+			return [mini(int(_counters.get("webs", 0)), 30), 30]
+		"pills":
+			return [pills_found(), 3]
+		"collector":
+			return [_finds.size(), FINDS.size()]
+		"archivist":
+			return [mini(Game.notes_count(), Game.NOTES_TOTAL), Game.NOTES_TOTAL]
+	return []
+
+
+## Для экрана достижений: [{id, title, text, got, hidden, icon, progress, date}].
 func entries() -> Array:
+	# Прогресс мог набраться раньше, чем появились достижения (старые сохранения), — засчитать.
+	for id in ["archivist", "pyro", "pills", "collector"]:
+		var p := progress(id)
+		if not p.is_empty() and int(p[0]) >= int(p[1]):
+			unlock(id)
 	var out := []
 	for id in LIST:
 		var e: Array = LIST[id]
 		var got := _got.has(id)
-		out.append({"title": str(e[0]) if got or not e[2] else "???", "text": str(e[1]) if got or not e[2] else "Скрытое достижение.", "got": got})
+		var secret: bool = e[2] and not got
+		out.append({
+			"id": id,
+			"title": "Скрытое достижение" if secret else str(e[0]),
+			"text": "Продолжай играть, чтобы узнать." if secret else str(e[1]),
+			"got": got,
+			"hidden": secret,
+			"icon": "hidden" if secret else str(e[3]),
+			"progress": [] if got or secret else progress(id),
+			"date": int(_dates.get(id, 0)),
+		})
+	return out
+
+
+## Находки для коллекции: [{id, title, text, got}] в порядке FINDS.
+func find_entries() -> Array:
+	var out := []
+	for id in FINDS:
+		var f: Array = FINDS[id]
+		var got := _finds.has(id)
+		out.append({"id": id, "title": str(f[1]) if got else "???", "text": str(f[2]) if got else "Ещё не найдено.", "got": got})
 	return out

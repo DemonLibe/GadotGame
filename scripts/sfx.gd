@@ -99,6 +99,23 @@ static func pump() -> AudioStreamWAV:
 	return _stream("pump")
 
 
+## Эмбиент: сквозняк в тоннеле, тёмный пэд, тревожный пэд (при сильном страхе), стон металла вдали.
+static func wind() -> AudioStreamWAV:
+	return _stream("wind")
+
+
+static func pad() -> AudioStreamWAV:
+	return _stream("pad")
+
+
+static func pad_tense() -> AudioStreamWAV:
+	return _stream("pad_tense")
+
+
+static func groan() -> AudioStreamWAV:
+	return _stream("groan")
+
+
 ## Крик для скримера: резкий, рваный, с перегрузом.
 static func scream() -> AudioStreamWAV:
 	return _stream("scream")
@@ -142,6 +159,10 @@ static func _stream(key: String) -> AudioStreamWAV:
 		"scuttle": w = _make_scuttle()
 		"pump": w = _make_pump()
 		"scream": w = _make_scream()
+		"wind": w = _make_wind()
+		"pad": w = _make_pad([55.0, 65.5, 82.5, 110.0, 131.0], 0.25)
+		"pad_tense": w = _make_pad([58.25, 77.75, 116.5, 155.5, 932.5], 0.5)
+		"groan": w = _make_groan()
 		_: w = _make_pickup()
 	_cache[key] = w
 	return w
@@ -496,4 +517,70 @@ static func _make_scream() -> AudioStreamWAV:
 		v += sin(TAU * 55.0 * t) * 3.0 * exp(-t * 6.0)  # удар
 		var env := minf(t * 80.0, 1.0) * minf((dur - t) * 2.5, 1.0)
 		s[i] = tanh(v * 0.9) * env * 0.95
+	return _wav(s)
+
+
+# Сквозняк в тоннеле: шум через два фильтра, медленные порывы. Петля 8 с; конец плавно
+# перетекает в начало, чтобы не было щелчка на стыке.
+static func _make_wind() -> AudioStreamWAV:
+	var loop := 8.0
+	var fade := 1.0
+	var raw := _buf(loop + fade)
+	var lp := 0.0
+	var lp2 := 0.0
+	var hp := 0.0
+	for i in raw.size():
+		var t := float(i) / RATE
+		var n := randf_range(-1.0, 1.0)
+		lp += 0.06 * (n - lp)
+		lp2 += 0.06 * (lp - lp2)
+		hp += 0.004 * (lp2 - hp)
+		var gust := 0.55 + 0.3 * sin(TAU * t / 8.0) + 0.15 * sin(TAU * t / 2.0 + 1.0)
+		raw[i] = (lp2 - hp) * 6.0 * gust
+	var s := _buf(loop)
+	var nf := int(fade * RATE)
+	for i in s.size():
+		var v := raw[i]
+		if i < nf:
+			var k := float(i) / nf
+			v = raw[i] * k + raw[i + s.size()] * (1.0 - k)
+		s[i] = clampf(v, -1.0, 1.0) * 0.5
+	return _wav(s, true)
+
+
+# Тёмный пэд: частоты подобраны так, чтобы за 12 с укладывалось целое число периодов, —
+# петля без стыка. Пары тонов чуть расстроены (beat — разница в Гц) и медленно «дышат».
+static func _make_pad(freqs: Array, beat: float) -> AudioStreamWAV:
+	var loop := 12.0
+	var s := _buf(loop)
+	var amps := []
+	for k in freqs.size():
+		amps.append(1.0 / (1.0 + k * 0.6))
+	amps[freqs.size() - 1] *= 0.25 if freqs[freqs.size() - 1] > 500.0 else 1.0
+	for i in s.size():
+		var t := float(i) / RATE
+		var v := 0.0
+		for k in freqs.size():
+			var f: float = freqs[k]
+			var a: float = amps[k] * (0.6 + 0.4 * sin(TAU * t * (k + 1) / loop + k))
+			v += a * (sin(TAU * f * t) + 0.8 * sin(TAU * (f + beat) * t) + 0.15 * sin(TAU * 2.0 * f * t))
+		s[i] = v * 0.09
+	return _wav(s, true)
+
+
+# Стон металла где-то далеко: низкий тон медленно сползает вниз, неровные обертоны и скрежет.
+static func _make_groan() -> AudioStreamWAV:
+	var dur := 3.6
+	var s := _buf(dur)
+	var ph := 0.0
+	var lp := 0.0
+	for i in s.size():
+		var t := float(i) / RATE
+		var f := 62.0 - 14.0 * (t / dur) + 3.0 * sin(TAU * 4.5 * t) * (t / dur)
+		ph += f / RATE
+		var v := sin(TAU * ph) + 0.5 * sin(TAU * ph * 2.03) + 0.3 * sin(TAU * ph * 3.1) + 0.2 * sin(TAU * ph * 5.37)
+		lp += 0.1 * (randf_range(-1.0, 1.0) - lp)
+		v += lp * 1.5 * (0.5 + 0.5 * sin(TAU * 9.0 * t))
+		var env := minf(t * 1.5, 1.0) * minf((dur - t) * 1.2, 1.0)
+		s[i] = tanh(v * 0.6) * env * 0.5
 	return _wav(s)
