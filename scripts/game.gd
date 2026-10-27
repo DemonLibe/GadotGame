@@ -13,6 +13,9 @@ const FINAL_DAY := 5
 ## Кто поднялся в пятую смену, не докладывая, спускается ещё дважды: шестая — собраться, седьмая — выбраться.
 const LAST_DAY := 7
 const GEAR_AMMO_BOXES := 4
+## Пул поручений: вид → с какой смены. Сколько поручений из пула добавить в смену (сверх сюжетных).
+const POOL := {"filters": 1, "webs": 1, "cable": 2, "fuse": 2, "valves": 2, "cartpush": 2, "photo": 2, "relay": 3}
+const POOL_PER_DAY := [0, 0, 4, 4, 3, 3]
 const THOUGHT := Color(0.93, 0.91, 0.84)
 const WHISPER := Color(0.62, 0.64, 0.75)
 const SYSTEM := Color(0.6, 0.86, 0.6)
@@ -24,6 +27,7 @@ var fear := 0.0
 var ended := false
 var notes_read := {}  # прочитанные записки (id → true), копятся за всю игру
 var pending_day := 1  # с какой смены начать, когда загрузится сцена игры
+var valve_order: Array = [1, 2, 3]  # в каком порядке перекрывать задвижки сегодня
 var gear := {}  # что собрано в шестую смену и взято в седьмую: pistol, ammo, batteries
 const NOTES_TOTAL := 9
 var _said := {}
@@ -54,30 +58,67 @@ func build_tasks(d: int) -> void:
 			return
 	_task("radio", "Забрать рацию со стола", 1)
 	_task("generator", "Запустить генератор на станции", 1)
+	# Сюжетные поручения смены — всегда.
+	var taken: Array = []
 	match d:
 		1:
-			_task("charge:station", "Зарядить фонарь на станции", 1)
+			_task("crank", "Подзарядить фонарь вручную (держать R)", 1)
 			_task("filters", "Заменить забитый фильтр в вентиляции", 1)
 			_task("webs", "Сжечь паутину в тоннеле", 2)
+			taken = ["filters", "webs"]
 		2:
 			_task("sensor", "Перезагрузить датчик движения на 3-м пикете", 1)
 			_task("inspect:end", "Осмотреть завал у ограждения", 1)
-			_task("filters", "Заменить забитые фильтры", 2)
-			_task("webs", "Сжечь паутину в тоннеле", 3)
 		3:
-			_task("cable", "Устранить замыкание кабеля в тоннеле", 1)
 			_task("inspect:cart", "Проверить вагонетку", 1)
-			_task("filters", "Заменить забитые фильтры", 2)
-			_task("webs", "Сжечь паутину в тоннеле", 4)
+			taken = ["cartpush"]  # вагонетку сегодня укатил кто-то другой
 		4:
 			_task("water", "Откачать воду в третьей штольне", 1)
 			_task("token", "Найти жетон Седьмого", 1)
-			_task("charge:far", "Зарядить фонарь у дальнего щитка", 1)
-			_task("filters", "Заменить забитые фильтры", 3)
-			_task("webs", "Сжечь паутину в тоннеле", 5)
+			_pool_task("fuse", d)  # «во второй штольне выбивает щиток» — так сказал диспетчер
+			taken = ["fuse"]
 		_:
 			_task("inspect:grate", "Проверить решётку в конце тоннеля", 1)
+	# Остальное — из пула, каждый раз своё и в других местах.
+	var pool: Array = []
+	for kind in POOL:
+		if d >= int(POOL[kind]) and not taken.has(kind):
+			pool.append(kind)
+	pool.shuffle()
+	for i in mini(int(POOL_PER_DAY[d]), pool.size()):
+		_pool_task(pool[i], d)
 	_task("return", "Доложить диспетчеру по рации", 1)
+	tasks_changed.emit()
+
+
+## Поручение из пула. Цели растут со сменой; порядок задвижек — каждый раз новый.
+func _pool_task(kind: String, d: int) -> void:
+	match kind:
+		"filters":
+			_task("filters", "Заменить забитые фильтры", randi_range(2, 3))
+		"webs":
+			_task("webs", "Сжечь паутину в тоннеле", mini(d + 1, 5))
+		"cable":
+			_task("cable", "Устранить замыкание кабеля в тоннеле", 1)
+		"fuse":
+			_task("fuse", "Заменить предохранитель в щитке (запасной — в служебной комнате)", 1)
+		"valves":
+			valve_order = [1, 2, 3]
+			valve_order.shuffle()
+			_task("valves", "Перекрыть задвижки строго по порядку: З-%d → З-%d → З-%d" % valve_order, 3)
+		"cartpush":
+			_task("cartpush", "Докатить вагонетку до ПК 2 (толкать, удерживая E)", 1)
+		"relay":
+			_task("relay", "Повесить ретрансляторы рации (ящик — на станции)", 3)
+		"photo":
+			_task("photo", "Сфотографировать точки осмотра (помечены мелом)", 3)
+
+
+## Начать поручение заново (перепутал задвижки — пар сорвал всё, что перекрыл).
+func reset_task(kind: String) -> void:
+	for t in tasks:
+		if t["kind"] == kind and not t["done"]:
+			t["progress"] = 0
 	tasks_changed.emit()
 
 
@@ -104,6 +145,13 @@ func report(kind: String, amount := 1) -> void:
 			changed = true
 	if changed:
 		tasks_changed.emit()
+
+
+func tasks_progress(kind: String) -> int:
+	for t in tasks:
+		if t["kind"] == kind:
+			return int(t["progress"])
+	return 0
 
 
 func task_target(kind: String) -> int:
@@ -232,6 +280,8 @@ func _setup_input() -> void:
 	_bind("interact", [KEY_E])
 	_bind("flashlight", [KEY_F])
 	_bind("restart", [KEY_R])
+	_bind("crank", [KEY_R])
+	_bind("throw", [KEY_G])  # во время игры R — ручка динамо, на финальном экране — заново
 	_bind("slot_1", [KEY_1])
 	_bind("slot_2", [KEY_2])
 	_bind("slot_3", [KEY_3])

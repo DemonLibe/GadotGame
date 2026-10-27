@@ -27,6 +27,10 @@ var _hunt_pending := false
 const HUNT_EVERY := {3: [75.0, 105.0], 4: [60.0, 90.0], 5: [45.0, 70.0], 7: [35.0, 55.0]}
 var _hunt_t := 0.0
 var _threat: AudioStreamPlayer  # тревожная петля: он идёт
+var _masha_pos := Vector3.ZERO  # откуда звала «Маша»
+var _picket: Label3D             # табличка, у которой сменился номер
+var _chalk: Label3D              # «ВОСЬМОЙ» и время
+const MASHA := Color(0.95, 0.76, 0.8)
 
 
 func _ready() -> void:
@@ -42,6 +46,9 @@ func _ready() -> void:
 
 func start_day(d: int) -> void:
 	_flags = {}
+	_masha_pos = Vector3.ZERO
+	_picket = null
+	_chalk = null
 	_hunt_pending = false
 	_echo_left = 0
 	_cooldown = randf_range(20.0, 35.0)
@@ -49,11 +56,14 @@ func start_day(d: int) -> void:
 	match d:
 		1: _budget = {}
 		2: _budget = {"footsteps": 1, "sighting": 1, "radio": 1}
-		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1, "radio": 1, "crawler": 1, "interfere": 1}
-		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1, "radio": 1, "crawler": 2, "interfere": 2}
-		5: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1, "crawler": 3, "interfere": 1}
+		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1, "radio": 1, "crawler": 1, "interfere": 1,
+			"masha": 1, "silence": 1}
+		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1, "radio": 1, "crawler": 2, "interfere": 2,
+			"masha": 1, "double": 1, "silence": 1, "picket": 1, "name": 1}
+		5: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1, "crawler": 3, "interfere": 1,
+			"masha": 1, "double": 1, "silence": 1, "picket": 1, "name": 1}
 		6: _budget = {}  # тихая смена: ничего
-		_: _budget = {"behind": 1, "whisper": 2, "crawler": 2, "swarm": 6}
+		_: _budget = {"behind": 1, "whisper": 2, "crawler": 2, "swarm": 6, "double": 2, "silence": 2}
 
 
 func _next_hunt(d: int) -> float:
@@ -79,6 +89,9 @@ func _process(delta: float) -> void:
 	if player.global_position.z > Level.TUN_Z0 - 4.0 or player.global_position.y > Level.FLOOR_Y + 5.0:
 		return  # события только в тоннелях
 	if HUNT_EVERY.has(Game.day) and not stalker.visible and not _hunt_pending:
+		# Фонарь начинает подмигивать за несколько секунд до того, как он придёт.
+		if _hunt_t < 4.0 and randf() < delta * 1.5:
+			player.flicker(randf_range(0.1, 0.3))
 		_hunt_t -= delta
 		if _hunt_t <= 0.0:
 			_hunt_t = _next_hunt(Game.day) if _hunt() else 5.0
@@ -106,6 +119,9 @@ func _update_threat(delta: float) -> void:
 	if stalker.visible and stalker.mode == "hunt":
 		var d := stalker.global_position.distance_to(player.global_position)
 		target = lerpf(-4.0, -22.0, clampf((d - 4.0) / 36.0, 0.0, 1.0))
+		# Чем он ближе, тем чаще дрожит фонарь.
+		if d < 18.0 and randf() < delta * (18.0 - d) / 6.0:
+			player.flicker(randf_range(0.05, 0.2))
 		if stalker.is_chasing():
 			target = 0.0
 	elif _hunt_pending:
@@ -187,6 +203,27 @@ func _story() -> void:
 			Game.say("Решётка заперта. За ней... каски? Чьи это каски?", Game.THOUGHT, 5.0)
 	if d == Game.FINAL_DAY and y < Level.FLOOR_Y + 5.0 and z < Level.GRATE_Z - 25.0:
 		main.ending()
+	# Дошёл туда, откуда звала «Маша»: пусто — а за спиной хлопает дверь.
+	if _masha_pos != Vector3.ZERO and player.global_position.distance_to(_masha_pos) < 5.0 and _once("masha_found"):
+		var slammed := false
+		for door in main.doors:
+			if door.is_open and door.global_position.distance_to(player.global_position) < 45.0:
+				door.slam()
+				slammed = true
+				break
+		if not slammed:
+			Game.play_at(Sfx.clank(), player.global_position - player.forward_flat() * 6.0 + Vector3(0, 1.0, 0), 4.0)
+		Game.add_fear(15.0)
+		Game.say("Пусто. Только на стене мелом — фонарик. Такой, как она нарисовала мне в письме.", Game.THOUGHT, 5.0)
+	# Пикет за спиной сменил номер — заметил, когда оглянулся.
+	if _picket and player.is_looking_at(_picket.global_position, 0.9) and player.global_position.distance_to(_picket.global_position) < 18.0:
+		Game.add_fear(10.0)
+		Game.say("ПК 8?.. Я только что прошёл мимо. Там был ПК %d." % int(_picket.get_meta("number")), Game.THOUGHT, 4.5)
+		_picket = null
+	if _chalk and player.is_lighting(_chalk.global_position):
+		Game.add_fear(12.0)
+		Game.say("«ВОСЬМОЙ». И время. Сейчас — ровно столько. Мел ещё сыпется.", Game.THOUGHT, 4.5)
+		_chalk = null
 
 
 func _once(key: String) -> bool:
@@ -225,6 +262,16 @@ func _run(ev: String) -> bool:
 			return _hunt()
 		"swarm":
 			return _swarm()
+		"masha":
+			return _masha()
+		"double":
+			return _double()
+		"silence":
+			return _silence()
+		"picket":
+			return _change_picket()
+		"name":
+			return _write_name()
 	return false
 
 
@@ -342,6 +389,101 @@ func _crawler_arrive(pos: Vector3) -> void:
 	Game.play_at(Sfx.hiss(), pos + Vector3(0, 0.5, 0), 2.0)
 
 
+## Голос Маши из штольни, где обходчика нет: «Папа?.. Папа, ты где?»
+func _masha() -> bool:
+	var p := player.global_position
+	var cand: Array = []
+	for i in Level.BRANCHES.size():
+		var length := float(Level.BRANCHES[i]["length"])
+		if main._reachable(i, length):
+			var end := Level.branch_origin(i) + Level.branch_dir(i) * (length - 6.0)
+			if end.distance_to(p) > 25.0:
+				cand.append(end)
+	if cand.is_empty():
+		return false
+	_masha_pos = cand.pick_random()
+	var path := "res://voice/m_call.ogg"
+	var voice: AudioStream = load(path) if ResourceLoader.exists(path) else Sfx.whisper()
+	var a := AudioStreamPlayer3D.new()
+	a.stream = voice
+	a.unit_size = 14.0
+	a.volume_db = 6.0
+	main.add_child(a)
+	a.global_position = _masha_pos + Vector3(0, 1.2, 0)
+	a.finished.connect(a.queue_free)
+	a.play()
+	Game.say("…Папа?.. Папа, ты где?…", MASHA, 4.0)
+	get_tree().create_timer(4.5).timeout.connect(func(): Game.say_once("masha_heard", "Это... голос Маши? Здесь? Из штольни...", Game.THOUGHT, 4.0))
+	return true
+
+
+## Двойник: далеко впереди по проходу стоит обходчик и слепит налобником.
+func _double() -> bool:
+	var p := player.global_position
+	var axis := level.axis_at(p)
+	var along := player.forward_flat().dot(axis)
+	if absf(along) < 0.6:
+		return false
+	var pos := p + axis * signf(along) * randf_range(26.0, 32.0)
+	pos.y = Level.FLOOR_Y
+	if not level.is_walkable(pos) or level.is_lit_near(pos) or pos.z > Level.TUN_Z0 - 4.0:
+		return false
+	var d := Double.new()
+	d.player = player
+	main.add_child(d)
+	d.global_position = pos
+	Game.play_at(Sfx.click(), pos + Vector3(0, 1.8, 0), 0.0)
+	return true
+
+
+## Ложная тишина: всё замолкает. Потом из этой тишины что-то выходит — или ничего, и это хуже.
+func _silence() -> bool:
+	var t := randf_range(6.0, 10.0)
+	main.ambience.silence(t)
+	Game.say_once("silence", "Тихо. Совсем тихо. Даже капель перестала.", Game.THOUGHT, 3.5)
+	get_tree().create_timer(t).timeout.connect(_after_silence)
+	return true
+
+
+func _after_silence() -> void:
+	if main.busy or Game.day == Game.LAST_DAY - 1:
+		return
+	match randi_range(0, 3):
+		0:
+			_crawler()
+		1:
+			if Game.day == Game.LAST_DAY:
+				_swarm()
+			else:
+				_hunt_t = minf(_hunt_t, 2.0)
+
+
+## Табличка пикета за спиной меняет номер на «ПК 8».
+func _change_picket() -> bool:
+	var p := player.global_position
+	for pk in level.pickets:
+		var dist := pk.global_position.distance_to(p)
+		if dist > 6.0 and dist < 25.0 and not player.is_looking_at(pk.global_position, 0.3) and pk.text != "ПК 8":
+			pk.text = "ПК 8"
+			_picket = pk
+			return true
+	return false
+
+
+## «ВОСЬМОЙ» и нынешнее время мелом — на стене впереди, ещё в темноте.
+func _write_name() -> bool:
+	var p := player.global_position
+	if absf(level.axis_at(p).dot(Vector3.FORWARD)) < 0.99:
+		return false
+	var sgn := -1.0 if player.forward_flat().z < 0.0 else 1.0
+	var z := p.z + sgn * 16.0
+	if z > Level.TUN_Z0 - 4.0 or z < maxf(main.day_limit() + 2.0, Level.GRATE_Z + 2.0):
+		return false
+	var t := Time.get_time_dict_from_system()
+	_chalk = main.write_chalk(-1, -1 if randf() < 0.5 else 1, z, 1.6, "ВОСЬМОЙ\n%02d:%02d" % [t["hour"], t["minute"]])
+	return true
+
+
 ## Седьмая смена: из темноты впереди по проходу набегает стая кусачих пауков.
 func _swarm() -> bool:
 	var p := player.global_position
@@ -358,22 +500,23 @@ func _swarm() -> bool:
 	return true
 
 
-## «Он» вмешивается в работу: выдёргивает зарядку, двигает ящик, захлопывает дверь, глушит генератор.
+## «Он» вмешивается в работу: гасит налобник, двигает ящик, захлопывает дверь, глушит генератор.
 func _interfere() -> bool:
 	var p := player.global_position
-	var opts: Array = ["charger", "crate", "door"]
+	var opts: Array = ["lamp", "crate", "door"]
 	if Game.day >= 4:
 		opts.append("generator")
 	opts.shuffle()
 	for o in opts:
 		match o:
-			"charger":
-				for c in main.chargers:
-					var ch := c as Charger
-					if not ch.unplugged and ch.global_position.distance_to(p) > 15.0:
-						ch.unplug()
-						Game.play_at(Sfx.click(), p + Vector3(0, 2.0, 12.0), -6.0)
-						return true
+			"lamp":
+				# Щелчок у самого уха — и налобник гаснет, батарея просела на четверть.
+				if player.flashlight_on and player.battery > 30.0:
+					player.battery -= 25.0
+					player.flicker(1.2)
+					Game.play_ui(Sfx.click(), -2.0)
+					Game.say_once("lamp_drained", "Щёлкнуло прямо над ухом — и фонарь почти сел. Будто кто-то выпил батарею.", Game.THOUGHT, 4.0)
+					return true
 			"crate":
 				for c in main.crates:
 					var cr := c as FilterCrate

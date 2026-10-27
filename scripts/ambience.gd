@@ -11,6 +11,7 @@ var _drips: AudioStreamPlayer
 var _pad: AudioStreamPlayer
 var _tense: AudioStreamPlayer
 var _next := 6.0
+var _silence := 0.0  # «ложная тишина»: всё замолкает на эти секунды
 
 
 func _ready() -> void:
@@ -32,7 +33,21 @@ func _loop(stream: AudioStream, db: float) -> AudioStreamPlayer:
 	return p
 
 
+## Ложная тишина: гул, капель, сквозняк и пэды разом замолкают — остаются только твои шаги.
+func silence(seconds: float) -> void:
+	_silence = seconds
+
+
+func is_silent() -> bool:
+	return _silence > 0.0
+
+
 func _process(delta: float) -> void:
+	if _silence > 0.0:
+		_silence -= delta
+		for p in [_drone, _wind, _drips, _pad, _tense]:
+			(p as AudioStreamPlayer).volume_db = move_toward(p.volume_db, -80.0, delta * 60.0)
+		return
 	var fear := 0.0
 	var below := false
 	var climbing := false

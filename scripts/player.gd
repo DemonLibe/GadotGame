@@ -25,6 +25,15 @@ const MOUSE_SENS := 0.0022
 const MAX_FILTERS := 3
 const MAX_BATTERIES := 2
 const DRAIN_PER_SEC := 100.0 / 240.0    # полный заряд — 4 минуты
+## Ручка динамо (R): процентов в секунду (с находкой «аккумулятор» — быстрее) и сколько метров слышно треск.
+const CRANK_RATE := 1.2
+const CRANK_RATE_CELL := 1.6
+const NOISE_CRANK := 12.0
+const NOISE_CRANK_CELL := 8.0
+const NOISE_CRANK_HIDDEN := 4.0
+## Болты: сколько влезает в карман и сколько при себе в начале смены.
+const MAX_BOLTS := 6
+const START_BOLTS := 2
 const REACH := 2.4
 const STEP_LENGTH := 1.25
 const RUNG_STEP := 0.3
@@ -76,6 +85,13 @@ var crouching := false
 var hiding := false          # сидит в шкафу
 var holding_breath := false
 var canisters := 0
+var bolts := 0                # болты в кармане — бросить (G), чтобы отвлечь
+var fuses := 0                # запасной предохранитель для щитка
+var relays := 0               # ретрансляторы рации, которые надо развесить
+var cranking := false         # крутит ручку динамо
+var cranked_today := 0.0      # сколько процентов накрутил за смену
+var _crank_sound: AudioStreamPlayer
+var _crank_noise := 0.0
 var speed_mult := 1.0        # вода в штольне замедляет
 var climb_mult := 1.0        # в финале по лестнице лезут быстрее
 var _hideout = null
@@ -175,6 +191,7 @@ func _ready() -> void:
 	_step_sound = _sound(Sfx.step(), -14.0)
 	_click_sound = _sound(Sfx.click(), -6.0)
 	_rung_sound = _sound(Sfx.rung(), -12.0)
+	_crank_sound = _sound(Sfx.crank(), -9.0)
 	_show_selected()
 
 
@@ -362,6 +379,8 @@ func cycle(step: int) -> void:
 
 ## Действие предметом в руке (ЛКМ). Горелка работает, пока кнопка зажата.
 func use_item() -> void:
+	if cranking:
+		return  # руки заняты ручкой
 	match held():
 		"battery":
 			if batteries <= 0:
@@ -416,6 +435,12 @@ func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
 	holding_breath = false
 	_hideout = null
 	canisters = 0
+	bolts = START_BOLTS
+	fuses = 0
+	relays = 0
+	cranking = false
+	cranked_today = 0.0
+	_crank_sound.stop()
 	speed_mult = 1.0
 	climb_mult = 1.0
 	ran_today = false
@@ -463,7 +488,7 @@ func _physics_process(delta: float) -> void:
 	# Бег тратит выносливость; выдохся — бежать нельзя, пока не отдышишься.
 	crouching = Input.is_action_pressed("crouch") and not input_locked
 	head.position.y = move_toward(head.position.y, HEAD_CROUCH if crouching else HEAD_STAND, delta * 4.0)
-	var running := Input.is_action_pressed("run") and input.length() > 0.1 and not _exhausted and not input_locked and not crouching
+	var running := Input.is_action_pressed("run") and input.length() > 0.1 and not _exhausted and not input_locked and not crouching and not cranking
 	if running:
 		ran_today = true
 		stamina = maxf(0.0, stamina - STAMINA_RUN * delta)
@@ -481,7 +506,7 @@ func _physics_process(delta: float) -> void:
 		velocity.y = JUMP_VELOCITY
 		stamina -= STAMINA_JUMP
 		_stamina_wait = STAMINA_DELAY
-	var speed := (RUN_SPEED if running else (CROUCH_SPEED if crouching else WALK_SPEED)) * speed_mult
+	var speed := (RUN_SPEED if running else (CROUCH_SPEED if crouching or cranking else WALK_SPEED)) * speed_mult
 	velocity.x = move_toward(velocity.x, dir.x * speed, 20.0 * delta)
 	velocity.z = move_toward(velocity.z, dir.z * speed, 20.0 * delta)
 	if not is_on_floor():
@@ -624,6 +649,8 @@ func _process(delta: float) -> void:
 				select(i)
 		if Input.is_action_just_pressed("flashlight"):
 			toggle_light()
+		if Input.is_action_just_pressed("throw"):
+			throw_bolt()
 		if Input.is_action_just_pressed("burn") and held() != "burner":
 			use_item()
 	_show_selected()
@@ -633,6 +660,7 @@ func _process(delta: float) -> void:
 	_hurt_wait -= delta
 	if _hurt_wait <= 0.0 and health < HEALTH_MAX:
 		health = minf(HEALTH_MAX, health + 1.5 * delta)
+	_update_crank(delta)
 	_update_battery(delta)
 	_sync_flashlight(delta)
 	_update_burner(delta)
@@ -644,23 +672,61 @@ func _process(delta: float) -> void:
 		hud.set_map_visible(held() == "map" and not input_locked)
 		hud.set_stamina(stamina / STAMINA_MAX, _exhausted)
 		var st := ""
-		if hiding:
+		if cranking:
+			st = "КРУТИШЬ ДИНАМО · треск слышно" + (" (в шкафу — тише)" if hiding else "")
+		elif hiding:
 			st = "В ШКАФУ · ДЫХАНИЕ ЗАДЕРЖАНО" if holding_breath else "В ШКАФУ · держи Space — не дышать"
 		elif crouching:
 			st = "ПРИСЕЛ · шаги почти не слышны"
 		if canisters > 0:
 			st += ("   " if st != "" else "") + "канистр: %d" % canisters
+		if bolts > 0:
+			st += ("   " if st != "" else "") + "болтов: %d (G)" % bolts
+		if fuses > 0:
+			st += ("   " if st != "" else "") + "предохранитель"
+		if relays > 0:
+			st += ("   " if st != "" else "") + "ретрансляторов: %d" % relays
 		hud.set_status(st)
+
+
+## Ручка динамо: пока крутишь — заряд растёт, а не тратится, но треск слышат все, кто рядом.
+func _update_crank(delta: float) -> void:
+	var want := Input.is_action_pressed("crank") and not input_locked and not climbing and battery < 100.0
+	if want != cranking:
+		cranking = want
+		if cranking:
+			_crank_sound.play()
+			_crank_noise = 0.0
+		else:
+			_crank_sound.stop()
+	if not cranking:
+		return
+	var cell := Achievements.has_find("cell")
+	var add := (CRANK_RATE_CELL if cell else CRANK_RATE) * delta
+	battery = minf(100.0, battery + add)
+	cranked_today += add
+	_empty_warned = false
+	if cranked_today >= 20.0:
+		Game.report("crank")
+	_crank_noise -= delta
+	if _crank_noise <= 0.0:
+		_crank_noise = 0.5
+		Game.make_noise(global_position, NOISE_CRANK_HIDDEN if hiding else (NOISE_CRANK_CELL if cell else NOISE_CRANK))
 
 
 func _update_battery(delta: float) -> void:
 	var on := flashlight_on and battery > 0.0
-	if on:
+	if on and not cranking:
 		battery = maxf(0.0, battery - DRAIN_PER_SEC * drain_mult * upgrade_drain * delta)
 		if battery <= 0.0 and not _empty_warned:
 			_empty_warned = true
-			Game.say("Фонарь сел. Нужна батарейка или зарядка... быстро.")
+			Game.say("Фонарь сел. Батарейка — или крутить ручку (R). Быстро.")
+	if on and battery < 20.0:
+		Game.say_once("crank_hint", "Фонарь садится. R — крутить ручку динамо. Только треск слышно далеко.", Game.SYSTEM, 5.0)
 	var energy := 4.0 * clampf(battery / 30.0, 0.25, 1.0)
+	if cranking:
+		# Пока крутишь — луч тусклый и пульсирует в такт ручке.
+		energy *= 0.35 + 0.25 * absf(sin(Time.get_ticks_msec() * 0.012))
 	if battery < 15.0 and randf() < 0.04:
 		_flicker = maxf(_flicker, randf_range(0.05, 0.2))
 	if _flicker > 0.0:
@@ -685,7 +751,7 @@ func _update_burner(delta: float) -> void:
 	if Input.is_action_just_pressed("burn") and held() == "burner" and not aiming_web and not input_locked:
 		_click_sound.play()
 		Game.say_once("burner_hint", "Газа мало. Горелку зажигаю только у паутины.", Game.THOUGHT, 3.0)
-	var want := Input.is_action_pressed("burn") and not input_locked and held() == "burner" and aiming_web
+	var want := Input.is_action_pressed("burn") and not input_locked and held() == "burner" and aiming_web and not cranking
 	if want != _burning:
 		_burning = want
 		_flame.emitting = want
@@ -739,7 +805,7 @@ func _find_interactable(o: Object) -> Node:
 # --- Для других систем -------------------------------------------------------
 
 func _shoot() -> void:
-	if not has_pistol or _shot_cd > 0.0:
+	if not has_pistol or _shot_cd > 0.0 or cranking:
 		return
 	_shot_cd = 0.45
 	if ammo <= 0:
@@ -759,6 +825,20 @@ func _shoot() -> void:
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
 	if not hit.is_empty() and hit["collider"].has_method("hit"):
 		hit["collider"].hit()
+
+
+## Бросить болт по взгляду: там, где он звякнет, его и будут искать.
+func throw_bolt() -> void:
+	if bolts <= 0 or hiding or climbing or cranking:
+		if bolts <= 0:
+			Game.say_once("no_bolts", "Болтов нет. Они валяются по тоннелю — в коробках у стен.", Game.THOUGHT, 3.0)
+		return
+	bolts -= 1
+	var b := Bolt.new()
+	get_tree().current_scene.add_child(b)
+	var fwd := -camera.global_transform.basis.z
+	b.throw(camera.global_position + fwd * 0.4, fwd)
+	Game.say_once("bolt_thrown", "Звякнет — и они пойдут туда. Не ко мне.", Game.THOUGHT, 3.0)
 
 
 func take_damage(amount: float) -> void:

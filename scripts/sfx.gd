@@ -131,6 +131,16 @@ static func scream() -> AudioStream:
 	return _stream("scream")
 
 
+## Динамо налобного фонаря: треск храповика и вой маленького генератора (петля).
+static func crank() -> AudioStream:
+	return _stream("crank")
+
+
+## Старый телефон на стене: две трели и пауза (петля 3 с).
+static func phone() -> AudioStream:
+	return _stream("phone")
+
+
 static func radio() -> AudioStream:
 	return _stream("radio")
 
@@ -206,6 +216,8 @@ static func _stream(key: String) -> AudioStream:
 		"pad": w = _make_pad([55.0, 65.5, 82.5, 110.0, 131.0], 0.25)
 		"pad_tense": w = _make_pad([58.25, 77.75, 116.5, 155.5, 932.5], 0.5)
 		"groan": w = _make_groan()
+		"crank": w = _make_crank()
+		"phone": w = _make_phone()
 		_: w = _make_pickup()
 	_cache[key] = w
 	return w
@@ -313,6 +325,35 @@ static func _make_hum() -> AudioStreamWAV:
 	for i in s.size():
 		var t := float(i) / RATE
 		s[i] = 0.2 * sin(TAU * 50.0 * t) + 0.1 * sin(TAU * 100.0 * t) + 0.05 * sin(TAU * 150.0 * t)
+	return _wav(s, true)
+
+
+# Полсекунды: семь щелчков храповика и вой шестерёнок с моторчиком — бесшовная петля.
+static func _make_crank() -> AudioStreamWAV:
+	var dur := 0.5
+	var s := _buf(dur)
+	var clicks := 7
+	for i in s.size():
+		var t := float(i) / RATE
+		var tc := fmod(t, dur / clicks)
+		var click := randf_range(-1.0, 1.0) * exp(-tc * 260.0) * 0.55
+		var whine := sin(TAU * 360.0 * t) * 0.08 + sin(TAU * 720.0 * t) * 0.04
+		var motor := (fmod(t * 90.0, 1.0) * 2.0 - 1.0) * 0.07
+		s[i] = click + whine + motor
+	return _wav(s, true)
+
+
+# Звонок советского телефона: молоточек бьёт по двум чашкам 25 раз в секунду, две трели — и тишина.
+static func _make_phone() -> AudioStreamWAV:
+	var s := _buf(3.0)
+	for i in s.size():
+		var t := float(i) / RATE
+		var on := t < 0.4 or (t > 0.6 and t < 1.0)
+		if not on:
+			continue
+		var strike := fmod(t, 0.04)
+		var bell := sin(TAU * 1200.0 * t) * 0.5 + sin(TAU * 1640.0 * t) * 0.35 + sin(TAU * 2510.0 * t) * 0.15
+		s[i] = bell * exp(-strike * 60.0) * 0.5
 	return _wav(s, true)
 
 
