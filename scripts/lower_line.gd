@@ -360,6 +360,53 @@ func floor_spot(c: Vector2i) -> Vector3:
 	return center(c) + Vector3(rng.randf_range(-0.9, 0.9), 0.05, rng.randf_range(-0.9, 0.9))
 
 
+# --- Обвалы -------------------------------------------------------------------
+
+## Есть ли обход, если проход a—b завалит (тогда завал не отрежет ни одну клетку).
+func has_detour(a: Vector2i, b: Vector2i) -> bool:
+	if not cells.has(a) or not (cells[a]["links"] as Array).has(b):
+		return false
+	_unlink(a, b)
+	var ok := _path(a, b).size() > 0
+	(cells[a]["links"] as Array).append(b)
+	(cells[b]["links"] as Array).append(a)
+	return ok
+
+
+func _unlink(a: Vector2i, b: Vector2i) -> void:
+	(cells[a]["links"] as Array).erase(b)
+	(cells[b]["links"] as Array).erase(a)
+
+
+## Середина прохода между соседними клетками (на полу).
+func link_point(a: Vector2i, b: Vector2i) -> Vector3:
+	return (center(a) + center(b)) / 2.0
+
+
+## Обвал: проход a—b заваливает кирпичом до свода. Навигация и карта перестают его видеть.
+func collapse(a: Vector2i, b: Vector2i) -> void:
+	_materials()
+	_unlink(a, b)
+	var dw := dir_world(b - a)
+	var across := Vector3(absf(dw.z), 0.0, absf(dw.x))
+	var body := StaticBody3D.new()
+	body.position = link_point(a, b)
+	add_child(body)
+	Geo.collider_box(body, across * W + dw.abs() * 1.2 + Vector3(0, H, 0), Vector3(0, H / 2.0, 0))
+	# Сплошная осыпь: ядро до свода и откос понизу в обе стороны, поверх — торчащие куски кирпича.
+	Geo.box(body, Vector3(0, H / 2.0, 0), across * (W + 0.1) + dw.abs() * 0.3 + Vector3(0, H, 0), _m["brick"], false)
+	for side in [-1.0, 1.0]:
+		var slope := Geo.box(body, dw * side * 0.55 + Vector3(0, 0.35, 0), across * (W + 0.1) + dw.abs() * 0.9 + Vector3(0, 0.9, 0), _m["brick"], false)
+		slope.rotation = across * side * 0.5
+	for i in 44:
+		var t := sqrt(float(i) / 44.0)
+		var size := Vector3(rng.randf_range(0.35, 0.7), rng.randf_range(0.2, 0.45), rng.randf_range(0.3, 0.6)) * (1.0 - t * 0.4)
+		var pos := across * rng.randf_range(-W / 2.0 + 0.2, W / 2.0 - 0.2) + dw * rng.randf_range(0.2, 1.0) * (1.0 - t * 0.6) * (-1.0 if i % 2 == 0 else 1.0) \
+			+ Vector3(0, t * H * 0.95, 0)
+		var brick := Geo.box(body, pos, size, _m["brick"], false)
+		brick.rotation = Vector3(rng.randf_range(-0.5, 0.5), rng.randf() * TAU, rng.randf_range(-0.5, 0.5))
+
+
 ## Место на глухой стене клетки (для надписей мелом): лицом внутрь клетки. Нет глухой стены — пустой Transform.
 func wall_mount(c: Vector2i, height := 1.6) -> Transform3D:
 	var links: Array = cells[c]["links"]

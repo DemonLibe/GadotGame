@@ -56,6 +56,9 @@ func start_day(d: int) -> void:
 	_mimic = Vector2i(-1, -1)
 	_mimic_left = 2 if d >= 5 else 1
 	_lower_t = 25.0
+	_collapse_left = int(COLLAPSES.get(d, 0))
+	_collapsing = false
+	_lower_hunt_t = _next_lower_hunt() * 0.7 if LOWER_HUNT_EVERY.has(d) else 0.0
 	match d:
 		1: _budget = {}
 		2: _budget = {"footsteps": 1, "sighting": 1, "radio": 1}
@@ -130,9 +133,19 @@ var _mimic_calls := 0
 var _mimic_t := 0.0
 var _mimic_voice: Array = []
 var _mimic_left := 0           # сколько ещё раз за смену
+## Обвалы свода: сколько за смену (с четвёртой).
+const COLLAPSES := {4: 1, 5: 2, 6: 2}
+const COLLAPSE_WARN := 2.5     # сколько сыплется пыль, прежде чем рухнет
+var _collapse_left := 0
+var _collapsing := false
+## «Другой» спускается в старую линию: через сколько секунд внизу он приходит (по сменам).
+const LOWER_HUNT_EVERY := {5: [60.0, 95.0], 6: [80.0, 120.0]}
+const LOWER_HUNT_DAY := {5: 5, 6: 4}  # насколько он зол внизу (конфиг охоты Stalker.HUNT)
+var _lower_hunt_t := 0.0
 
 
 func _lower_events(delta: float) -> void:
+	_update_lower_hunt(delta)
 	if _mimic.x >= 0:
 		_update_mimic(delta)
 		return
@@ -143,6 +156,9 @@ func _lower_events(delta: float) -> void:
 	if Game.day >= MIMIC_FROM and _mimic_left > 0 and randf() < 0.6 and _start_mimic():
 		_mimic_left -= 1
 		return
+	if _collapse_left > 0 and not _collapsing and randf() < 0.6 and start_collapse():
+		_collapse_left -= 1
+		return
 	match randi() % 3:
 		0:
 			_whisper()
@@ -151,6 +167,120 @@ func _lower_events(delta: float) -> void:
 		_:
 			Game.play_ui(Sfx.rumble(), -16.0)
 			Game.say_once("lower_train", "...Поезд? Здесь? Рельсы сняли сто лет назад.", Game.WHISPER, 3.5)
+
+
+## Обвал: выбрать проход рядом с обходчиком, у которого есть обход, — сначала пыль и треск, потом рушится.
+## Шум обвала слышат все внизу. Кто стоит под сводом — получает кирпичом.
+func start_collapse() -> bool:
+	var lower := level.lower
+	var here := lower.cell_of(player.global_position)
+	if not lower.cells.has(here):
+		return false
+	var cand: Array = []
+	for a in [here] + (lower.cells[here]["links"] as Array):
+		for b in lower.cells[a]["links"]:
+			if lower.has_detour(a, b):
+				cand.append([a, b])
+	if cand.is_empty():
+		return false
+	var pick: Array = cand.pick_random()
+	_collapsing = true
+	var at := lower.link_point(pick[0], pick[1])
+	Game.play_at(Sfx.creak(), at + Vector3(0, LowerLine.H, 0), 2.0)
+	Game.play_at(Sfx.rumble(), at + Vector3(0, LowerLine.H, 0), -2.0)
+	player.flicker(0.3)
+	_dust(at)
+	Game.say_once("collapse_warn", "Свод трещит! Сыплется... Прочь оттуда!", Game.THOUGHT, 3.0)
+	get_tree().create_timer(COLLAPSE_WARN).timeout.connect(func(): _collapse_now(pick[0], pick[1]))
+	return true
+
+
+func _collapse_now(a: Vector2i, b: Vector2i) -> void:
+	_collapsing = false
+	var lower := level.lower
+	if not lower.cells.has(a) or not (lower.cells[a]["links"] as Array).has(b):
+		return
+	var at := lower.link_point(a, b)
+	lower.collapse(a, b)
+	Game.play_at(Sfx.rumble(), at + Vector3(0, 1.0, 0), 6.0)
+	Game.play_at(Sfx.clank(), at + Vector3(0, 0.5, 0), 2.0)
+	Game.make_noise(at, 22.0)
+	player.flicker(0.6)
+	Game.add_fear(10.0)
+	var flat := player.global_position - at
+	flat.y = 0.0
+	if lower.contains(player.global_position) and flat.length() < 1.6:
+		# Стоял под сводом — придавило и отбросило.
+		player.global_position = at + (flat.normalized() if flat.length() > 0.05 else Vector3.BACK) * 1.4 + Vector3(0, 0.1, 0)
+		player.take_damage(30.0)
+		Game.say("Кирпичом по плечу... Живой. Прохода больше нет.", Game.THOUGHT, 3.5)
+	else:
+		Game.say_once("collapse_done", "Завалило. Назад этой дорогой не пройти — искать обход.", Game.THOUGHT, 4.0)
+
+
+## Пыль и кирпичная крошка с потолка над проходом.
+func _dust(at: Vector3) -> void:
+	var p := CPUParticles3D.new()
+	p.amount = 40
+	p.lifetime = 1.2
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	p.emission_box_extents = Vector3(1.2, 0.05, 1.2)
+	p.direction = Vector3.DOWN
+	p.spread = 10.0
+	p.gravity = Vector3(0, -6.0, 0)
+	p.initial_velocity_min = 0.2
+	p.initial_velocity_max = 1.0
+	p.scale_amount_min = 0.02
+	p.scale_amount_max = 0.06
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3.ONE
+	p.mesh = mesh
+	p.material_override = ProcTex.flat(Color(0.5, 0.36, 0.28), 1.0)
+	p.add_to_group("day_objects")
+	main.add_child(p)
+	p.global_position = at + Vector3(0, LowerLine.H - 0.1, 0)
+	get_tree().create_timer(COLLAPSE_WARN + 1.5).timeout.connect(p.queue_free)
+
+
+## «Другой» внизу (с пятой смены): фонарь мигает, из глубины — его ворчание, и через несколько секунд
+## он выходит в нескольких поворотах от обходчика. Спасают старые шкафы в залах.
+func _update_lower_hunt(delta: float) -> void:
+	if not LOWER_HUNT_EVERY.has(Game.day) or stalker.visible or _hunt_pending:
+		return
+	if _lower_hunt_t < 4.0 and randf() < delta * 1.5:
+		player.flicker(randf_range(0.1, 0.3))
+	_lower_hunt_t -= delta
+	if _lower_hunt_t <= 0.0:
+		_lower_hunt_t = _next_lower_hunt() if lower_hunt() else 5.0
+
+
+func _next_lower_hunt() -> float:
+	var r: Array = LOWER_HUNT_EVERY.get(Game.day, [60.0, 90.0])
+	return randf_range(float(r[0]), float(r[1]))
+
+
+func lower_hunt() -> bool:
+	var lower := level.lower
+	var here := lower.cell_of(player.global_position)
+	if not lower.cells.has(here) or _hunt_pending:
+		return false
+	var cand: Array[Vector2i] = []
+	for c in lower.cells:
+		var steps := lower._path(here, c).size() - 1
+		if steps >= 4 and steps <= 7:
+			cand.append(c)
+	if cand.is_empty():
+		for c in lower.cells:
+			if lower._path(here, c).size() - 1 >= 3:
+				cand.append(c)
+	if cand.is_empty():
+		return false
+	var pos := lower.center(cand.pick_random()) + Vector3(0, 0.05, 0)
+	_hunt_pending = true
+	Game.play_at(Sfx.stalker_growl(), pos + Vector3(0, 1.8, 0), 4.0)
+	Game.say_once("lower_hunt", "Это его голос... Он спустился сюда. За мной. Шкаф — в залах были старые шкафы.", Game.THOUGHT, 4.5)
+	get_tree().create_timer(4.0).timeout.connect(func(): _hunt_arrive(pos, int(LOWER_HUNT_DAY.get(Game.day, 5))))
+	return true
 
 
 ## Выбрать тупик в 2–max_steps клетках пути от обходчика и начать звать оттуда.
@@ -429,11 +559,11 @@ func _hunt() -> bool:
 	return true
 
 
-func _hunt_arrive(pos: Vector3) -> void:
+func _hunt_arrive(pos: Vector3, rage := -1) -> void:
 	_hunt_pending = false
-	if main.busy or main.collapsing or stalker.visible or level.lower.contains(player.global_position):
+	if main.busy or main.collapsing or stalker.visible or not level.same_floor(pos, player.global_position):
 		return
-	stalker.hunt(pos, Game.day)
+	stalker.hunt(pos, Game.day if rage < 0 else rage)
 	Game.play_at(Sfx.whisper(), pos + Vector3(0, 1.7, 0), 4.0)
 
 
@@ -708,6 +838,8 @@ func _on_vanished(m: String, seen: bool) -> void:
 				Game.say_once("saw", "Там... кто-то стоял. В самом конце луча.")
 		"hunt":
 			_hunt_t = _next_hunt(Game.day)  # ушёл — на время
+			if LOWER_HUNT_EVERY.has(Game.day):
+				_lower_hunt_t = _next_lower_hunt()
 			if seen:
 				Game.say_once("hunt_light", "Ушёл из луча... Не убит — просто ушёл. Он вернётся.", Game.THOUGHT, 3.5)
 			elif stalker.player_hid_during_hunt():

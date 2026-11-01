@@ -158,6 +158,8 @@ func hunt(pos: Vector3, day: int) -> void:
 func _on_noise(pos: Vector3, radius: float) -> void:
 	if mode != "hunt" or _chasing:
 		return
+	if level and not level.same_floor(global_position, pos):
+		return
 	if global_position.distance_to(pos) <= radius * float(_cfg["hear"]):
 		_goal = pos
 		_search = float(_cfg["search"])
@@ -258,6 +260,11 @@ func _hunt_update(delta: float) -> void:
 		if player.crouching and not player.has_light():
 			r *= 0.6
 		sees = dist < r and player.is_looking_at(head, -1.0)
+		# В старой линии кирпичные стены: видит только по прямой.
+		if sees and level and level.lower.contains(global_position):
+			var q := PhysicsRayQueryParameters3D.create(head, player.camera.global_position, 1 | Geo.WALL_LAYER)
+			q.exclude = [player.get_rid()]
+			sees = get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 	if sees:
 		if not _chasing:
 			_say(Sfx.stalker_roar())
