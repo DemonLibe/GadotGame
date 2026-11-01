@@ -114,7 +114,7 @@ func _draw_lower(font: Font) -> void:
 			var end := q if lower.visited.has(n) else p.lerp(q, 0.4)
 			draw_line(p, end, Color(INK, 0.85), k * 0.22)
 		if c == LowerLine.ENTRY:
-			draw_string(font, p + Vector2(k * 0.3, 4), "лестница", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK)
+			draw_string(font, p + Vector2(k * 0.3, 4), "пролом", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK)
 		if c == lower.goal:
 			draw_string(font, p + Vector2(k * 0.4, 4), "платформа", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, red)
 	# Вы здесь.

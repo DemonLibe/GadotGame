@@ -33,6 +33,11 @@ const SIDE_ROOMS := [
 	{"z": -252.5, "side": 1},
 ]
 
+## Пролом в правой стене тоннеля между ПК 2 и ПК 3 — ход в старую линию (с третьей по шестую смену).
+const OLD_BREACH_Z := -110.0
+const OLD_BREACH_W := 2.2        # ширина пролома
+const OLD_BREACH_H := 2.4
+
 const SHAFT_X := -1.6        # центр шахты
 const SHAFT_Z := -32.0
 const SHAFT_HALF := 0.9
@@ -54,7 +59,8 @@ var grate: Node3D
 var _end_wall: MeshInstance3D   # глухая стена тупика
 var _breach: Node3D             # пролом на её месте (седьмая смена)
 var _main_seg := 0              # индекс основного тоннеля в _segments
-var lower: LowerLine            # старая линия под станцией (собирается для вылазок)
+var lower: LowerLine            # старая линия рядом с тоннелем (собирается заново каждую смену)
+var _old_plug: Node3D           # кладка, которой пролом заложен, пока старая линия закрыта
 var pickets: Array[Label3D] = []  # таблички «ПК n» (номер может «поменяться», пока стоишь спиной)
 var rooms: Array[Dictionary] = []  # {center, basis, door}: basis +Z смотрит из комнаты к двери
 var _segments: Array[Dictionary] = []  # оси проходов {a, b, dir} в XZ — для событий
@@ -174,13 +180,19 @@ func is_lit_near(pos: Vector3) -> bool:
 
 ## Обе точки на одном ярусе: станция с тоннелями или старая линия под ней (шум сквозь тридцать метров грунта не слышен).
 func same_floor(a: Vector3, b: Vector3) -> bool:
-	return lower.contains(a) == lower.contains(b)
+	if lower.contains(a) == lower.contains(b):
+		return true
+	# У пролома слышно и в тоннеле, и в старой линии.
+	var m := Vector2(LowerLine.MOUTH.x + 4.0, LowerLine.MOUTH.z)
+	return Vector2(a.x, a.z).distance_to(m) < 10.0 or Vector2(b.x, b.z).distance_to(m) < 10.0
 
 
 ## Точка внутри станции или тоннелей (для появления «Другого»).
 func is_walkable(p: Vector3) -> bool:
 	if lower.contains(p):
 		return lower.is_walkable(p)
+	if lower.in_passage(p):
+		return true
 	if p.y > FLOOR_Y + 5.0:
 		return false
 	if Rect2(-3.0, -50.0, 6.0, 20.0).has_point(Vector2(p.x, p.z)):
@@ -191,8 +203,22 @@ func is_walkable(p: Vector3) -> bool:
 ## Следующая точка пути из from в to: если они в разных проходах — сначала к развилке.
 ## Проходы: 0 — станция и основной тоннель, 1..3 — штольни.
 func next_waypoint(from: Vector3, to: Vector3) -> Vector3:
-	if lower.contains(from) or lower.contains(to):
-		return lower.next_waypoint(from, to) if lower.contains(from) and lower.contains(to) else to
+	var fl := lower.contains(from)
+	var tl := lower.contains(to)
+	if fl and tl:
+		return lower.next_waypoint(from, to)
+	var entry := lower.center(LowerLine.ENTRY)
+	var mouth := Vector3(LowerLine.MOUTH.x, from.y, LowerLine.MOUTH.z)
+	if fl:
+		# Из старой линии в тоннель: к входной клетке, потом по ходу к пролому.
+		return lower.next_waypoint(from, entry) if lower.cell_of(from) != LowerLine.ENTRY else mouth
+	if lower.in_passage(from):
+		return entry if tl else mouth
+	if tl:
+		# Из тоннеля в старую линию: по тоннелю к пролому, от него — в ход.
+		if Vector2(from.x, from.z).distance_to(Vector2(mouth.x, mouth.z)) < 0.8:
+			return entry
+		return next_waypoint(from, mouth)
 	var a := _segment_index(from)
 	var b := _segment_index(to)
 	if a == b:
@@ -573,6 +599,7 @@ func _build_main_tunnel() -> void:
 		holes.append([float(b["z"]) + JUNCTION_MAIN, float(b["z"]) - JUNCTION_MAIN])
 	for r in SIDE_ROOMS:
 		holes.append([float(r["z"]) + ROOM_SECTION, float(r["z"]) - ROOM_SECTION])
+	holes.append([OLD_BREACH_Z + ROOM_SECTION, OLD_BREACH_Z - ROOM_SECTION])
 	holes.sort_custom(func(a, b): return a[0] > b[0])
 	var zc := TUN_Z0
 	for h in holes:
@@ -582,6 +609,7 @@ func _build_main_tunnel() -> void:
 	_main_segment(zc, METRO_Z1)
 	for r in SIDE_ROOMS:
 		_build_side_room(r)
+	_build_old_breach()
 	_end_wall = Geo.box(self, Vector3(TUN_CX, TUBE_CY, TUN_Z1 - 0.15), Vector3(TUBE_R * 2 + 0.4, TUBE_R * 2 + 0.4, 0.3), m_concrete)
 	Geo.box(self, Vector3(TUN_CX, TUBE_CY, METRO_Z1 - 0.15), Vector3(TUBE_R * 2 + 0.4, TUBE_R * 2 + 0.4, 0.3), m_concrete)
 	_main_seg = _segments.size()
@@ -737,6 +765,50 @@ func _build_side_room(r: Dictionary) -> void:
 	_room_floor(center, room_basis)
 	rooms.append({"center": center, "basis": room_basis,
 		"door": Transform3D(room_basis, Vector3(TUN_CX + side * (TUBE_R + WALL_T - 0.05), FLOOR_Y, zr))})
+
+
+## Пролом в старую линию: кусок трубы с рваной дырой в правой стене. За ней — кирпичный ход (его строит LowerLine).
+## Пока старая линия закрыта, дыра заложена кирпичом.
+func _build_old_breach() -> void:
+	var z := OLD_BREACH_Z
+	var axis := Vector3(TUN_CX, TUBE_CY, z)
+	var main_basis := Basis(Vector3.RIGHT, PI / 2)
+	var csg := _new_csg()
+	_csg_tube(csg, TUBE_R + WALL_T, ROOM_SECTION * 2, Transform3D(main_basis, axis), m_concrete, false)
+	_csg_tube(csg, TUBE_R, ROOM_SECTION * 2 + 0.04, Transform3D(main_basis, axis), m_tubbing_tri, true)
+	# Рваные края: несколько повёрнутых коробок вместо ровного проёма.
+	var x_mid := TUN_CX + (TUBE_R + WALL_T) * 0.85
+	_csg_box(csg, Vector3(1.6, OLD_BREACH_H, OLD_BREACH_W), Transform3D(Basis.IDENTITY, Vector3(x_mid, FLOOR_Y + OLD_BREACH_H / 2.0, z)), m_concrete, true)
+	_csg_box(csg, Vector3(1.6, 0.9, 1.4), Transform3D(Basis(Vector3.RIGHT, 0.5), Vector3(x_mid, FLOOR_Y + OLD_BREACH_H, z + 0.3)), m_concrete, true)
+	_csg_box(csg, Vector3(1.6, 1.2, 0.7), Transform3D(Basis(Vector3.RIGHT, -0.3), Vector3(x_mid, FLOOR_Y + 1.4, z - OLD_BREACH_W / 2.0)), m_concrete, true)
+	var chord := _tube_half(FLOOR_Y) * 2.0
+	Geo.box(self, Vector3(TUN_CX, FLOOR_Y - 0.15, z), Vector3(chord, 0.3, ROOM_SECTION * 2), m_floor)
+	# Невидимые стены тоннеля — по обе стороны от пролома (справа) и целиком слева.
+	Geo.solid(self, Vector3(TUN_CX - TUN_HW - 0.15, FLOOR_Y + 2.0, z), Vector3(0.3, 4.0, ROOM_SECTION * 2))
+	for s in [-1.0, 1.0]:
+		var seg := ROOM_SECTION - OLD_BREACH_W / 2.0
+		Geo.solid(self, Vector3(TUN_CX + TUN_HW + 0.15, FLOOR_Y + 2.0, z + s * (OLD_BREACH_W / 2.0 + seg / 2.0)), Vector3(0.3, 4.0, seg))
+	# Обломки тюбинга и кирпич на полу у дыры.
+	var brick := ProcTex.bricks()
+	for k in 7:
+		var p := Vector3(TUN_CX + randf_range(0.8, 1.6), FLOOR_Y + randf_range(0.05, 0.2), z + randf_range(-2.2, 2.2))
+		Geo.box(self, p, Vector3.ONE * randf_range(0.18, 0.4), m_concrete if k % 2 == 0 else brick, false,
+			Basis.from_euler(Vector3(randf() * TAU, randf() * TAU, randf() * TAU)))
+	# Заложено кирпичом (закрыто в 1-ю, 2-ю и 7-ю смены).
+	_old_plug = StaticBody3D.new()
+	add_child(_old_plug)
+	var plug_size := Vector3(0.6, OLD_BREACH_H + 1.6, OLD_BREACH_W + 1.4)
+	var plug_at := Vector3(TUN_CX + TUBE_R + 0.15, FLOOR_Y + plug_size.y / 2.0, z)
+	Geo.box(_old_plug, plug_at, plug_size, brick, false)
+	Geo.collider_box(_old_plug, plug_size, plug_at)
+
+
+## Пролом в старую линию открыт или заложен.
+func set_old_breach(open: bool) -> void:
+	_old_plug.visible = not open
+	for c in _old_plug.get_children():
+		if c is CollisionShape3D:
+			(c as CollisionShape3D).disabled = open
 
 
 ## Комната в тупике штольни: торец трубы с дверью и комната за ним.

@@ -1,11 +1,11 @@
 class_name LowerLine
 extends Node3D
-## Нижняя «Тихая» — старая дореволюционная линия на тридцать метров ниже станции.
-## Каждая вылазка собирает её заново: от входа под станцией по сетке клеток прорастают кирпичные
+## Старая «Тихая» — дореволюционная линия рядом с тоннелем. Вход — пролом в правой стене тоннеля у ПК 2,
+## за ним короткий кирпичный ход. Каждую смену она собирается заново: от входа по сетке клеток прорастают кирпичные
 ## коридоры с развилками и петлями; в тупиках — залы с колоннами, в самой дальней точке — старая платформа.
 ## Отдаёт существам навигацию (is_walkable, next_waypoint, axis_at), а карте — обойдённые клетки.
 
-const Y := -45.0              # пол нижней линии
+const Y := Level.FLOOR_Y      # пол старой линии — вровень с тоннелем
 const CELL := 6.0             # клетка сетки
 const W := 3.0                # ширина коридора
 const H := 3.0                # высота коридора
@@ -13,9 +13,13 @@ const HALL_H := 3.8           # высота зала
 const WALL := 0.4
 const COLS := 9
 const ROWS := 9
-## Угол сетки: клетка (c, r) — от ORIGIN на c клеток по +X и на r клеток по -Z (вглубь, под тоннель).
-const ORIGIN := Vector3(-27.0, Y, -37.0)
-const ENTRY := Vector2i(4, 0)  # вход — прямо под люком на станции
+## Угол сетки: клетка (c, r) — от ORIGIN на c клеток по +X (прочь от тоннеля) и на r клеток по -Z (вглубь).
+## Сетка лежит справа от тоннеля между ПК 2 и ПК 3 — там, где нет ни комнат, ни штолен.
+const ORIGIN := Vector3(9.0, Y, -83.0)
+const ENTRY := Vector2i(0, 4)  # вход — клетка у тоннеля, с запада в неё ведёт ход от пролома
+const BREACH_Z := Level.OLD_BREACH_Z  # пролом в тоннеле — напротив входа (center(ENTRY).z)
+const PASS_X0 := 2.85          # ход от пролома начинается у края пола тоннеля…
+const MOUTH := Vector3(Level.TUN_CX + 1.0, Y, BREACH_Z)  # …а это точка в тоннеле прямо перед проломом
 const DIRS := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 const HALL_KINDS := ["hall", "platform"]
 
@@ -57,6 +61,30 @@ func generate(seed_value: int, size: int) -> void:
 	_mark_rooms()
 	for c in cells:
 		_build_cell(c)
+	_build_passage()
+
+
+## Ход от пролома в тоннеле до входной клетки.
+func _build_passage() -> void:
+	var root := Node3D.new()
+	add_child(root)
+	var body := StaticBody3D.new()
+	root.add_child(body)
+	var length := ORIGIN.x - PASS_X0
+	var mid := Vector3(PASS_X0 + length / 2.0, Y, BREACH_Z)
+	var parts := [
+		[mid + Vector3(0, -0.15, 0), Vector3(length, 0.3, W), "floor"],
+		[mid + Vector3(0, H + 0.15, 0), Vector3(length, 0.3, W), "ceiling"],
+		[mid + Vector3(0, H / 2.0, W / 2.0 + WALL / 2.0), Vector3(length, H, WALL), "brick"],
+		[mid + Vector3(0, H / 2.0, -W / 2.0 - WALL / 2.0), Vector3(length, H, WALL), "brick"],
+	]
+	for part in parts:
+		Geo.box(root, part[0], part[1], _m[part[2]], false)
+		Geo.collider_box(body, part[1], part[0])
+	# Осыпь у пролома.
+	for i in 6:
+		var b := Geo.box(root, Vector3(PASS_X0 + rng.randf_range(0.3, 2.0), Y + 0.08, BREACH_Z + rng.randf_range(-1.1, 1.1)), Vector3(0.28, 0.13, 0.14), _m["brick"], false)
+		b.rotation = Vector3(rng.randf() * 0.4, rng.randf() * TAU, rng.randf() * 0.4)
 
 
 ## Разобрать линию (в смены, когда люк завален).
@@ -173,7 +201,9 @@ func _build_cell(c: Vector2i) -> void:
 
 
 func _build_corridor(c: Vector2i, root: Node3D) -> void:
-	var links: Array = cells[c]["links"]
+	var links: Array = (cells[c]["links"] as Array).duplicate()
+	if c == ENTRY:
+		links.append(ENTRY + Vector2i(-1, 0))  # проём к ходу от пролома
 	var arm := (CELL - W) / 2.0
 	_box("floor", Vector3(0, -0.15, 0), Vector3(W, 0.3, W))
 	_box("ceiling", Vector3(0, H + 0.15, 0), Vector3(W, 0.3, W))
@@ -263,7 +293,14 @@ func cell_of(p: Vector3) -> Vector2i:
 
 
 func contains(p: Vector3) -> bool:
-	return p.y < Y + 6.0 and p.y > Y - 3.0
+	return p.y < Y + 6.0 and p.y > Y - 3.0 and p.x >= ORIGIN.x and p.x <= ORIGIN.x + COLS * CELL \
+		and p.z <= ORIGIN.z and p.z >= ORIGIN.z - ROWS * CELL
+
+
+## В ходе между проломом и входной клеткой (ни тоннель, ни линия).
+func in_passage(p: Vector3) -> bool:
+	return not cells.is_empty() and p.y < Y + 6.0 and p.y > Y - 3.0 and p.x > PASS_X0 - 0.2 and p.x < ORIGIN.x \
+		and absf(p.z - BREACH_Z) < W / 2.0 - 0.3
 
 
 func is_walkable(p: Vector3) -> bool:
@@ -277,7 +314,10 @@ func is_walkable(p: Vector3) -> bool:
 	var half := W / 2.0 - 0.3
 	if absf(l.x) < half and absf(l.z) < half:
 		return true
-	for n in cells[c]["links"]:
+	var arms: Array = (cells[c]["links"] as Array).duplicate()
+	if c == ENTRY:
+		arms.append(ENTRY + Vector2i(-1, 0))  # к ходу от пролома
+	for n in arms:
 		var dw := dir_world((n as Vector2i) - c)
 		var along := l.dot(dw)
 		var across := absf(l.dot(Vector3(dw.z, 0.0, dw.x)))
@@ -412,7 +452,7 @@ func wall_mount(c: Vector2i, height := 1.6) -> Transform3D:
 	var links: Array = cells[c]["links"]
 	var depth := CELL / 2.0 - WALL if HALL_KINDS.has(cells[c]["kind"]) else W / 2.0
 	for d in DIRS:
-		if not links.has(c + d):
+		if not links.has(c + d) and not (c == ENTRY and d == Vector2i(-1, 0)):
 			var dw := dir_world(d)
 			return Transform3D(Basis.looking_at(dw, Vector3.UP), center(c) + dw * (depth - 0.02) + Vector3(0, height, 0))
 	return Transform3D()

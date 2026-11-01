@@ -1,6 +1,6 @@
 class_name Listener
 extends CharacterBody3D
-## Слушатель — житель старой линии. Высокий, из одних костей, без глаз: свет ему безразличен.
+## Слушатель — житель старой линии. Без глаз: свет ему безразличен.
 ## Стоит неподвижно и слушает. Первый звук — поворачивает голову и щёлкает,
 ## второй, пока он настороже, — бросается туда, откуда услышал. Медленно и пригнувшись мимо пройти можно,
 ## бегом — нет. Громкий звук (бег, прыжок, ручка динамо, болт) — бросается сразу. Болт уводит его в сторону. Пули его не берут — только злят.
@@ -34,9 +34,9 @@ func _ready() -> void:
 	var shape := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
 	cap.radius = 0.35
-	cap.height = 2.2
+	cap.height = 1.8
 	shape.shape = cap
-	shape.position.y = 1.1
+	shape.position.y = 0.9
 	add_child(shape)
 	_build()
 	_click = AudioStreamPlayer3D.new()
@@ -48,32 +48,28 @@ func _ready() -> void:
 	_t = randf() * 10.0
 
 
-## Скелет из частей Dungeon Debris (как у останков), только стоймя, вытянутый и с длинными руками.
+## Модель: Blind Hunter (Mophs, CC-BY-SA 3.0/4.0) — безглазая тварь с пастью во всю голову.
+## Бледнее оригинала: под землёй сто лет без света. Смотрит в +Z.
+const MODEL := "res://models/listener/listener.obj"
+const SKIN := "res://models/listener/listener_albedo.png"
+const SCALE := 0.5
+const YAW := 0.0  # поворот модели, чтобы пасть смотрела в +Z узла
+
+
 func _build() -> void:
-	var bone := ProcTex.model_skin(Remains.DIR + "bone_albedo.png", Color(0.55, 0.52, 0.47), 0.85)
-	bone.rim_enabled = true
-	bone.rim = 0.4
-	var skull_mat := ProcTex.model_skin(Remains.DIR + "skull_albedo.png", Color(0.6, 0.56, 0.5), 0.8)
+	var skin := ProcTex.model_skin(SKIN, Color(0.95, 0.85, 0.8), 0.6)
+	skin.rim_enabled = true
+	skin.rim = 0.35
 	_body = Node3D.new()
 	add_child(_body)
-	# Части лежат вдоль Z (голова к -Z, лицом вверх) — поворот на 90° по X ставит их стоймя лицом к +Z.
-	var lying := Node3D.new()
-	lying.rotation.x = PI / 2
-	lying.scale = Vector3.ONE * 1.45
-	lying.position.y = 1.15
-	_body.add_child(lying)
-	_head = Node3D.new()
-	_head.position = Vector3(0, 0.1, -0.6)
-	lying.add_child(_head)
-	Remains._part(_head, "skull_1_001", skull_mat, Vector3(0, 0.03, -0.06), Vector3(-PI / 2, 0, 0))
-	Remains._part(lying, "spine_2_001", bone, Vector3(0, 0.08, -0.3), Vector3(0, 0, PI / 2))
-	Remains._part(lying, "ribcage_2_001", bone, Vector3(0, 0.02, -0.42), Vector3.ZERO)
-	for s in [-1.0, 1.0]:
-		var arm := Remains._part(lying, "arm_2_001", bone, Vector3(s * 0.26, 0.02, -0.12), Vector3(0, -s * 0.08, 0), s < 0.0)
-		arm.scale.z *= 1.6  # руки до колен
-		var leg := Remains._part(lying, "leg_2_001", bone, Vector3(s * 0.11, 0, 0.42), Vector3(0, s * 0.05, 0), s < 0.0)
-		leg.scale.z *= 1.15
-	Remains._part(lying, "pelvis_2_001", bone, Vector3(0, 0.09, 0.06), Vector3(-PI / 2, 0, 0))
+	_head = Node3D.new()  # поворачивается целиком — «вслушивается»
+	_body.add_child(_head)
+	var mi := MeshInstance3D.new()
+	mi.mesh = load(MODEL)
+	mi.material_override = skin
+	mi.scale = Vector3.ONE * SCALE
+	mi.rotation.y = YAW
+	_head.add_child(mi)
 
 
 ## Слух — единственное, что у него есть.
@@ -133,12 +129,12 @@ func _physics_process(delta: float) -> void:
 	match state:
 		"listen":
 			# Покачивается и медленно водит головой.
-			_head.rotation.y = sin(_t * 0.4) * 0.5
+			_head.rotation.y = sin(_t * 0.4) * 0.25
 			_body.rotation.x = 0.0
 		"alert":
 			_alert -= delta
 			_head.rotation.y = move_toward(_head.rotation.y, 0.0, delta * 3.0)
-			_head.rotation.z = sin(_t * 9.0) * 0.08
+			_head.rotation.z = sin(_t * 9.0) * 0.03
 			if _alert <= 0.0:
 				state = "listen"
 		"charge", "search":
@@ -148,7 +144,7 @@ func _physics_process(delta: float) -> void:
 			var left := _goal - global_position
 			left.y = 0.0
 			if state == "charge":
-				_body.rotation.x = 0.35
+				_body.rotation.x = 0.12
 				if left.length() > 0.5 and go.length() > 0.05:
 					v = go.normalized() * SPEED
 					rotation.y = atan2(go.x, go.z)
@@ -156,9 +152,9 @@ func _physics_process(delta: float) -> void:
 					state = "search"
 					_search = 3.0
 			else:
-				_body.rotation.x = 0.1
+				_body.rotation.x = 0.04
 				_search -= delta
-				_head.rotation.y = sin(_t * 3.0) * 0.7
+				_head.rotation.y = sin(_t * 3.0) * 0.4
 				if _search <= 0.0:
 					state = "listen"
 	velocity.x = v.x
