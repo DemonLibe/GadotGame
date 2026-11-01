@@ -49,6 +49,7 @@ func _ready() -> void:
 
 
 func _on_new_game() -> void:
+	Meta.new_run()
 	Game.save_day(1)
 	_start(1)
 

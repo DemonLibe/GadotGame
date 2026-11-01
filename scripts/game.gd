@@ -142,6 +142,8 @@ func report(kind: String, amount := 1) -> void:
 				t["done"] = true
 				if kind != "return":
 					say("Выполнено: " + str(t["text"]), SYSTEM, 3.0)
+				if kind != "return" and kind != "radio":
+					Meta.earn(Meta.PAY_TASK, "поручение")
 			changed = true
 	if changed:
 		tasks_changed.emit()

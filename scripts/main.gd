@@ -338,7 +338,7 @@ func _process(delta: float) -> void:
 		fail_day("Ты сорвался в шахту.")
 		return
 	# В браузере Esc снимает захват мыши сам — тогда ставим игру на паузу.
-	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not hud.is_shop_open():
 		_uncaptured += delta
 		if _uncaptured > 0.4 and _grace <= 0.0:
 			_pause()
@@ -350,6 +350,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if state == "playing" and event.is_action_pressed("ui_cancel"):
 		_pause()
 	elif Game.ended and event.is_action_pressed("restart"):
+		Meta.new_run()
 		Game.save_day(1)
 		Game.pending_day = 1
 		get_tree().reload_current_scene()
@@ -449,6 +450,11 @@ func _spawn_props() -> void:
 	phone.position = Vector3(Level.SHAFT_X + 3.45, Level.ROOM_Y + 1.45, Level.SHAFT_Z + 0.9)
 	phone.rotation.y = deg_to_rad(-90.0)
 	add_child(phone)
+	# Шкафчик снабжения — второй шкафчик у стены, рядом с фото Маши.
+	var locker := SupplyLocker.new()
+	locker.position = Vector3(Level.SHAFT_X - 3.5 + 0.56, Level.ROOM_Y + 1.5, Level.SHAFT_Z + 2.25)
+	locker.rotation.y = deg_to_rad(90.0)
+	add_child(locker)
 	journal = Journal.new()
 	journal.position = Vector3(Level.SHAFT_X + 2.9, Level.ROOM_Y, Level.SHAFT_Z - 1.6)
 	journal.rotation.y = deg_to_rad(90.0)
@@ -609,12 +615,14 @@ func start_day(d: int, retry := false) -> void:
 			Game.say("На столе шипит рация. Диспетчер ждёт.", Game.THOUGHT, 3.5)
 		if d == 1:
 			Game.say("Рация в руке (4) и ЛКМ — спросить диспетчера, куда идти. Шуметь внизу не стоит: приседай (C).", Game.SYSTEM, 6.0)
+			Game.say("За поручения платят. Шкафчик снабжения — у стены, рядом с фото Маши.", Game.SYSTEM, 5.0)
 
 
 func end_day() -> void:
 	if busy:
 		return
 	busy = true
+	Meta.earn(Meta.PAY_SHIFT, "смена закрыта")
 	# Достижения за смену.
 	if Game.day == 1:
 		Achievements.unlock("shift1")
@@ -1560,6 +1568,23 @@ func _smoke_test() -> void:
 			journal.interact(player)  # в шестую смену журнал закрыл бы смену — это проверяется ниже
 		await get_tree().create_timer(1.5).timeout
 		stalker.hide_now()
+	# Снабжение: купить расходники и снаряжение, отложить на операцию.
+	start_day(3)
+	await get_tree().create_timer(5.5).timeout
+	Meta.earn(3000, "смоук")
+	var money_before := Meta.money
+	hud.open_shop(player)
+	await get_tree().process_frame
+	for id in Meta.SUPPLIES:
+		hud._shop._buy_supply(id)
+	for id in Meta.UPGRADES:
+		hud._shop._buy_upgrade(id)
+	hud._shop._save(100)
+	hud.close_shop()
+	await get_tree().create_timer(0.5).timeout
+	var shop_ok := Meta.money < money_before and Meta.level("boots") > 0 and not player.input_locked
+	if not shop_ok:
+		print("SMOKE FAIL: снабжение")
 	# Провал смены: начинается заново уже внизу, с рацией.
 	start_day(3)
 	await get_tree().create_timer(5.5).timeout
@@ -1589,7 +1614,7 @@ func _smoke_test() -> void:
 	await get_tree().create_timer(6.0).timeout
 	hud.close_newspaper()
 	await get_tree().create_timer(7.0).timeout
-	var ok := Game.ended and retry_ok and hide_ok
+	var ok := Game.ended and retry_ok and hide_ok and shop_ok
 	# Концовка 3: все записки, засов решётки изнутри.
 	start_day(5)
 	await get_tree().create_timer(5.5).timeout

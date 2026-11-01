@@ -59,6 +59,10 @@ var _diary_scrawl: Control
 var _diary_cry: Label
 var _diary_pages: Array = []
 var _diary_i := -1
+var _money: Label
+var _coin: Label
+var _coin_t := 0.0
+var _shop: ShopPanel
 var _flash: ColorRect
 var _photo: PanelContainer
 var _photo_tex: TextureRect
@@ -152,6 +156,19 @@ func _ready() -> void:
 
 	_battery_label = _make_label(_ingame, 18, HORIZONTAL_ALIGNMENT_RIGHT)
 	_place(_battery_label, 1, 1, 1, 1, -300, -80, -24, -56)
+	# Деньги (Meta) и «+40 ₽ · поручение», когда заплатили.
+	_money = _make_label(_ingame, 16, HORIZONTAL_ALIGNMENT_RIGHT)
+	_place(_money, 1, 1, 1, 1, -300, -108, -24, -84)
+	_coin = _make_label(_ingame, 16, HORIZONTAL_ALIGNMENT_RIGHT)
+	_coin.add_theme_color_override("font_color", AMBER)
+	_place(_coin, 1, 1, 1, 1, -420, -136, -24, -112)
+	_coin.modulate.a = 0.0
+	Meta.changed.connect(_refresh_money)
+	Meta.earned.connect(func(amount: int, reason: String):
+		_coin.text = "+%d ₽ · %s" % [amount, reason]
+		_coin_t = 3.0
+		Game.play_ui(Sfx.pickup(), -16.0))
+	_refresh_money()
 	_battery = ProgressBar.new()
 	_battery.show_percentage = false
 	_battery.max_value = 100.0
@@ -360,6 +377,8 @@ func _process(delta: float) -> void:
 	_toast_t -= delta
 	_toast.modulate.a = clampf(_toast_t, 0.0, 1.0)
 	_flash.color.a = move_toward(_flash.color.a, 0.0, delta * 2.5)
+	_coin_t -= delta
+	_coin.modulate.a = clampf(_coin_t, 0.0, 1.0)
 	_photo_t -= delta
 	_photo.modulate.a = clampf(_photo_t, 0.0, 1.0)
 	_photo.visible = _photo_t > 0.0
@@ -483,6 +502,37 @@ func _build_newspaper() -> void:
 	body.custom_minimum_size = Vector2(450, 0)
 	row.add_child(body)
 	box.add_child(_paper_label("E — дальше", 13, Color(ink, 0.6), HORIZONTAL_ALIGNMENT_RIGHT))
+
+
+func _refresh_money() -> void:
+	_money.text = "%d ₽" % Meta.money
+
+
+## Шкафчик снабжения: пока открыт, обходчик стоит, мышь свободна.
+func open_shop(who: Player) -> void:
+	if _shop == null:
+		_shop = ShopPanel.new()
+		_place(_shop, 0.5, 0.5, 0.5, 0.5, -350, -300, 350, 300)
+		_root.add_child(_shop)
+		_shop.closed.connect(close_shop)
+	who.input_locked = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_shop.open(who)
+
+
+func close_shop() -> void:
+	if _shop == null or not _shop.visible:
+		return
+	_shop.visible = false
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	# Пауза, чтобы та же E не открыла шкафчик снова.
+	await get_tree().create_timer(0.25).timeout
+	if _shop.player:
+		_shop.player.input_locked = false
+
+
+func is_shop_open() -> bool:
+	return _shop != null and _shop.visible
 
 
 ## Вспышка фотоаппарата и снимок-«полароид» в углу экрана.

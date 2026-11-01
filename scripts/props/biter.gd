@@ -141,6 +141,7 @@ func _die() -> void:
 		return
 	_dead = true
 	collision_layer = 0
+	Meta.earn(Meta.PAY_BITER, "паук")
 	_anim.speed_scale = 1.0
 	_anim.play("Die", 0.05)
 	Game.play_at(Sfx.hiss(), global_position, -6.0)

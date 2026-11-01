@@ -23,6 +23,8 @@ func get_prompt(_player) -> String:
 
 
 func interact(_player) -> void:
+	if not Game.notes_read.has(note_id):
+		Meta.earn(Meta.PAY_NOTE, "записка")
 	Game.notes_read[note_id] = true
 	if note_id == "masha":
 		Achievements.unlock("masha")

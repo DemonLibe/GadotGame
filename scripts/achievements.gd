@@ -105,6 +105,7 @@ func collect(id: String) -> void:
 	_finds[id] = true
 	_save()
 	found.emit(id)
+	Meta.earn(Meta.PAY_FIND, "находка")
 	match id:
 		"lens", "cell", "duck", "sponjik":
 			unlock(id)

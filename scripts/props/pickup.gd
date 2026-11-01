@@ -82,7 +82,7 @@ func interact(player) -> void:
 		queue_free()
 		return
 	if kind == "bolts":
-		var took := mini(amount, Player.MAX_BOLTS - player.bolts)
+		var took := mini(amount, player.max_bolts() - player.bolts)
 		if took <= 0:
 			Game.say("Карман и так полон болтов.", Game.THOUGHT, 2.0)
 			return
