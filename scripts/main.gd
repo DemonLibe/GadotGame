@@ -90,6 +90,7 @@ const BITERS_AT_START := 8
 const LOWER_CELLS := {3: 22, 4: 28, 5: 32, 6: 34}
 const LOWER_CRAWLERS := {3: 1, 4: 2, 5: 3, 6: 1}
 const LOWER_RELICS := {3: 3, 4: 4, 5: 5, 6: 4}
+const LOWER_LISTENERS := {3: 1, 4: 1, 5: 2, 6: 2}
 ## Находки: [название, цена]; чем дальше от лестницы, тем дороже.
 const RELICS := [["серебряные монеты", 60], ["подстаканник", 50], ["карманные часы", 90], ["путейский фонарь", 70], ["эмалированная табличка", 80]]
 ## Мелом на кирпиче — по смене. Старая линия помнит тех, кто был здесь раньше.
@@ -707,8 +708,15 @@ func _setup_lower(d: int, retry: bool) -> void:
 		l.rotate_object_local(Vector3.FORWARD, randf_range(-0.06, 0.06))
 		l.add_to_group("day_objects")
 	for i in LOWER_CRAWLERS[d]:
-		var cr := spawn_crawler(lower.floor_spot(lower.random_cell(4)))
-		cr.hp = 2
+		spawn_crawler(lower.floor_spot(lower.random_cell(4)))
+	# Слушатели стоят в залах (если залов мало — в коридорах), подальше от лестницы.
+	var halls: Array[Vector2i] = []
+	for c in lower.cells:
+		if lower.cells[c]["kind"] == "hall" and int(lower.cells[c]["dist"]) >= 3:
+			halls.append(c)
+	halls.shuffle()
+	for i in LOWER_LISTENERS[d]:
+		spawn_listener(lower.center(halls[i]) if i < halls.size() else lower.floor_spot(lower.random_cell(4)))
 
 
 func _lower_pickup(kind: String, amount: int, pos: Vector3, title := "") -> Pickup:
@@ -1328,6 +1336,16 @@ func spawn_crawler(pos: Vector3) -> Crawler:
 	return c
 
 
+func spawn_listener(pos: Vector3) -> Listener:
+	var l := Listener.new()
+	l.player = player
+	l.level = level
+	l.position = pos + Vector3(0, 0.1, 0)
+	l.rotation.y = randf() * TAU
+	add_child(l)
+	return l
+
+
 func spawn_biter(pos: Vector3) -> Biter:
 	var b := Biter.new()
 	b.player = player
@@ -1738,6 +1756,31 @@ func _smoke_test() -> void:
 	if relic:
 		relic.interact(player)
 	var carried := player.loot
+	# Слушатель: тихий звук — насторожился, второй — бросился; громкий — сразу.
+	var lis := spawn_listener(lower.center(lower.goal))
+	await get_tree().physics_frame
+	Game.make_noise(lis.global_position + Vector3(2, 0, 0), Player.NOISE_WALK)
+	var lis_ok := lis.state == "alert"
+	Game.make_noise(lis.global_position + Vector3(2, 0, 0), Player.NOISE_WALK)
+	lis_ok = lis_ok and lis.state == "charge"
+	lis.state = "listen"
+	Game.make_noise(lis.global_position + Vector3(2, 0, 0), Player.NOISE_RUN)
+	lis_ok = lis_ok and lis.state == "charge"
+	lis.queue_free()
+	await get_tree().process_frame
+	# Подражатель: зовёт из тупика; пришёл на голос — засада.
+	if director._start_mimic(99):
+		var before := get_tree().get_nodes_in_group("creatures").size()
+		director._lower_events(0.1)
+		player.global_position = lower.center(director._mimic) + Vector3(0, 0.1, 0)
+		await get_tree().physics_frame
+		director._lower_events(0.1)
+		await get_tree().process_frame
+		lis_ok = lis_ok and director._mimic.x < 0 and get_tree().get_nodes_in_group("creatures").size() > before
+	else:
+		print("SMOKE note: подражателю негде звать в этой раскладке")
+	if not lis_ok:
+		print("SMOKE FAIL: слушатель или подражатель")
 	player.global_position = lower.center(lower.goal) + Vector3(0, 0.1, 0)
 	await get_tree().create_timer(0.5).timeout
 	low_ok = low_ok and carried > 0 and not Game.has_open_task("platform")
@@ -1788,7 +1831,7 @@ func _smoke_test() -> void:
 	await get_tree().create_timer(6.0).timeout
 	hud.close_newspaper()
 	await get_tree().create_timer(7.0).timeout
-	var ok := Game.ended and retry_ok and hide_ok and shop_ok and low_ok
+	var ok := Game.ended and retry_ok and hide_ok and shop_ok and low_ok and lis_ok
 	# Концовка 3: все записки, засов решётки изнутри.
 	start_day(5)
 	await get_tree().create_timer(5.5).timeout

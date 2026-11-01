@@ -98,6 +98,10 @@
   монеты, часы, путейские фонари — за них платят, если вынесешь их на станцию. Рация внизу не берёт,
   карта показывает только то, где уже прошёл. Провалил смену внизу — старая линия будет той же,
   а вещмешок с находками останется там, где ты упал.
+- **Жители старой линии.** Внизу свои опасности. Слушатель стоит в залах и не видит — свет ему безразличен,
+  зато слышит: тихий шаг — насторожится и защёлкает, второй — бросится на звук; бег, прыжок, ручку динамо
+  и болт — сразу. Мимо — только пригнувшись, а болт уводит его в сторону. Пули его не берут.
+  С четвёртой смены внизу можно услышать знакомый голос из бокового прохода. Рация там не берёт.
 - **Болты** (G) лежат по тоннелю в коробках, двое — с собой в начале смены. Брошенный болт звякает
   там, где упал: ползуны, пауки и «Другой» идут туда. Его можно подобрать снова.
 - **Подсказки по рации.** ЛКМ с рацией в руке — диспетчер подскажет, куда идти дальше.
@@ -194,7 +198,7 @@ scripts/
   proc_tex.gd          процедурные текстуры (тюбинги, плитка, гранит, щебень, краска) и частицы
   sfx.gd               звуки: записи из sounds/, остальные синтезируются
   map_view.gd          бумажная карта
-  props/               рация, люк, лестница, двери, останки, записки, ограждения, ползуны, пистолет и патроны, паутина, вентблок, ящик, устройства поручений (task_device.gd), болт (bolt.gd), журнал, вагонетка, пауки, находки (find.gd) и другие объекты — по скрипту на каждый
+  props/               рация, люк, лестница, двери, останки, записки, ограждения, ползуны, Слушатель (listener.gd), пистолет и патроны, паутина, вентблок, ящик, устройства поручений (task_device.gd), болт (bolt.gd), журнал, вагонетка, пауки, находки (find.gd) и другие объекты — по скрипту на каждый
 sounds/                звуки и музыка с OpenGameArt (CC0), сведены в моно OGG
 models/                модели с OpenGameArt, уменьшенные текстуры к ним, настройки импорта (*.import)
   mine/                вагонетка и звено пути
@@ -221,7 +225,7 @@ Godot импортирует FBX, OBJ и glTF сам; паук и «Другой
 | Пауки | `models/spider/` | [Low Poly Spider (Glest)](https://opengameart.org/content/low-poly-spider-glest) | Wciow, John.d.h | [CC-BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) — изменённая модель (`spider.glb`) распространяется на тех же условиях |
 | «Другой» | `models/angler/` | [Angler Man 3D](https://opengameart.org/content/angler-man-3d) | piacenti | [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) — анимации добавлены для игры |
 | Декорации | `models/subway/` | [Train Kit](https://opengameart.org/content/train-kit) | Kenney | CC0 |
-| Останки, кучи костей | `models/bones/` | [3D Dungeon Debris — Skull and Bones](https://opengameart.org/content/3d-dungeon-debris-skull-and-bones) | Paul Wortmann | CC0 |
+| Останки, кучи костей, Слушатель | `models/bones/` | [3D Dungeon Debris — Skull and Bones](https://opengameart.org/content/3d-dungeon-debris-skull-and-bones) | Paul Wortmann | CC0 |
 | Баллон горелки, канистра | `models/items/propane.glb`, `jerrycan.glb` | [Containers Pack](https://opengameart.org/content/containers-pack) | loafbrr_1 | CC0 |
 | Пистолет | `models/items/pistol.glb` | [Pistol](https://opengameart.org/content/pistol-5) | loafbrr_1 | CC0 |
 | Батарейка, аккумулятор | `models/items/battery.glb` | [Lowpoly Survival Item Pack](https://opengameart.org/content/lowpoly-survival-item-pack) | artie31 | CC0 |
