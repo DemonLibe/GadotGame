@@ -32,6 +32,9 @@ func _draw() -> void:
 	var font := get_theme_default_font()
 	draw_rect(Rect2(Vector2.ZERO, size), PAPER)
 	draw_rect(Rect2(Vector2(4, 4), size - Vector2(8, 8)), Color(INK, 0.5), false, 2.0)
+	if level != null and player != null and level.lower.contains(player.global_position):
+		_draw_lower(font)
+		return
 	draw_string(font, Vector2(PAD, 30), "СХЕМА ЛИНИИ «ТИХАЯ»", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, INK)
 	if level == null:
 		return
@@ -90,3 +93,34 @@ func _draw() -> void:
 		var side := Vector2(-dir.y, dir.x)
 		draw_colored_polygon(PackedVector2Array([pp + dir * 9, pp - dir * 5 + side * 5, pp - dir * 5 - side * 5]), Color(0.75, 0.1, 0.05))
 	draw_string(font, Vector2(PAD, size.y - 12), "красный — вы, × — поручение, ? — комната", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(INK, 0.8))
+
+
+## Старая линия: на схеме только то, где уже прошёл (и ходы из этих клеток — обрывками).
+func _draw_lower(font: Font) -> void:
+	var lower := level.lower
+	draw_string(font, Vector2(PAD, 30), "СТАРАЯ ЛИНИЯ — СВОЯ СХЕМА", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, INK)
+	var area := size - Vector2(PAD * 2, PAD * 2 + 50)
+	var k := minf(area.x / LowerLine.COLS, area.y / LowerLine.ROWS)
+	var at := func(c: Vector2i) -> Vector2:
+		return Vector2(PAD + (c.x + 0.5) * k, PAD + 40 + (c.y + 0.5) * k)
+	var red := Color(0.6, 0.1, 0.05)
+	for c in lower.visited:
+		var p: Vector2 = at.call(c)
+		var kind: String = lower.cells[c]["kind"]
+		var r := k * (0.36 if LowerLine.HALL_KINDS.has(kind) else 0.2)
+		draw_rect(Rect2(p - Vector2(r, r), Vector2(r, r) * 2), Color(INK, 0.85))
+		for n in lower.cells[c]["links"]:
+			var q: Vector2 = at.call(n)
+			var end := q if lower.visited.has(n) else p.lerp(q, 0.4)
+			draw_line(p, end, Color(INK, 0.85), k * 0.22)
+		if c == LowerLine.ENTRY:
+			draw_string(font, p + Vector2(k * 0.3, 4), "лестница", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK)
+		if c == lower.goal:
+			draw_string(font, p + Vector2(k * 0.4, 4), "платформа", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, red)
+	# Вы здесь.
+	var pp: Vector2 = at.call(lower.cell_of(player.global_position))
+	var f := -player.global_transform.basis.z
+	var dir := Vector2(f.x, -f.z).normalized()
+	var side := Vector2(-dir.y, dir.x)
+	draw_colored_polygon(PackedVector2Array([pp + dir * 9, pp - dir * 5 + side * 5, pp - dir * 5 - side * 5]), red)
+	draw_string(font, Vector2(PAD, size.y - 12), "красный — вы; видно только то, где уже был", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(INK, 0.8))

@@ -86,6 +86,12 @@ const AMMO_BOXES_PER_DAY := [0, 0, 0, 3, 3, 4, Game.GEAR_AMMO_BOXES, 4]
 const PISTOL_ROUNDS := [0, 0, 0, 6, 4, 6, 6, 0]
 ## Седьмая смена: кусачие пауки на полу с самого начала; вагон метро за проломом (центр головного вагона).
 const BITERS_AT_START := 8
+## Вылазки: размер старой линии (клеток) и плата; с каждой вылазкой — больше и дороже.
+const DESCENT_CELLS := 26
+const DESCENT_CELLS_PER := 4
+const DESCENT_PAY := 200
+const DESCENT_PAY_PER := 50
+const OLD_HATCH := Vector3(-1.0, Level.FLOOR_Y, -42.5)  # ржавый люк на платформе станции
 ## Коробки с болтами по тоннелю — каждую смену.
 const BOLT_BOXES := 4
 const METRO_CAR_Z := -390.0
@@ -328,6 +334,8 @@ func _process(delta: float) -> void:
 		var pos := player.global_position + Vector3(randf_range(-2.0, 2.0), 2.5, randf_range(-10.0, 10.0))
 		Game.play_at(Sfx.drip(), pos, -6.0)
 	_fear_peak = maxf(_fear_peak, Game.fear)
+	if Game.descent > 0:
+		_update_descent()
 	if collapsing and not busy:
 		_update_collapse(delta)
 	_update_water()
@@ -392,7 +400,10 @@ func _begin(d: int) -> void:
 		player.input_locked = false
 		busy = false
 		return
-	start_day(d)
+	if Game.descent > 0:
+		start_descent(Game.descent)
+	else:
+		start_day(d)
 
 
 func _pause() -> void:
@@ -511,6 +522,7 @@ func _spawn_props() -> void:
 func start_day(d: int, retry := false) -> void:
 	busy = true
 	collapsing = false
+	Game.descent = 0
 	Game.day = d
 	Game.fear = 0.0
 	Game.ended = false
@@ -621,6 +633,9 @@ func start_day(d: int, retry := false) -> void:
 func end_day() -> void:
 	if busy:
 		return
+	if Game.descent > 0:
+		_end_descent()
+		return
 	busy = true
 	Meta.earn(Meta.PAY_SHIFT, "смена закрыта")
 	# Достижения за смену.
@@ -638,6 +653,135 @@ func end_day() -> void:
 	start_day(mini(Game.day + 1, Game.LAST_DAY))
 
 
+# --- Вылазки в старую линию ---------------------------------------------------
+
+## Вылазка n: наверху — тихая станция (свет горит, рации нет), внизу — старая линия, собранная заново.
+## retry — после провала: обходчик сразу на платформе станции.
+func start_descent(n: int, retry := false) -> void:
+	busy = true
+	collapsing = false
+	Game.descent = n
+	Game.day = Game.DESCENT_DAY
+	Game.fear = 0.0
+	Game.ended = false
+	Game.build_descent_tasks()
+	for obj in get_tree().get_nodes_in_group("day_objects"):
+		obj.queue_free()
+	for door in doors:
+		door.set_open(false)
+	_setup_vents_and_crates(Game.DESCENT_DAY)
+	_setup_access(Game.DESCENT_DAY)
+	generator.reset(100.0)
+	generator.run()
+	cart.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, -40.0)
+	level.set_grate_open(false)
+	level.set_breach(false)
+	level.tunnel_lights_off = false
+	level.blackout = false
+	level.reset_pickets()
+	phone.stop()
+	stalker.hide_now()
+	hatch.set_open(false)
+	radio.reset()
+	radio.take_away()
+	dispatcher.stop()
+	level.lower.generate(randi(), DESCENT_CELLS + DESCENT_CELLS_PER * mini(n - 1, 8))
+	_spawn_descent(n)
+	player.reset_for_day(SPAWN, SPAWN_YAW, START_BATTERY)
+	if retry:
+		player.global_position = BOTTOM_SPAWN
+		player.rotation.y = 0.0
+		hatch.set_open(true)
+	player.drain_mult = 1.3
+	_fear_peak = 0.0
+	player.input_locked = true
+	director.start_day(Game.DESCENT_DAY)
+	hud.set_black()
+	hud.show_title("Вылазка %d" % n, "Старая линия. Тридцать метров под станцией.", 2.5)
+	await get_tree().create_timer(3.0).timeout
+	await hud.fade_to(0.0, 2.0).finished
+	player.input_locked = false
+	busy = false
+	if not retry:
+		Game.say("Под платформой — старый люк. Ниже станции есть ещё одна «Тихая». Каждый раз — другая.", Game.THOUGHT, 5.0)
+
+
+## Ход в старую линию, лестница наверх, существа и припасы внизу.
+func _spawn_descent(n: int) -> void:
+	var lower := level.lower
+	var hatch_down := OldStairs.new()
+	hatch_down.main = self
+	hatch_down.down = true
+	hatch_down.position = OLD_HATCH
+	add_child(hatch_down)
+	var up := OldStairs.new()
+	up.main = self
+	up.down = false
+	up.position = lower.center(LowerLine.ENTRY) + Vector3(0, 0, LowerLine.W / 2.0 - 0.05)
+	up.rotation.y = PI
+	add_child(up)
+	for i in mini(1 + n / 2, 5):
+		var c := spawn_crawler(lower.floor_spot(lower.random_cell(4)))
+		c.speed = 2.0 + 0.1 * n
+		c.hp = 2
+	for kind in ["ammo", "bolts", "bolts"]:
+		var box := Pickup.new()
+		box.kind = kind
+		box.amount = 3
+		box.position = lower.floor_spot(lower.random_cell(2))
+		box.rotation.y = randf() * TAU
+		add_child(box)
+
+
+## Спуститься в старую линию или подняться на станцию — через затемнение.
+func use_old_stairs(down: bool) -> void:
+	if busy:
+		return
+	busy = true
+	player.input_locked = true
+	Game.play_ui(Sfx.creak(), -4.0)
+	await hud.fade_to(1.0, 0.6).finished
+	for i in 3:
+		Game.play_ui(Sfx.rung(), -6.0)
+		await get_tree().create_timer(0.35).timeout
+	if down:
+		player.global_position = level.lower.center(LowerLine.ENTRY) + Vector3(0, 0.1, 0.4)
+		player.rotation.y = 0.0
+		Game.report("descend")
+	else:
+		player.global_position = OLD_HATCH + Vector3(0.8, 0.1, 0.0)
+		player.rotation.y = 0.0
+	player.velocity = Vector3.ZERO
+	await hud.fade_to(0.0, 0.8).finished
+	player.input_locked = false
+	busy = false
+	if down:
+		Game.say_once("old_line", "Кирпич. Свод. Дореволюционная кладка — та самая, о которой писала бригада. Тихо... слишком.", Game.THOUGHT, 5.0)
+
+
+## Каждый кадр во время вылазки: карта открывается по мере обхода, платформа — цель.
+func _update_descent() -> void:
+	var lower := level.lower
+	var p := player.global_position
+	lower.visit(p)
+	if lower.contains(p) and lower.cell_of(p) == lower.goal and Game.has_open_task("platform"):
+		Game.report("platform")
+		Game.say("Платформа. «Ст. Тихая, 1913». Сюда сто лет не спускался ни один поезд. Теперь — назад, наверх.", Game.THOUGHT, 5.0)
+
+
+## Вернулся и отметился в журнале: заплатить и собрать следующую, более глубокую вылазку.
+func _end_descent() -> void:
+	busy = true
+	player.input_locked = true
+	Meta.earn(DESCENT_PAY + DESCENT_PAY_PER * (Game.descent - 1), "вылазка")
+	Game.play_ui(Sfx.click())
+	await hud.fade_to(1.0, 1.5).finished
+	hud.show_title("ВЫЛАЗКА %d ЗАВЕРШЕНА" % Game.descent, "Старая линия уходит глубже.", 2.5)
+	await get_tree().create_timer(3.0).timeout
+	busy = false
+	start_descent(Game.descent + 1)
+
+
 ## Смена провалена (сорвался, страх взял верх) — начинается заново. Игра всегда сложная.
 func fail_day(reason: String) -> void:
 	if busy:
@@ -647,6 +791,12 @@ func fail_day(reason: String) -> void:
 	stalker.hide_now()
 	Game.play_ui(Sfx.sting(), 0.0)
 	await hud.fade_to(1.0, 0.5).finished
+	if Game.descent > 0:
+		# Вылазка провалена: старая линия соберётся заново, деньги и снаряжение — при тебе.
+		hud.show_title("ВЫЛАЗКА ПРОВАЛЕНА", reason + "\n\nСтарая линия будет уже другой.", 2.5)
+		await get_tree().create_timer(4.0).timeout
+		start_descent(Game.descent, true)
+		return
 	hud.show_title("СМЕНА ПРОВАЛЕНА", reason + "\n\nСмена начнётся заново — уже внизу.", 2.5)
 	await get_tree().create_timer(4.0).timeout
 	start_day(Game.day, true)
@@ -1585,6 +1735,29 @@ func _smoke_test() -> void:
 	var shop_ok := Meta.money < money_before and Meta.level("boots") > 0 and not player.input_locked
 	if not shop_ok:
 		print("SMOKE FAIL: снабжение")
+	# Вылазка: старая линия собрана, спуск, платформа, подъём, журнал — и следующая вылазка.
+	start_descent(1)
+	await get_tree().create_timer(5.5).timeout
+	var lower := level.lower
+	var desc_ok := lower.cells.size() >= DESCENT_CELLS
+	use_old_stairs(true)
+	await get_tree().create_timer(3.0).timeout
+	desc_ok = desc_ok and lower.contains(player.global_position) and not Game.has_open_task("descend")
+	for ev in ["footsteps", "whisper", "silence", "crawler"]:
+		director._run(ev)
+	player.hold("map")
+	await get_tree().create_timer(1.0).timeout
+	player.global_position = lower.center(lower.goal) + Vector3(0, 0.1, 0)
+	await get_tree().create_timer(0.5).timeout
+	desc_ok = desc_ok and not Game.has_open_task("platform")
+	use_old_stairs(false)
+	await get_tree().create_timer(3.0).timeout
+	player.global_position = SPAWN
+	journal.interact(player)
+	await get_tree().create_timer(10.0).timeout
+	desc_ok = desc_ok and Game.descent == 2 and not busy
+	if not desc_ok:
+		print("SMOKE FAIL: вылазка")
 	# Провал смены: начинается заново уже внизу, с рацией.
 	start_day(3)
 	await get_tree().create_timer(5.5).timeout
@@ -1614,7 +1787,7 @@ func _smoke_test() -> void:
 	await get_tree().create_timer(6.0).timeout
 	hud.close_newspaper()
 	await get_tree().create_timer(7.0).timeout
-	var ok := Game.ended and retry_ok and hide_ok and shop_ok
+	var ok := Game.ended and retry_ok and hide_ok and shop_ok and desc_ok
 	# Концовка 3: все записки, засов решётки изнутри.
 	start_day(5)
 	await get_tree().create_timer(5.5).timeout

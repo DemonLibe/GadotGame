@@ -38,6 +38,7 @@ func _ready() -> void:
 	add_child(menu)
 	menu.new_game.connect(_on_new_game)
 	menu.continue_game.connect(func(): _start(Game.load_day()))
+	menu.descent.connect(func(): _start(Game.DESCENT_DAY, 1))
 	menu.quit.connect(func(): get_tree().quit())
 	Settings.changed.connect(_apply_settings)
 	_apply_settings()
@@ -54,8 +55,10 @@ func _on_new_game() -> void:
 	_start(1)
 
 
-func _start(d: int) -> void:
+## descent — номер вылазки в старую линию (0 — сюжетные смены).
+func _start(d: int, descent := 0) -> void:
 	Game.pending_day = d
+	Game.descent = descent
 	menu.show_loading()
 	# Захват мыши — сразу по нажатию: браузер разрешает его только в ответ на действие игрока.
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED

@@ -13,6 +13,8 @@ const FINAL_DAY := 5
 ## Кто поднялся в пятую смену, не докладывая, спускается ещё дважды: шестая — собраться, седьмая — выбраться.
 const LAST_DAY := 7
 const GEAR_AMMO_BOXES := 4
+## Вылазки в старую линию идут под своим номером дня (свои правила режиссёра, без сюжетных событий).
+const DESCENT_DAY := 8
 ## Пул поручений: вид → с какой смены. Сколько поручений из пула добавить в смену (сверх сюжетных).
 const POOL := {"filters": 1, "webs": 1, "cable": 2, "fuse": 2, "valves": 2, "cartpush": 2, "photo": 2, "relay": 3}
 const POOL_PER_DAY := [0, 0, 4, 4, 3, 3]
@@ -28,7 +30,8 @@ var ended := false
 var notes_read := {}  # прочитанные записки (id → true), копятся за всю игру
 var pending_day := 1  # с какой смены начать, когда загрузится сцена игры
 var valve_order: Array = [1, 2, 3]  # в каком порядке перекрывать задвижки сегодня
-var gear := {}  # что собрано в шестую смену и взято в седьмую: pistol, ammo, batteries
+var gear := {}
+var descent := 0  # номер вылазки в старую линию; 0 — сюжетные смены  # что собрано в шестую смену и взято в седьмую: pistol, ammo, batteries
 const NOTES_TOTAL := 9
 var _said := {}
 
@@ -88,6 +91,16 @@ func build_tasks(d: int) -> void:
 	for i in mini(int(POOL_PER_DAY[d]), pool.size()):
 		_pool_task(pool[i], d)
 	_task("return", "Доложить диспетчеру по рации", 1)
+	tasks_changed.emit()
+
+
+## Вылазка: спуститься через старый люк, найти платформу, вернуться и отметиться.
+func build_descent_tasks() -> void:
+	tasks.clear()
+	_said.clear()
+	_task("descend", "Спуститься в старую линию (ржавый люк на платформе)", 1)
+	_task("platform", "Найти старую платформу «Тихая»", 1)
+	_task("return", "Подняться и отметиться в журнале смен", 1)
 	tasks_changed.emit()
 
 

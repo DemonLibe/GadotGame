@@ -84,7 +84,10 @@ func _physics_process(delta: float) -> void:
 	var to := player.global_position - global_position
 	to.y = 0.0
 	var dist := to.length()
-	var target := player.global_position if state == "chase" else _goal
+	var final := player.global_position if state == "chase" else _goal
+	var target := final
+	if level:
+		target = level.next_waypoint(global_position, final)  # в старой линии — по коридорам, а не сквозь стену
 	var s := speed
 	match state:
 		"wander":
@@ -99,9 +102,11 @@ func _physics_process(delta: float) -> void:
 	var v := Vector3.ZERO
 	var go := target - global_position
 	go.y = 0.0
+	var left := final - global_position  # дошёл ли — по самой цели, а не по точке пути
+	left.y = 0.0
 	if _wait > 0.0:
 		_wait -= delta
-	elif go.length() > (ATTACK_RANGE * 0.8 if state == "chase" else 0.6):
+	elif left.length() > (ATTACK_RANGE * 0.8 if state == "chase" else 0.6) and go.length() > 0.05:
 		v = go.normalized() * s
 		look_at(global_position + go, Vector3.UP)
 	else:

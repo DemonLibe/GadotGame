@@ -869,7 +869,8 @@ func _on_message(text: String, color: Color, duration: float) -> void:
 
 
 func _refresh_tasks() -> void:
-	var lines: PackedStringArray = ["[b]СМЕНА № %d — СПИСОК ДЕЛ[/b]" % Game.day, ""]
+	var head := "ВЫЛАЗКА № %d" % Game.descent if Game.descent > 0 else "СМЕНА № %d" % Game.day
+	var lines: PackedStringArray = ["[b]%s — СПИСОК ДЕЛ[/b]" % head, ""]
 	for t in Game.tasks:
 		var text := str(t["text"])
 		if int(t["target"]) > 1:

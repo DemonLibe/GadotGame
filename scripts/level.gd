@@ -54,6 +54,7 @@ var grate: Node3D
 var _end_wall: MeshInstance3D   # глухая стена тупика
 var _breach: Node3D             # пролом на её месте (седьмая смена)
 var _main_seg := 0              # индекс основного тоннеля в _segments
+var lower: LowerLine            # старая линия под станцией (собирается для вылазок)
 var pickets: Array[Label3D] = []  # таблички «ПК n» (номер может «поменяться», пока стоишь спиной)
 var rooms: Array[Dictionary] = []  # {center, basis, door}: basis +Z смотрит из комнаты к двери
 var _segments: Array[Dictionary] = []  # оси проходов {a, b, dir} в XZ — для событий
@@ -99,6 +100,8 @@ func build() -> void:
 	_build_grate()
 	_build_nest_decor()
 	_build_breach()
+	lower = LowerLine.new()
+	add_child(lower)
 
 
 func _process(delta: float) -> void:
@@ -171,6 +174,8 @@ func is_lit_near(pos: Vector3) -> bool:
 
 ## Точка внутри станции или тоннелей (для появления «Другого»).
 func is_walkable(p: Vector3) -> bool:
+	if lower.contains(p):
+		return lower.is_walkable(p)
 	if p.y > FLOOR_Y + 5.0:
 		return false
 	if Rect2(-3.0, -50.0, 6.0, 20.0).has_point(Vector2(p.x, p.z)):
@@ -181,6 +186,8 @@ func is_walkable(p: Vector3) -> bool:
 ## Следующая точка пути из from в to: если они в разных проходах — сначала к развилке.
 ## Проходы: 0 — станция и основной тоннель, 1..3 — штольни.
 func next_waypoint(from: Vector3, to: Vector3) -> Vector3:
+	if lower.contains(from) or lower.contains(to):
+		return lower.next_waypoint(from, to) if lower.contains(from) and lower.contains(to) else to
 	var a := _segment_index(from)
 	var b := _segment_index(to)
 	if a == b:
@@ -208,6 +215,8 @@ func _segment_index(p: Vector3) -> int:
 
 ## Направление прохода, в котором стоит точка (основной тоннель или штольня).
 func axis_at(p: Vector3) -> Vector3:
+	if lower.contains(p):
+		return lower.axis_at(p)
 	return _nearest_segment(p).get("dir", Vector3.FORWARD)
 
 

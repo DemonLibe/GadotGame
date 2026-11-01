@@ -63,6 +63,7 @@ func start_day(d: int) -> void:
 		5: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1, "crawler": 3, "interfere": 1,
 			"masha": 1, "double": 1, "silence": 1, "picket": 1, "name": 1}
 		6: _budget = {}  # тихая смена: ничего
+		Game.DESCENT_DAY: _budget = {"footsteps": 1, "whisper": 2, "silence": 1}  # старая линия: только звуки
 		_: _budget = {"behind": 1, "whisper": 2, "crawler": 2, "swarm": 6, "double": 2, "silence": 2}
 
 
@@ -148,7 +149,7 @@ func _update_fear(delta: float) -> void:
 		Game.add_fear(-delta * (6.0 if pos.z > Level.TUN_Z0 or pos.y > Level.ROOM_Y - 1.0 else 2.5))
 	else:
 		# Шестая смена — тихая, страх копится как в первую.
-		var d := 1 if Game.day == Game.LAST_DAY - 1 else Game.day
+		var d := 1 if Game.day == Game.LAST_DAY - 1 else (4 if Game.day == Game.DESCENT_DAY else Game.day)
 		Game.add_fear(delta * (3.5 + d * 1.2))
 		Game.say_once("dark", "Темно... Слишком темно. Нужен свет.")
 	if stalker.visible and stalker.global_position.distance_to(pos) < 12.0:
