@@ -8,7 +8,7 @@ config_version=5
 
 config/name="Hope Light"
 config/description="Хоррор про обходчика узкого тоннеля метро."
-config/version="1.6.2"
+config/version="2.0.0"
 run/main_scene="res://scenes/splash.tscn"
 config/features=PackedStringArray("4.3", "GL Compatibility")
 boot_splash/bg_color=Color(0, 0, 0, 1)
@@ -24,6 +24,7 @@ general/text_to_speech=true
 Settings="*res://scripts/settings.gd"
 Game="*res://scripts/game.gd"
 Achievements="*res://scripts/achievements.gd"
+Meta="*res://scripts/meta.gd"
 
 [display]
 

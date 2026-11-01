@@ -88,6 +88,7 @@ var canisters := 0
 var bolts := 0                # болты в кармане — бросить (G), чтобы отвлечь
 var fuses := 0                # запасной предохранитель для щитка
 var relays := 0               # ретрансляторы рации, которые надо развесить
+var loot := 0                 # находки из старой линии при себе (₽): платят, когда вынесешь на станцию
 var cranking := false         # крутит ручку динамо
 var cranked_today := 0.0      # сколько процентов накрутил за смену
 var _crank_sound: AudioStreamPlayer
@@ -321,6 +322,19 @@ func _sound(stream: AudioStream, volume_db: float) -> AudioStreamPlayer:
 
 # --- Инвентарь ---------------------------------------------------------------
 
+## Карманы (разгрузка из снабжения добавляет места).
+func max_batteries() -> int:
+	return MAX_BATTERIES + Meta.level("vest")
+
+
+func max_filters() -> int:
+	return MAX_FILTERS + Meta.level("vest")
+
+
+func max_bolts() -> int:
+	return MAX_BOLTS + 2 * Meta.level("vest")
+
+
 func held() -> String:
 	return ITEMS[selected] if selected >= 0 else ""
 
@@ -439,6 +453,7 @@ func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
 	bolts = START_BOLTS
 	fuses = 0
 	relays = 0
+	set_loot(0)
 	cranking = false
 	cranked_today = 0.0
 	_crank_sound.stop()
@@ -450,6 +465,16 @@ func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
 	_burning = false
 	_flame.emitting = false
 	_show_selected()
+
+
+func add_loot(amount: int) -> void:
+	set_loot(loot + amount)
+
+
+func set_loot(amount: int) -> void:
+	loot = amount
+	if hud:
+		hud.set_loot(loot)
 
 
 # --- Ввод --------------------------------------------------------------------
@@ -535,6 +560,8 @@ func _physics_process(delta: float) -> void:
 			var noise := NOISE_CROUCH if crouching else (NOISE_RUN if running else NOISE_WALK)
 			if speed_mult < 0.9:
 				noise *= 2.0  # по воде хлюпает
+			if Meta.level("boots") > 0:
+				noise *= 0.5  # тихие ботинки
 			Game.make_noise(global_position, noise)
 	else:
 		_bob_amp = move_toward(_bob_amp, 0.0, delta * 4.0)
@@ -703,7 +730,8 @@ func _update_crank(delta: float) -> void:
 	if not cranking:
 		return
 	var cell := Achievements.has_find("cell")
-	var add := (CRANK_RATE_CELL if cell else CRANK_RATE) * delta
+	var dynamo := Meta.level("dynamo")  # шестерня из снабжения: быстрее и тише
+	var add := (CRANK_RATE_CELL if cell else CRANK_RATE) * (1.0 + 0.2 * dynamo) * delta
 	battery = minf(100.0, battery + add)
 	cranked_today += add
 	_empty_warned = false
@@ -712,7 +740,8 @@ func _update_crank(delta: float) -> void:
 	_crank_noise -= delta
 	if _crank_noise <= 0.0:
 		_crank_noise = 0.5
-		Game.make_noise(global_position, NOISE_CRANK_HIDDEN if hiding else (NOISE_CRANK_CELL if cell else NOISE_CRANK))
+		var noise := NOISE_CRANK_HIDDEN if hiding else (NOISE_CRANK_CELL if cell else NOISE_CRANK)
+		Game.make_noise(global_position, noise * (1.0 - 0.25 * dynamo))
 
 
 func _update_battery(delta: float) -> void:
@@ -864,8 +893,9 @@ func has_light() -> bool:
 ## Находки для фонаря: рефлектор — луч длиннее и шире, аккумулятор — садится медленнее.
 func apply_upgrades() -> void:
 	var lens := Achievements.has_find("lens")
-	flashlight.spot_range = 34.0 if lens else 26.0
-	flashlight.spot_angle = 29.0 if lens else 24.0
+	var lamp := Meta.level("lamp")  # налобник из снабжения
+	flashlight.spot_range = (34.0 if lens else 26.0) + 4.0 * lamp
+	flashlight.spot_angle = (29.0 if lens else 24.0) + 2.0 * lamp
 	upgrade_drain = 0.7 if Achievements.has_find("cell") else 1.0
 
 

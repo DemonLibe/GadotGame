@@ -13,9 +13,11 @@ const FINAL_DAY := 5
 ## Кто поднялся в пятую смену, не докладывая, спускается ещё дважды: шестая — собраться, седьмая — выбраться.
 const LAST_DAY := 7
 const GEAR_AMMO_BOXES := 4
+## Смены, в которые открыт ржавый люк в старую линию под станцией (в остальные он завален).
+const OLD_LINE_DAYS := [3, 4, 5, 6]
 ## Пул поручений: вид → с какой смены. Сколько поручений из пула добавить в смену (сверх сюжетных).
 const POOL := {"filters": 1, "webs": 1, "cable": 2, "fuse": 2, "valves": 2, "cartpush": 2, "photo": 2, "relay": 3}
-const POOL_PER_DAY := [0, 0, 4, 4, 3, 3]
+const POOL_PER_DAY := [0, 0, 4, 3, 2, 3]
 const THOUGHT := Color(0.93, 0.91, 0.84)
 const WHISPER := Color(0.62, 0.64, 0.75)
 const SYSTEM := Color(0.6, 0.86, 0.6)
@@ -47,7 +49,7 @@ func build_tasks(d: int) -> void:
 		6:
 			# Тихая смена: собрать всё, что понадобится завтра.
 			_task("gear:pistol", "Забрать пистолет из оружейного ящика", 1)
-			_task("gear:ammo", "Собрать коробки с патронами в тоннелях", GEAR_AMMO_BOXES)
+			_task("gear:ammo", "Собрать коробки с патронами (две — в старой линии)", GEAR_AMMO_BOXES)
 			_task("gear:battery", "Запасти батарейки для фонаря", Player.MAX_BATTERIES)
 			_task("return", "Подняться и отметиться в журнале смен", 1)
 			tasks_changed.emit()
@@ -71,10 +73,12 @@ func build_tasks(d: int) -> void:
 			_task("inspect:end", "Осмотреть завал у ограждения", 1)
 		3:
 			_task("inspect:cart", "Проверить вагонетку", 1)
+			_task("descend", "Спуститься в старую линию (ржавый люк на платформе)", 1)
+			_task("platform", "Найти старую платформу «Тихая»", 1)
 			taken = ["cartpush"]  # вагонетку сегодня укатил кто-то другой
 		4:
 			_task("water", "Откачать воду в третьей штольне", 1)
-			_task("token", "Найти жетон Седьмого", 1)
+			_task("token", "Найти жетон Седьмого в старой линии", 1)
 			_pool_task("fuse", d)  # «во второй штольне выбивает щиток» — так сказал диспетчер
 			taken = ["fuse"]
 		_:
@@ -142,6 +146,8 @@ func report(kind: String, amount := 1) -> void:
 				t["done"] = true
 				if kind != "return":
 					say("Выполнено: " + str(t["text"]), SYSTEM, 3.0)
+				if kind != "return" and kind != "radio":
+					Meta.earn(Meta.PAY_TASK, "поручение")
 			changed = true
 	if changed:
 		tasks_changed.emit()

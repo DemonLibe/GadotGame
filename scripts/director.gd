@@ -53,6 +53,9 @@ func start_day(d: int) -> void:
 	_echo_left = 0
 	_cooldown = randf_range(20.0, 35.0)
 	_hunt_t = _next_hunt(d) * 0.6
+	_mimic = Vector2i(-1, -1)
+	_mimic_left = 2 if d >= 5 else 1
+	_lower_t = 25.0
 	match d:
 		1: _budget = {}
 		2: _budget = {"footsteps": 1, "sighting": 1, "radio": 1}
@@ -86,6 +89,9 @@ func _process(delta: float) -> void:
 	if Game.fear >= Achievements.fear_max():
 		main.panic()
 		return
+	if level.lower.contains(player.global_position):
+		_lower_events(delta)
+		return  # в старой линии — свои звуки, охоты сюда не доходят
 	if player.global_position.z > Level.TUN_Z0 - 4.0 or player.global_position.y > Level.FLOOR_Y + 5.0:
 		return  # события только в тоннелях
 	if HUNT_EVERY.has(Game.day) and not stalker.visible and not _hunt_pending:
@@ -111,6 +117,109 @@ func _process(delta: float) -> void:
 		_cooldown = randf_range(35.0, 60.0) - Game.day * 4.0
 	else:
 		_cooldown = 4.0
+
+
+## Старая линия: шаги за спиной, шёпот и далёкий поезд, которого здесь быть не может.
+var _lower_t := 25.0
+## Подражатель: зовёт знакомым голосом из тупика. Пошёл на голос — там ждут.
+const MIMIC_FROM := 4          # с какой смены
+const MIMIC_CALLS := 4         # сколько раз позовёт, прежде чем замолчать
+const MIMIC_VOICES := [["m_call", "…Папа?.. Папа, я здесь…", MASHA], ["b1_0", "«Обходчик, приём. Говорит диспетчер».", Dispatcher.COLOR]]
+var _mimic := Vector2i(-1, -1)  # клетка-тупик, откуда зовёт
+var _mimic_calls := 0
+var _mimic_t := 0.0
+var _mimic_voice: Array = []
+var _mimic_left := 0           # сколько ещё раз за смену
+
+
+func _lower_events(delta: float) -> void:
+	if _mimic.x >= 0:
+		_update_mimic(delta)
+		return
+	_lower_t -= delta
+	if _lower_t > 0.0:
+		return
+	_lower_t = randf_range(30.0, 55.0)
+	if Game.day >= MIMIC_FROM and _mimic_left > 0 and randf() < 0.6 and _start_mimic():
+		_mimic_left -= 1
+		return
+	match randi() % 3:
+		0:
+			_whisper()
+		1:
+			_echo_step()
+		_:
+			Game.play_ui(Sfx.rumble(), -16.0)
+			Game.say_once("lower_train", "...Поезд? Здесь? Рельсы сняли сто лет назад.", Game.WHISPER, 3.5)
+
+
+## Выбрать тупик в 2–max_steps клетках пути от обходчика и начать звать оттуда.
+func _start_mimic(max_steps := 8) -> bool:
+	var lower := level.lower
+	var here := lower.cell_of(player.global_position)
+	if not lower.cells.has(here):
+		return false
+	var cand: Array[Vector2i] = []
+	for c in lower.cells:
+		if c == LowerLine.ENTRY or c == lower.goal or c == here or (lower.cells[c]["links"] as Array).size() != 1:
+			continue
+		var steps := lower._path(here, c).size() - 1
+		if steps >= 2 and steps <= max_steps:
+			cand.append(c)
+	if cand.is_empty():
+		return false
+	_mimic = cand.pick_random()
+	_mimic_calls = 0
+	_mimic_t = 0.0
+	_mimic_voice = MIMIC_VOICES.pick_random()
+	return true
+
+
+func _update_mimic(delta: float) -> void:
+	var lower := level.lower
+	if not lower.cells.has(_mimic):
+		_mimic = Vector2i(-1, -1)
+		return
+	var c := lower.center(_mimic)
+	if lower.cell_of(player.global_position) == _mimic:
+		_mimic_ambush(c)
+		return
+	_mimic_t -= delta
+	if _mimic_t > 0.0:
+		return
+	if _mimic_calls >= MIMIC_CALLS:
+		_mimic = Vector2i(-1, -1)
+		Game.say_once("mimic_quiet", "Замолчало. Будто поняло, что я не приду.", Game.THOUGHT, 3.5)
+		return
+	_mimic_t = randf_range(7.0, 10.0)
+	_mimic_calls += 1
+	var path := "res://voice/%s.ogg" % _mimic_voice[0]
+	var a := AudioStreamPlayer3D.new()
+	a.stream = load(path) if ResourceLoader.exists(path) else Sfx.whisper()
+	a.unit_size = 10.0
+	a.volume_db = 4.0
+	main.add_child(a)
+	a.global_position = c + Vector3(0, 1.4, 0)
+	a.finished.connect(a.queue_free)
+	a.play()
+	Game.say(_mimic_voice[1], _mimic_voice[2], 3.5)
+	if _mimic_calls == 2:
+		Game.say_once("mimic_think", "Рация здесь не берёт. И Маша — дома. Кто тогда зовёт?", Game.THOUGHT, 4.0)
+
+
+## Пришёл на голос: в тупике пусто — а потом из-под свода падает то, что звало.
+func _mimic_ambush(c: Vector3) -> void:
+	var lower := level.lower
+	var link: Vector2i = (lower.cells[_mimic]["links"] as Array)[0]
+	var back := LowerLine.dir_world(link - _mimic)
+	_mimic = Vector2i(-1, -1)
+	Game.play_ui(Sfx.sting(), 0.0)
+	Game.add_fear(20.0)
+	var cr: Crawler = main.spawn_crawler(c - back * 1.0)
+	cr.state = "chase"
+	cr._goal = player.global_position
+	Game.play_at(Sfx.hiss(), c + Vector3(0, 2.5, 0), 4.0)
+	Game.say("Пусто... Голос был отсюда. «Не иди на голос» — вот о чём писал Седьмой.", Game.THOUGHT, 4.0)
 
 
 ## Тревожная петля: тихо, когда пауки только побежали, громче, чем ближе он, во весь голос — когда гонится.
@@ -322,7 +431,7 @@ func _hunt() -> bool:
 
 func _hunt_arrive(pos: Vector3) -> void:
 	_hunt_pending = false
-	if main.busy or main.collapsing or stalker.visible:
+	if main.busy or main.collapsing or stalker.visible or level.lower.contains(player.global_position):
 		return
 	stalker.hunt(pos, Game.day)
 	Game.play_at(Sfx.whisper(), pos + Vector3(0, 1.7, 0), 4.0)
@@ -585,7 +694,7 @@ func _on_step() -> void:
 
 func _echo_step() -> void:
 	var pos := player.global_position - player.forward_flat() * 7.0
-	pos.y = Level.FLOOR_Y + 0.1
+	pos.y = (LowerLine.Y if level.lower.contains(player.global_position) else Level.FLOOR_Y) + 0.1
 	Game.play_at(Sfx.step(), pos, 0.0)
 
 

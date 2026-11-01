@@ -3,8 +3,9 @@ extends StaticBody3D
 ## Предмет, который подбирают одним нажатием: коробка патронов, оружейный ящик с пистолетом,
 ## канистра с топливом или жетон пропавшего обходчика.
 
-var kind := "ammo"  # ammo / pistol / fuel / token / bolts / fuse / relays
+var kind := "ammo"  # ammo / pistol / fuel / token / bolts / fuse / relays / relic / bag
 var amount := 4
+var title := ""  # находка из старой линии: что это
 
 
 func _ready() -> void:
@@ -45,6 +46,15 @@ func _ready() -> void:
 			for k in 3:
 				Geo.cylinder(self, Vector3(-0.12 + k * 0.12, 0.33, 0.0), 0.006, 0.2, ProcTex.flat(Color(0.05, 0.05, 0.05), 0.5))
 			Geo.collider_box(self, Vector3(0.55, 0.35, 0.4), Vector3(0, 0.17, 0))
+		"relic":
+			_relic_model()
+		"bag":
+			# Свой же вещмешок — там, где упал в прошлый раз.
+			var cloth := ProcTex.flat(Color(0.24, 0.24, 0.17), 0.95)
+			Geo.box(self, Vector3(0, 0.14, 0), Vector3(0.4, 0.28, 0.26), cloth, false)
+			Geo.box(self, Vector3(0, 0.3, 0), Vector3(0.3, 0.06, 0.2), cloth, false)
+			Geo.box(self, Vector3(0, 0.2, 0.135), Vector3(0.22, 0.12, 0.02), ProcTex.flat(Color(0.2, 0.19, 0.13), 0.95), false)
+			Geo.collider_box(self, Vector3(0.45, 0.35, 0.3), Vector3(0, 0.17, 0))
 		"token":
 			var brass := ProcTex.flat(Color(0.7, 0.55, 0.25), 0.35, 0.9)
 			Geo.cylinder(self, Vector3(0, 0.005, 0), 0.035, 0.006, brass)
@@ -57,8 +67,38 @@ func _ready() -> void:
 			Geo.collider_box(self, Vector3(0.3, 0.2, 0.3), Vector3(0, 0.1, 0))
 
 
+## Находки старой линии: монета, подстаканник, фонарь, табличка — по названию.
+func _relic_model() -> void:
+	var brass := ProcTex.flat(Color(0.62, 0.48, 0.22), 0.35, 0.9)
+	var silver := ProcTex.flat(Color(0.7, 0.7, 0.72), 0.3, 0.9)
+	var glow := ProcTex.emissive(Color(1.0, 0.8, 0.4), 0.6)
+	if title.contains("монет"):
+		for k in 3:
+			Geo.cylinder(self, Vector3(randf_range(-0.05, 0.05), 0.004 + k * 0.007, randf_range(-0.05, 0.05)), 0.03, 0.006, silver)
+	elif title.contains("подстаканник"):
+		Geo.cylinder(self, Vector3(0, 0.05, 0), 0.045, 0.1, silver)
+		Geo.box(self, Vector3(0.055, 0.06, 0), Vector3(0.02, 0.06, 0.012), silver, false)
+	elif title.contains("фонарь"):
+		Geo.cylinder(self, Vector3(0, 0.12, 0), 0.06, 0.18, brass)
+		Geo.cylinder(self, Vector3(0, 0.12, 0), 0.045, 0.12, ProcTex.flat(Color(0.5, 0.45, 0.3), 0.2, 0.0))
+		Geo.box(self, Vector3(0, 0.25, 0), Vector3(0.02, 0.06, 0.02), brass, false)
+	elif title.contains("табличк"):
+		Geo.box(self, Vector3(0, 0.01, 0), Vector3(0.3, 0.012, 0.12), ProcTex.flat(Color(0.12, 0.2, 0.4), 0.6, 0.3), false)
+		var plate := Geo.label(self, Vector3(0, 0.018, 0), "ТИХАЯ", 0, 24, Color(0.9, 0.88, 0.8), true, 0.002)
+		plate.rotation.x = -PI / 2
+	else:
+		# Часы на цепочке.
+		Geo.cylinder(self, Vector3(0, 0.008, 0), 0.035, 0.014, brass)
+		Geo.cylinder(self, Vector3(0, 0.016, 0), 0.03, 0.002, glow)
+	Geo.collider_box(self, Vector3(0.3, 0.25, 0.3), Vector3(0, 0.1, 0))
+
+
 func get_prompt(_player) -> String:
 	match kind:
+		"relic":
+			return "E — взять: %s" % title
+		"bag":
+			return "E — забрать свой вещмешок"
 		"pistol":
 			return "E — взять пистолет"
 		"fuel":
@@ -82,7 +122,7 @@ func interact(player) -> void:
 		queue_free()
 		return
 	if kind == "bolts":
-		var took := mini(amount, Player.MAX_BOLTS - player.bolts)
+		var took := mini(amount, player.max_bolts() - player.bolts)
 		if took <= 0:
 			Game.say("Карман и так полон болтов.", Game.THOUGHT, 2.0)
 			return
@@ -103,6 +143,15 @@ func interact(player) -> void:
 		player.relays += amount
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
 		Game.say("Три ретранслятора. Кронштейны для них — по тоннелю, на карте отмечены.", Game.THOUGHT, 4.0)
+		queue_free()
+		return
+	if kind == "relic" or kind == "bag":
+		player.add_loot(amount)
+		Game.play_at(Sfx.pickup(), global_position, -6.0)
+		if kind == "bag":
+			Game.say("Мой вещмешок. Всё на месте — кроме меня в прошлый раз.", Game.THOUGHT, 3.5)
+		else:
+			Game.say_once("relic_pick", title.left(1).to_upper() + title.substr(1) + ". Наверху за такое заплатят — если вынесу.", Game.THOUGHT, 3.5)
 		queue_free()
 		return
 	if kind == "token":

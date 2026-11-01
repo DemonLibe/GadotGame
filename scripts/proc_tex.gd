@@ -244,6 +244,29 @@ static func tiles() -> StandardMaterial3D:
 	return _textured("tiles", img, Color(0.85, 0.83, 0.75), 0.35, 0.0, 2.5, 1.2)
 
 
+## Старая кирпичная кладка нижней линии: тёмный кирпич, чёрный раствор, потёки.
+static func bricks() -> StandardMaterial3D:
+	if _cache.has("bricks"):
+		return _cache["bricks"]
+	var s := 256
+	var img := _noise(s, 0.08, 3)
+	img.adjust_bcs(1.3, 0.35, 1.0)
+	var bw := 64
+	var bh := 24
+	var mortar := Color(0.08, 0.07, 0.06)
+	for row in range(0, s / bh + 1):
+		var off := (row % 2) * (bw / 2)
+		for col in range(-1, s / bw + 1):
+			var x := col * bw + off
+			var shade := Image.create(bw, bh, false, Image.FORMAT_RGBA8)
+			shade.fill(Color(0.0, 0.0, 0.0, randf_range(0.0, 0.3)))
+			img.blend_rect(shade, Rect2i(0, 0, bw, bh), Vector2i(x, row * bh))
+			img.fill_rect(Rect2i(x, row * bh, 3, bh), mortar)
+		img.fill_rect(Rect2i(0, row * bh, s, 3), mortar)
+	_streaks(img, 10, Color(0.12, 0.1, 0.08), 160, true)
+	return _textured("bricks", img, Color(0.55, 0.32, 0.24), 0.9, 0.0, 3.0, 1.6)
+
+
 ## Гранитные плиты пола станции.
 static func granite() -> StandardMaterial3D:
 	if _cache.has("granite"):

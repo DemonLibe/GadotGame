@@ -53,8 +53,8 @@ func get_prompt(_player) -> String:
 
 
 func interact(player) -> void:
-	var took_f := mini(filters, Player.MAX_FILTERS - player.filters)
-	var took_b := mini(batteries, Player.MAX_BATTERIES - player.batteries)
+	var took_f := mini(filters, player.max_filters() - player.filters)
+	var took_b := mini(batteries, player.max_batteries() - player.batteries)
 	if took_f + took_b <= 0:
 		if filters + batteries > 0:
 			Game.say("Больше не унесу.")
