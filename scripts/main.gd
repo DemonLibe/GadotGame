@@ -38,7 +38,7 @@ const WEB_SPOTS := [
 const WEBS_PER_DAY := [0, 2, 4, 5, 7, 9, 3, 6]
 # Шкафы-укрытия: [tunnel, side, along]. tunnel -2 — станция.
 const HIDEOUT_SPOTS := [
-	[-2, 1, -34.0], [-1, 1, -71.0], [-1, 1, -110.0], [-1, -1, -188.0], [-1, -1, -236.0],
+	[-2, 1, -34.0], [-1, 1, -71.0], [-1, -1, -110.0], [-1, -1, -188.0], [-1, -1, -236.0],
 	[-1, 1, -305.0], [0, -1, 31.0], [1, 1, 45.0], [2, -1, 31.0],
 ]
 ## Генератор: сколько топлива в баке в начале смены и сколько канистр спрятано в тоннелях.
@@ -102,7 +102,6 @@ const LOWER_CHALK := {
 	5: ["ВОСЬМОЙ, ТЫ ОПОЗДАЛ", "ПОЕЗД ХОДИТ ПО ЧЕТВЕРГАМ"],
 	6: ["ТЫ УЖЕ ВЫБРАЛСЯ?", "ОН ЖДЁТ НАВЕРХУ"],
 }
-const OLD_HATCH := Vector3(-1.0, Level.FLOOR_Y, -42.5)  # ржавый люк на платформе станции
 ## Коробки с болтами по тоннелю — каждую смену.
 const BOLT_BOXES := 4
 const METRO_CAR_Z := -390.0
@@ -241,6 +240,7 @@ var _photo_reveal := -1  # на каком снимке проявится «о�
 var _debug_t := 0.0
 var _lower_seed := 0          # старая линия в эту смену (после провала — та же)
 var _lost := {}               # где остался вещмешок с находками: {pos, amount}
+var _in_lower := false        # обходчик в старой линии (для «вошёл / вынес находки»)
 
 
 func _ready() -> void:
@@ -273,6 +273,7 @@ func _ready() -> void:
 	add_child(dispatcher)
 	player.dispatcher = dispatcher
 	dispatcher.player = player
+	dispatcher.lower = level.lower
 	radio.dispatcher = dispatcher
 	dispatcher.shift_closed.connect(end_day)
 	dispatcher.collapse_reported.connect(func(): _reported = true)
@@ -662,10 +663,12 @@ func end_day() -> void:
 
 # --- Старая линия -------------------------------------------------------------
 
-## С третьей по шестую смену под ржавым люком на платформе — старая линия. Каждую смену она другая
-## (после провала — та же, и там, где упал, лежит вещмешок с находками).
+## С третьей по шестую смену пролом в правой стене тоннеля у ПК 2 открыт — за ним старая линия.
+## Каждую смену она другая (после провала — та же, и там, где упал, лежит вещмешок с находками).
 func _setup_lower(d: int, retry: bool) -> void:
 	var lower := level.lower
+	_in_lower = false
+	level.set_old_breach(LOWER_CELLS.has(d))
 	if not LOWER_CELLS.has(d):
 		lower.clear()
 		_lost = {}
@@ -674,17 +677,6 @@ func _setup_lower(d: int, retry: bool) -> void:
 		_lower_seed = randi()
 		_lost = {}
 	lower.generate(_lower_seed, LOWER_CELLS[d])
-	var hatch_down := OldStairs.new()
-	hatch_down.main = self
-	hatch_down.down = true
-	hatch_down.position = OLD_HATCH
-	add_child(hatch_down)
-	var up := OldStairs.new()
-	up.main = self
-	up.down = false
-	up.position = lower.center(LowerLine.ENTRY) + Vector3(0, 0, LowerLine.W / 2.0 - 0.05)
-	up.rotation.y = PI
-	add_child(up)
 	# Сюжет: на четвёртую смену в самом низу — жетон Седьмого, на шестую — патроны.
 	if d == 4 and Game.has_open_task("token"):
 		_lower_pickup("token", 1, lower.center(lower.goal) + Vector3(0.6, 0.05, 0.4))
@@ -753,48 +745,27 @@ func _lower_pickup(kind: String, amount: int, pos: Vector3, title := "") -> Pick
 	return p
 
 
-## Спуститься в старую линию или подняться на станцию — через затемнение.
-func use_old_stairs(down: bool) -> void:
-	if busy:
-		return
-	busy = true
-	player.input_locked = true
-	Game.play_ui(Sfx.creak(), -4.0)
-	await hud.fade_to(1.0, 0.6).finished
-	for i in 3:
-		Game.play_ui(Sfx.rung(), -6.0)
-		await get_tree().create_timer(0.35).timeout
-	# Лестница обрывает охоту: на другом ярусе он тебя потерял.
-	stalker.hide_now()
-	if down:
-		player.global_position = level.lower.center(LowerLine.ENTRY) + Vector3(0, 0.1, 0.4)
-		player.rotation.y = 0.0
-		Game.report("descend")
-	else:
-		player.global_position = OLD_HATCH + Vector3(0.8, 0.1, 0.0)
-		player.rotation.y = 0.0
-	player.velocity = Vector3.ZERO
-	await hud.fade_to(0.0, 0.8).finished
-	player.input_locked = false
-	busy = false
-	if down:
-		Game.say_once("old_line", "Кирпич. Свод. Дореволюционная кладка. Рация здесь молчит. Тихо... слишком.", Game.THOUGHT, 5.0)
-	elif player.loot > 0:
-		Meta.earn(player.loot, "находки из старой линии")
-		player.set_loot(0)
-		_lost = {}
-
-
 ## Каждый кадр, пока есть старая линия: карта открывается по мере обхода, платформа — цель.
 func _update_lower() -> void:
 	var lower := level.lower
 	var p := player.global_position
-	if not lower.contains(p):
+	var inside := lower.contains(p)
+	if inside != _in_lower and not busy:
+		_in_lower = inside
+		if inside:
+			Game.report("descend")
+			Game.say_once("old_line", "Кирпич. Свод. Дореволюционная кладка — старше тоннеля. Рация здесь молчит. Тихо... слишком.", Game.THOUGHT, 5.0)
+		elif player.loot > 0:
+			# Вынес находки в тоннель — их засчитывают.
+			Meta.earn(player.loot, "находки из старой линии")
+			player.set_loot(0)
+			_lost = {}
+	if not inside:
 		return
 	lower.visit(p)
 	if lower.cell_of(p) == lower.goal and Game.has_open_task("platform"):
 		Game.report("platform")
-		Game.say("Платформа. «Ст. Тихая, 1913». Сюда сто лет не приходил ни один поезд. Теперь — назад, наверх.", Game.THOUGHT, 5.0)
+		Game.say("Платформа. «Ст. Тихая, 1913». Сюда сто лет не приходил ни один поезд. Теперь — назад, к пролому.", Game.THOUGHT, 5.0)
 
 
 ## Смена провалена (сорвался, страх взял верх) — начинается заново. Игра всегда сложная.
@@ -1768,9 +1739,18 @@ func _smoke_test() -> void:
 	var lower := level.lower
 	var seed_before := _lower_seed
 	var low_ok := lower.cells.size() >= LOWER_CELLS[3]
-	use_old_stairs(true)
-	await get_tree().create_timer(3.0).timeout
-	low_ok = low_ok and lower.contains(player.global_position) and not Game.has_open_task("descend")
+	# Пройти пешком: из тоннеля перед проломом — прямо в старую линию.
+	player.global_position = LowerLine.MOUTH + Vector3(-0.5, 0.1, 0)
+	player.rotation.y = -PI / 2  # лицом к +X, в пролом
+	await get_tree().physics_frame
+	Input.action_press("move_forward")
+	await get_tree().create_timer(5.0).timeout
+	Input.action_release("move_forward")
+	await get_tree().create_timer(0.3).timeout
+	var walked := lower.contains(player.global_position)
+	if not walked:
+		print("SMOKE FAIL: через пролом не пройти — застрял в ", player.global_position)
+	low_ok = low_ok and walked and not Game.has_open_task("descend")
 	director._lower_t = 0.0
 	player.hold("map")
 	await get_tree().create_timer(1.0).timeout
@@ -1813,9 +1793,11 @@ func _smoke_test() -> void:
 	low_ok = low_ok and _lower_seed == seed_before and player.loot == 0 and bag != null and bag.amount == carried
 	if bag:
 		bag.interact(player)
-	var money_low := Meta.money
-	use_old_stairs(false)
-	await get_tree().create_timer(3.0).timeout
+	player.global_position = lower.center(LowerLine.ENTRY) + Vector3(0, 0.1, 0)
+	await get_tree().create_timer(0.5).timeout
+	var money_low := Meta.money  # уже после «вошёл в старую линию» (за поручение тоже платят)
+	player.global_position = LowerLine.MOUTH + Vector3(0, 0.1, 0)
+	await get_tree().create_timer(0.5).timeout
 	low_ok = low_ok and Meta.money == money_low + carried and player.loot == 0 and not busy
 	start_day(4)
 	await get_tree().create_timer(5.5).timeout
@@ -1823,8 +1805,8 @@ func _smoke_test() -> void:
 	# Пятая смена внизу: обвал не отрезает линию, «Другой» спускается, шкаф спасает и внизу.
 	start_day(5)
 	await get_tree().create_timer(5.5).timeout
-	use_old_stairs(true)
-	await get_tree().create_timer(3.0).timeout
+	player.global_position = lower.center(LowerLine.ENTRY) + Vector3(0, 0.1, 0)
+	await get_tree().create_timer(1.0).timeout
 	var deep_ok := false
 	var lower_cabs: Array = get_tree().get_nodes_in_group("hideouts").filter(func(h): return lower.contains(h.global_position))
 	var links_before := 0

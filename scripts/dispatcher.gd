@@ -29,6 +29,7 @@ var _last: Array = []
 var _static: AudioStreamPlayer
 var _speech: AudioStreamPlayer
 var _token := 0
+var lower: LowerLine  # в старой линии рация молчит
 var player: Node3D  # где обходчик: глубже RELAY_DEEP_Z без ретрансляторов связи нет
 ## Без ретрансляторов (если они — поручение смены) рация не берёт глубже этого пикета.
 const RELAY_DEEP_Z := -150.0
@@ -72,7 +73,7 @@ func radio_pressed(day: int) -> void:
 	if Game.has_open_task("escape"):
 		repeat_last()
 		return
-	if player and player.global_position.y < LowerLine.Y + 6.0:
+	if player and lower and lower.contains(player.global_position):
 		_static.play()
 		Game.say("Только шипение. Под кирпичным сводом рация не берёт.", Game.THOUGHT, 3.5)
 		return
