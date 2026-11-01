@@ -5,7 +5,6 @@ extends CanvasLayer
 
 signal new_game
 signal continue_game
-signal descent
 signal resume
 signal main_menu
 signal quit
@@ -83,7 +82,6 @@ func show_main(saved_day: int) -> void:
 	if saved_day > 1:
 		_button("Продолжить — смена %d" % saved_day, func(): continue_game.emit())
 	_button("Новая игра", func(): new_game.emit())
-	_button("Вылазка в старую линию", func(): descent.emit())
 	_button("Настройки", open_settings)
 	_button("Управление", _toggle_controls)
 	_button("Достижения", open_achievements)

@@ -158,7 +158,7 @@ func _ready() -> void:
 	_place(_battery_label, 1, 1, 1, 1, -300, -80, -24, -56)
 	# Деньги (Meta) и «+40 ₽ · поручение», когда заплатили.
 	_money = _make_label(_ingame, 16, HORIZONTAL_ALIGNMENT_RIGHT)
-	_place(_money, 1, 1, 1, 1, -300, -108, -24, -84)
+	_place(_money, 1, 1, 1, 1, -520, -108, -24, -84)
 	_coin = _make_label(_ingame, 16, HORIZONTAL_ALIGNMENT_RIGHT)
 	_coin.add_theme_color_override("font_color", AMBER)
 	_place(_coin, 1, 1, 1, 1, -420, -136, -24, -112)
@@ -504,8 +504,17 @@ func _build_newspaper() -> void:
 	box.add_child(_paper_label("E — дальше", 13, Color(ink, 0.6), HORIZONTAL_ALIGNMENT_RIGHT))
 
 
+var _loot := 0
+
+
 func _refresh_money() -> void:
-	_money.text = "%d ₽" % Meta.money
+	_money.text = "%d ₽" % Meta.money + ("  · при себе находок на %d ₽" % _loot if _loot > 0 else "")
+
+
+## Находки из старой линии при себе: платят, когда вынесешь их на станцию.
+func set_loot(amount: int) -> void:
+	_loot = amount
+	_refresh_money()
 
 
 ## Шкафчик снабжения: пока открыт, обходчик стоит, мышь свободна.
@@ -869,7 +878,7 @@ func _on_message(text: String, color: Color, duration: float) -> void:
 
 
 func _refresh_tasks() -> void:
-	var head := "ВЫЛАЗКА № %d" % Game.descent if Game.descent > 0 else "СМЕНА № %d" % Game.day
+	var head := "СМЕНА № %d" % Game.day
 	var lines: PackedStringArray = ["[b]%s — СПИСОК ДЕЛ[/b]" % head, ""]
 	for t in Game.tasks:
 		var text := str(t["text"])

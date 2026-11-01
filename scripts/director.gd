@@ -63,7 +63,6 @@ func start_day(d: int) -> void:
 		5: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1, "crawler": 3, "interfere": 1,
 			"masha": 1, "double": 1, "silence": 1, "picket": 1, "name": 1}
 		6: _budget = {}  # тихая смена: ничего
-		Game.DESCENT_DAY: _budget = {"footsteps": 1, "whisper": 2, "silence": 1}  # старая линия: только звуки
 		_: _budget = {"behind": 1, "whisper": 2, "crawler": 2, "swarm": 6, "double": 2, "silence": 2}
 
 
@@ -87,6 +86,9 @@ func _process(delta: float) -> void:
 	if Game.fear >= Achievements.fear_max():
 		main.panic()
 		return
+	if level.lower.contains(player.global_position):
+		_lower_events(delta)
+		return  # в старой линии — свои звуки, охоты сюда не доходят
 	if player.global_position.z > Level.TUN_Z0 - 4.0 or player.global_position.y > Level.FLOOR_Y + 5.0:
 		return  # события только в тоннелях
 	if HUNT_EVERY.has(Game.day) and not stalker.visible and not _hunt_pending:
@@ -112,6 +114,25 @@ func _process(delta: float) -> void:
 		_cooldown = randf_range(35.0, 60.0) - Game.day * 4.0
 	else:
 		_cooldown = 4.0
+
+
+## Старая линия: шаги за спиной, шёпот и далёкий поезд, которого здесь быть не может.
+var _lower_t := 25.0
+
+
+func _lower_events(delta: float) -> void:
+	_lower_t -= delta
+	if _lower_t > 0.0:
+		return
+	_lower_t = randf_range(30.0, 55.0)
+	match randi() % 3:
+		0:
+			_whisper()
+		1:
+			_echo_step()
+		_:
+			Game.play_ui(Sfx.rumble(), -16.0)
+			Game.say_once("lower_train", "...Поезд? Здесь? Рельсы сняли сто лет назад.", Game.WHISPER, 3.5)
 
 
 ## Тревожная петля: тихо, когда пауки только побежали, громче, чем ближе он, во весь голос — когда гонится.
@@ -149,7 +170,7 @@ func _update_fear(delta: float) -> void:
 		Game.add_fear(-delta * (6.0 if pos.z > Level.TUN_Z0 or pos.y > Level.ROOM_Y - 1.0 else 2.5))
 	else:
 		# Шестая смена — тихая, страх копится как в первую.
-		var d := 1 if Game.day == Game.LAST_DAY - 1 else (4 if Game.day == Game.DESCENT_DAY else Game.day)
+		var d := 1 if Game.day == Game.LAST_DAY - 1 else Game.day
 		Game.add_fear(delta * (3.5 + d * 1.2))
 		Game.say_once("dark", "Темно... Слишком темно. Нужен свет.")
 	if stalker.visible and stalker.global_position.distance_to(pos) < 12.0:
@@ -323,7 +344,7 @@ func _hunt() -> bool:
 
 func _hunt_arrive(pos: Vector3) -> void:
 	_hunt_pending = false
-	if main.busy or main.collapsing or stalker.visible:
+	if main.busy or main.collapsing or stalker.visible or level.lower.contains(player.global_position):
 		return
 	stalker.hunt(pos, Game.day)
 	Game.play_at(Sfx.whisper(), pos + Vector3(0, 1.7, 0), 4.0)
@@ -586,7 +607,7 @@ func _on_step() -> void:
 
 func _echo_step() -> void:
 	var pos := player.global_position - player.forward_flat() * 7.0
-	pos.y = Level.FLOOR_Y + 0.1
+	pos.y = (LowerLine.Y if level.lower.contains(player.global_position) else Level.FLOOR_Y) + 0.1
 	Game.play_at(Sfx.step(), pos, 0.0)
 
 

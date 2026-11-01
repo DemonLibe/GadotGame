@@ -172,6 +172,11 @@ func is_lit_near(pos: Vector3) -> bool:
 	return false
 
 
+## Обе точки на одном ярусе: станция с тоннелями или старая линия под ней (шум сквозь тридцать метров грунта не слышен).
+func same_floor(a: Vector3, b: Vector3) -> bool:
+	return lower.contains(a) == lower.contains(b)
+
+
 ## Точка внутри станции или тоннелей (для появления «Другого»).
 func is_walkable(p: Vector3) -> bool:
 	if lower.contains(p):

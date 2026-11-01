@@ -62,7 +62,7 @@ func _ready() -> void:
 func _on_noise(pos: Vector3, radius: float) -> void:
 	if _dead or state == "chase":
 		return
-	if global_position.distance_to(pos) > radius:
+	if global_position.distance_to(pos) > radius or (level and not level.same_floor(global_position, pos)):
 		return
 	state = "investigate"
 	_goal = pos

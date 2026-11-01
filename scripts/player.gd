@@ -88,6 +88,7 @@ var canisters := 0
 var bolts := 0                # болты в кармане — бросить (G), чтобы отвлечь
 var fuses := 0                # запасной предохранитель для щитка
 var relays := 0               # ретрансляторы рации, которые надо развесить
+var loot := 0                 # находки из старой линии при себе (₽): платят, когда вынесешь на станцию
 var cranking := false         # крутит ручку динамо
 var cranked_today := 0.0      # сколько процентов накрутил за смену
 var _crank_sound: AudioStreamPlayer
@@ -452,6 +453,7 @@ func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
 	bolts = START_BOLTS
 	fuses = 0
 	relays = 0
+	set_loot(0)
 	cranking = false
 	cranked_today = 0.0
 	_crank_sound.stop()
@@ -463,6 +465,16 @@ func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
 	_burning = false
 	_flame.emitting = false
 	_show_selected()
+
+
+func add_loot(amount: int) -> void:
+	set_loot(loot + amount)
+
+
+func set_loot(amount: int) -> void:
+	loot = amount
+	if hud:
+		hud.set_loot(loot)
 
 
 # --- Ввод --------------------------------------------------------------------

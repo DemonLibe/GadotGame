@@ -59,6 +59,15 @@ func generate(seed_value: int, size: int) -> void:
 		_build_cell(c)
 
 
+## Разобрать линию (в смены, когда люк завален).
+func clear() -> void:
+	for c in get_children():
+		c.queue_free()
+	cells.clear()
+	visited.clear()
+	goal = ENTRY
+
+
 ## «Растущее дерево»: чаще продолжаем последний коридор (длинные проходы), иногда ветвимся от старых клеток.
 func _grow(size: int) -> void:
 	cells[ENTRY] = {"links": [], "kind": "entry", "dist": 0}
@@ -349,6 +358,17 @@ func random_cell(min_dist: int, exclude_goal := true) -> Vector2i:
 ## Точка на полу клетки со случайным сдвигом (не в стену).
 func floor_spot(c: Vector2i) -> Vector3:
 	return center(c) + Vector3(rng.randf_range(-0.9, 0.9), 0.05, rng.randf_range(-0.9, 0.9))
+
+
+## Место на глухой стене клетки (для надписей мелом): лицом внутрь клетки. Нет глухой стены — пустой Transform.
+func wall_mount(c: Vector2i, height := 1.6) -> Transform3D:
+	var links: Array = cells[c]["links"]
+	var depth := CELL / 2.0 - WALL if HALL_KINDS.has(cells[c]["kind"]) else W / 2.0
+	for d in DIRS:
+		if not links.has(c + d):
+			var dw := dir_world(d)
+			return Transform3D(Basis.looking_at(dw, Vector3.UP), center(c) + dw * (depth - 0.02) + Vector3(0, height, 0))
+	return Transform3D()
 
 
 ## Отметить клетку как обойдённую (карта открывается по мере прохождения).

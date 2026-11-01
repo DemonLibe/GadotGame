@@ -82,15 +82,23 @@ const DAY_LIMIT_Z := [0.0, -117.5, -197.0, -239.0, -321.5, -1000.0, -321.5, -100
 const BRANCH_OPEN_DAY := [2, 3, 4]
 ## Сложность растёт: существа, коробки патронов, патроны в оружейном ящике.
 const CREATURES_PER_DAY := [0, 0, 0, 2, 4, 6, 0, 4]
-const AMMO_BOXES_PER_DAY := [0, 0, 0, 3, 3, 4, Game.GEAR_AMMO_BOXES, 4]
+const AMMO_BOXES_PER_DAY := [0, 0, 0, 3, 3, 4, Game.GEAR_AMMO_BOXES - 2, 4]  # в шестую — ещё две в старой линии
 const PISTOL_ROUNDS := [0, 0, 0, 6, 4, 6, 6, 0]
 ## Седьмая смена: кусачие пауки на полу с самого начала; вагон метро за проломом (центр головного вагона).
 const BITERS_AT_START := 8
-## Вылазки: размер старой линии (клеток) и плата; с каждой вылазкой — больше и дороже.
-const DESCENT_CELLS := 26
-const DESCENT_CELLS_PER := 4
-const DESCENT_PAY := 200
-const DESCENT_PAY_PER := 50
+## Старая линия по сменам: сколько клеток прорастёт, сколько в ней существ и находок.
+const LOWER_CELLS := {3: 22, 4: 28, 5: 32, 6: 34}
+const LOWER_CRAWLERS := {3: 1, 4: 2, 5: 3, 6: 1}
+const LOWER_RELICS := {3: 3, 4: 4, 5: 5, 6: 4}
+## Находки: [название, цена]; чем дальше от лестницы, тем дороже.
+const RELICS := [["серебряные монеты", 60], ["подстаканник", 50], ["карманные часы", 90], ["путейский фонарь", 70], ["эмалированная табличка", 80]]
+## Мелом на кирпиче — по смене. Старая линия помнит тех, кто был здесь раньше.
+const LOWER_CHALK := {
+	3: ["ЗДЕСЬ ОН НЕ СЧИТАЕТ", "1913 — 1917 — 19??"],
+	4: ["СЕДЬМОЙ. 14 РАЗ", "ЛИНИЯ КАЖДУЮ НОЧЬ ДРУГАЯ", "НЕ ИДИ НА ГОЛОС"],
+	5: ["ВОСЬМОЙ, ТЫ ОПОЗДАЛ", "ПОЕЗД ХОДИТ ПО ЧЕТВЕРГАМ"],
+	6: ["ТЫ УЖЕ ВЫБРАЛСЯ?", "ОН ЖДЁТ НАВЕРХУ"],
+}
 const OLD_HATCH := Vector3(-1.0, Level.FLOOR_Y, -42.5)  # ржавый люк на платформе станции
 ## Коробки с болтами по тоннелю — каждую смену.
 const BOLT_BOXES := 4
@@ -173,8 +181,8 @@ const PHONE_CALLS := {
 const DIARY := [
 	["Смена 1", "Спустился первый раз. Сто метров по лестнице — руки потом дрожали полчаса. Внизу генератор, фильтры, паутина, пауки размером с ладонь. Платят втрое. Маше хватит на операцию, если продержусь пять смен.\n\nДиспетчер вежливый. Слишком вежливый для этой работы."],
 	["Смена 2", "У ограждения что-то обрушилось, а в завале что-то шевелилось. Я сказал себе — крысы. На стене мелом: «Не оставайся без света». Почерк аккуратный, как в школьной прописи.\n\nМаша спросила по телефону, страшно ли под землёй. Я сказал — нет."],
-	["Смена 3", "Вагонетка уехала в тоннель сама. Диспетчер выдал пистолет — значит, они знают. Из темноты выползло бледное, на четвереньках. Два выстрела — и пыль.\n\nПотом пауки побежали все разом, и пришёл он. Я сидел в шкафу и не дышал. Он стоял рядом и слушал."],
-	["Смена 4", "Голос в рации иногда не его. Похож — но не его. В затопленной штольне нашёл жетон Седьмого: «Восьмой, не верь голосу». Восьмой — это я.\n\nКаждый раз, когда закрываю глаза, слышу, как он считает мои шаги."],
+	["Смена 3", "Вагонетка уехала в тоннель сама. Диспетчер выдал пистолет — значит, они знают. Из темноты выползло бледное, на четвереньках. Два выстрела — и пыль.\n\nПотом пауки побежали все разом, и пришёл он. Я сидел в шкафу и не дышал. Он стоял рядом и слушал.\n\nПод платформой — люк в старую линию, тысяча девятьсот тринадцатый год. Кирпич, своды, тишина. Туда он не спускается. Пока."],
+	["Смена 4", "Голос в рации иногда не его. Похож — но не его. В старой линии, у дальней платформы, нашёл жетон Седьмого: «Восьмой, не верь голосу». Восьмой — это я. Линия была не такой, как вчера: другие повороты, другие залы.\n\nКаждый раз, когда закрываю глаза, слышу, как он считает мои шаги."],
 	["Смена 5", "Решётка была открыта. Замок сорван изнутри. Тоннель рушился, рация кричала: «Доложи, где ты!» Я промолчал и полез наверх.\n\nВыбрался. А в журнале смен — свежая запись моим почерком: «Смена сдана. Восьмой». Я этого не писал. А снизу кто-то лез следом."],
 	["Смена 6", "Рации на столе нет. Пульт диспетчерской, оказывается, отключён с 2001 года. Кто со мной разговаривал пять ночей — не знаю и знать не хочу.\n\nСобрал пистолет, патроны, батарейки. За решёткой обвал пробил стену, и оттуда тянет тёплым воздухом. Ночью мне показалось, что там проехал поезд. Завтра пойду до конца. Маша, я вернусь."],
 	["Смена 7", "", "scrawl"],
@@ -228,6 +236,8 @@ var _fear_peak := 0.0  # для достижения «Холодная голо
 var _used_spots: Array = []
 var _photo_reveal := -1  # на каком снимке проявится «он»
 var _debug_t := 0.0
+var _lower_seed := 0          # старая линия в эту смену (после провала — та же)
+var _lost := {}               # где остался вещмешок с находками: {pos, amount}
 
 
 func _ready() -> void:
@@ -334,8 +344,8 @@ func _process(delta: float) -> void:
 		var pos := player.global_position + Vector3(randf_range(-2.0, 2.0), 2.5, randf_range(-10.0, 10.0))
 		Game.play_at(Sfx.drip(), pos, -6.0)
 	_fear_peak = maxf(_fear_peak, Game.fear)
-	if Game.descent > 0:
-		_update_descent()
+	if not level.lower.cells.is_empty():
+		_update_lower()
 	if collapsing and not busy:
 		_update_collapse(delta)
 	_update_water()
@@ -400,10 +410,7 @@ func _begin(d: int) -> void:
 		player.input_locked = false
 		busy = false
 		return
-	if Game.descent > 0:
-		start_descent(Game.descent)
-	else:
-		start_day(d)
+	start_day(d)
 
 
 func _pause() -> void:
@@ -522,7 +529,6 @@ func _spawn_props() -> void:
 func start_day(d: int, retry := false) -> void:
 	busy = true
 	collapsing = false
-	Game.descent = 0
 	Game.day = d
 	Game.fear = 0.0
 	Game.ended = false
@@ -547,6 +553,7 @@ func start_day(d: int, retry := false) -> void:
 		_setup_rooms(d)
 	_spawn_finds(d)
 	_spawn_threats(d, retry)
+	_setup_lower(d, retry)
 	_setup_power(d)
 	_spawn_task_devices(d)
 	_reported = false
@@ -633,9 +640,6 @@ func start_day(d: int, retry := false) -> void:
 func end_day() -> void:
 	if busy:
 		return
-	if Game.descent > 0:
-		_end_descent()
-		return
 	busy = true
 	Meta.earn(Meta.PAY_SHIFT, "смена закрыта")
 	# Достижения за смену.
@@ -653,62 +657,20 @@ func end_day() -> void:
 	start_day(mini(Game.day + 1, Game.LAST_DAY))
 
 
-# --- Вылазки в старую линию ---------------------------------------------------
+# --- Старая линия -------------------------------------------------------------
 
-## Вылазка n: наверху — тихая станция (свет горит, рации нет), внизу — старая линия, собранная заново.
-## retry — после провала: обходчик сразу на платформе станции.
-func start_descent(n: int, retry := false) -> void:
-	busy = true
-	collapsing = false
-	Game.descent = n
-	Game.day = Game.DESCENT_DAY
-	Game.fear = 0.0
-	Game.ended = false
-	Game.build_descent_tasks()
-	for obj in get_tree().get_nodes_in_group("day_objects"):
-		obj.queue_free()
-	for door in doors:
-		door.set_open(false)
-	_setup_vents_and_crates(Game.DESCENT_DAY)
-	_setup_access(Game.DESCENT_DAY)
-	generator.reset(100.0)
-	generator.run()
-	cart.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, -40.0)
-	level.set_grate_open(false)
-	level.set_breach(false)
-	level.tunnel_lights_off = false
-	level.blackout = false
-	level.reset_pickets()
-	phone.stop()
-	stalker.hide_now()
-	hatch.set_open(false)
-	radio.reset()
-	radio.take_away()
-	dispatcher.stop()
-	level.lower.generate(randi(), DESCENT_CELLS + DESCENT_CELLS_PER * mini(n - 1, 8))
-	_spawn_descent(n)
-	player.reset_for_day(SPAWN, SPAWN_YAW, START_BATTERY)
-	if retry:
-		player.global_position = BOTTOM_SPAWN
-		player.rotation.y = 0.0
-		hatch.set_open(true)
-	player.drain_mult = 1.3
-	_fear_peak = 0.0
-	player.input_locked = true
-	director.start_day(Game.DESCENT_DAY)
-	hud.set_black()
-	hud.show_title("Вылазка %d" % n, "Старая линия. Тридцать метров под станцией.", 2.5)
-	await get_tree().create_timer(3.0).timeout
-	await hud.fade_to(0.0, 2.0).finished
-	player.input_locked = false
-	busy = false
-	if not retry:
-		Game.say("Под платформой — старый люк. Ниже станции есть ещё одна «Тихая». Каждый раз — другая.", Game.THOUGHT, 5.0)
-
-
-## Ход в старую линию, лестница наверх, существа и припасы внизу.
-func _spawn_descent(n: int) -> void:
+## С третьей по шестую смену под ржавым люком на платформе — старая линия. Каждую смену она другая
+## (после провала — та же, и там, где упал, лежит вещмешок с находками).
+func _setup_lower(d: int, retry: bool) -> void:
 	var lower := level.lower
+	if not LOWER_CELLS.has(d):
+		lower.clear()
+		_lost = {}
+		return
+	if not retry or _lower_seed == 0:
+		_lower_seed = randi()
+		_lost = {}
+	lower.generate(_lower_seed, LOWER_CELLS[d])
 	var hatch_down := OldStairs.new()
 	hatch_down.main = self
 	hatch_down.down = true
@@ -720,17 +682,44 @@ func _spawn_descent(n: int) -> void:
 	up.position = lower.center(LowerLine.ENTRY) + Vector3(0, 0, LowerLine.W / 2.0 - 0.05)
 	up.rotation.y = PI
 	add_child(up)
-	for i in mini(1 + n / 2, 5):
-		var c := spawn_crawler(lower.floor_spot(lower.random_cell(4)))
-		c.speed = 2.0 + 0.1 * n
-		c.hp = 2
-	for kind in ["ammo", "bolts", "bolts"]:
-		var box := Pickup.new()
-		box.kind = kind
-		box.amount = 3
-		box.position = lower.floor_spot(lower.random_cell(2))
-		box.rotation.y = randf() * TAU
-		add_child(box)
+	# Сюжет: на четвёртую смену в самом низу — жетон Седьмого, на шестую — патроны.
+	if d == 4 and Game.has_open_task("token"):
+		_lower_pickup("token", 1, lower.center(lower.goal) + Vector3(0.6, 0.05, 0.4))
+	if d == 6:
+		for i in 2:
+			_lower_pickup("ammo", 3, lower.floor_spot(lower.random_cell(3)))
+	for i in LOWER_RELICS[d]:
+		var c := lower.random_cell(2, false)
+		var r: Array = RELICS.pick_random()
+		var deep := float(lower.cells[c]["dist"]) / maxf(1.0, float(lower.cells[lower.goal]["dist"]))
+		_lower_pickup("relic", int(round(float(r[1]) * (0.7 + 0.8 * deep) / 5.0)) * 5, lower.floor_spot(c), r[0])
+	for kind in ["bolts", "ammo"]:
+		_lower_pickup(kind, 3, lower.floor_spot(lower.random_cell(2)))
+	if not _lost.is_empty():
+		_lower_pickup("bag", int(_lost["amount"]), _lost["pos"])
+	var chalk: Array = LOWER_CHALK.get(d, [])
+	for text in chalk:
+		var tr := lower.wall_mount(lower.random_cell(2), randf_range(1.3, 1.9))
+		if tr.origin == Vector3.ZERO:
+			continue
+		var l := Geo.label(self, tr.origin, text, 0.0, 72, Color(0.85, 0.83, 0.78, 0.85), true, 0.0035)
+		l.basis = tr.basis
+		l.rotate_object_local(Vector3.FORWARD, randf_range(-0.06, 0.06))
+		l.add_to_group("day_objects")
+	for i in LOWER_CRAWLERS[d]:
+		var cr := spawn_crawler(lower.floor_spot(lower.random_cell(4)))
+		cr.hp = 2
+
+
+func _lower_pickup(kind: String, amount: int, pos: Vector3, title := "") -> Pickup:
+	var p := Pickup.new()
+	p.kind = kind
+	p.amount = amount
+	p.title = title
+	p.position = pos
+	p.rotation.y = randf() * TAU
+	add_child(p)
+	return p
 
 
 ## Спуститься в старую линию или подняться на станцию — через затемнение.
@@ -745,6 +734,8 @@ func use_old_stairs(down: bool) -> void:
 		Game.play_ui(Sfx.rung(), -6.0)
 		await get_tree().create_timer(0.35).timeout
 	if down:
+		# Вниз он не ходит: охота наверху обрывается.
+		stalker.hide_now()
 		player.global_position = level.lower.center(LowerLine.ENTRY) + Vector3(0, 0.1, 0.4)
 		player.rotation.y = 0.0
 		Game.report("descend")
@@ -756,30 +747,23 @@ func use_old_stairs(down: bool) -> void:
 	player.input_locked = false
 	busy = false
 	if down:
-		Game.say_once("old_line", "Кирпич. Свод. Дореволюционная кладка — та самая, о которой писала бригада. Тихо... слишком.", Game.THOUGHT, 5.0)
+		Game.say_once("old_line", "Кирпич. Свод. Дореволюционная кладка. Рация здесь молчит. Тихо... слишком.", Game.THOUGHT, 5.0)
+	elif player.loot > 0:
+		Meta.earn(player.loot, "находки из старой линии")
+		player.set_loot(0)
+		_lost = {}
 
 
-## Каждый кадр во время вылазки: карта открывается по мере обхода, платформа — цель.
-func _update_descent() -> void:
+## Каждый кадр, пока есть старая линия: карта открывается по мере обхода, платформа — цель.
+func _update_lower() -> void:
 	var lower := level.lower
 	var p := player.global_position
+	if not lower.contains(p):
+		return
 	lower.visit(p)
-	if lower.contains(p) and lower.cell_of(p) == lower.goal and Game.has_open_task("platform"):
+	if lower.cell_of(p) == lower.goal and Game.has_open_task("platform"):
 		Game.report("platform")
-		Game.say("Платформа. «Ст. Тихая, 1913». Сюда сто лет не спускался ни один поезд. Теперь — назад, наверх.", Game.THOUGHT, 5.0)
-
-
-## Вернулся и отметился в журнале: заплатить и собрать следующую, более глубокую вылазку.
-func _end_descent() -> void:
-	busy = true
-	player.input_locked = true
-	Meta.earn(DESCENT_PAY + DESCENT_PAY_PER * (Game.descent - 1), "вылазка")
-	Game.play_ui(Sfx.click())
-	await hud.fade_to(1.0, 1.5).finished
-	hud.show_title("ВЫЛАЗКА %d ЗАВЕРШЕНА" % Game.descent, "Старая линия уходит глубже.", 2.5)
-	await get_tree().create_timer(3.0).timeout
-	busy = false
-	start_descent(Game.descent + 1)
+		Game.say("Платформа. «Ст. Тихая, 1913». Сюда сто лет не приходил ни один поезд. Теперь — назад, наверх.", Game.THOUGHT, 5.0)
 
 
 ## Смена провалена (сорвался, страх взял верх) — начинается заново. Игра всегда сложная.
@@ -789,14 +773,11 @@ func fail_day(reason: String) -> void:
 	busy = true
 	player.input_locked = true
 	stalker.hide_now()
+	# Упал в старой линии с находками — вещмешок останется там же (линия после провала та же).
+	if player.loot > 0 and level.lower.contains(player.global_position):
+		_lost = {"pos": Vector3(player.global_position.x, LowerLine.Y + 0.05, player.global_position.z), "amount": player.loot}
 	Game.play_ui(Sfx.sting(), 0.0)
 	await hud.fade_to(1.0, 0.5).finished
-	if Game.descent > 0:
-		# Вылазка провалена: старая линия соберётся заново, деньги и снаряжение — при тебе.
-		hud.show_title("ВЫЛАЗКА ПРОВАЛЕНА", reason + "\n\nСтарая линия будет уже другой.", 2.5)
-		await get_tree().create_timer(4.0).timeout
-		start_descent(Game.descent, true)
-		return
 	hud.show_title("СМЕНА ПРОВАЛЕНА", reason + "\n\nСмена начнётся заново — уже внизу.", 2.5)
 	await get_tree().create_timer(4.0).timeout
 	start_day(Game.day, true)
@@ -1012,7 +993,9 @@ func _finish(which: String) -> void:
 	Game.gear = {}
 	Game.save_day(1)
 	hud.set_black()
-	hud.show_title("HOPE LIGHT", which + "\n\nСпасибо за игру.\nНажми R, чтобы начать заново.", 0.0)
+	var masha := "Деньги на операцию Маши отложены. Хватило." if Meta.operation_paid() \
+		else "На операцию Маши отложено %d из %d ₽." % [Meta.savings, Meta.OPERATION_COST]
+	hud.show_title("HOPE LIGHT", which + "\n\n" + masha + "\n\nСпасибо за игру.\nНажми R, чтобы начать заново.", 0.0)
 
 
 func _screamer() -> void:
@@ -1443,12 +1426,6 @@ func _spawn_task_devices(d: int) -> void:
 	if Game.has_open_task("cartpush"):
 		marks.append([Vector3(Level.TUN_CX, Level.FLOOR_Y, Cart.PUSH_TO), "ПК 2"])
 	hud.set_map_marks(marks)
-	if Game.has_open_task("token"):
-		var room: Dictionary = level.rooms[5]
-		var token := Pickup.new()
-		token.kind = "token"
-		token.position = room["center"] + (room["basis"] as Basis) * Vector3(0.2, 0.0, -0.3)
-		add_child(token)
 	if d == Game.LAST_DAY:
 		var car := MetroCar.new()
 		car.main = self
@@ -1602,6 +1579,14 @@ void fragment() {
 
 ## Прогон для CI (godot --headless -- --smoke): все дни, предметы, лестница, события и финал
 ## должны отработать без ошибок скрипта.
+func _first_pickup(kind: String) -> Pickup:
+	for n in get_tree().get_nodes_in_group("day_objects"):
+		var p := n as Pickup
+		if p and p.kind == kind and not p.is_queued_for_deletion():
+			return p
+	return null
+
+
 func _smoke_test() -> void:
 	state = "playing"
 	hud.set_ingame(true)
@@ -1735,29 +1720,45 @@ func _smoke_test() -> void:
 	var shop_ok := Meta.money < money_before and Meta.level("boots") > 0 and not player.input_locked
 	if not shop_ok:
 		print("SMOKE FAIL: снабжение")
-	# Вылазка: старая линия собрана, спуск, платформа, подъём, журнал — и следующая вылазка.
-	start_descent(1)
+	# Старая линия в третью смену: спуск, находка, платформа; провал — линия та же и вещмешок на месте;
+	# вынес находки наверх — заплатили.
+	start_day(3)
 	await get_tree().create_timer(5.5).timeout
 	var lower := level.lower
-	var desc_ok := lower.cells.size() >= DESCENT_CELLS
+	var seed_before := _lower_seed
+	var low_ok := lower.cells.size() >= LOWER_CELLS[3]
 	use_old_stairs(true)
 	await get_tree().create_timer(3.0).timeout
-	desc_ok = desc_ok and lower.contains(player.global_position) and not Game.has_open_task("descend")
-	for ev in ["footsteps", "whisper", "silence", "crawler"]:
-		director._run(ev)
+	low_ok = low_ok and lower.contains(player.global_position) and not Game.has_open_task("descend")
+	director._lower_t = 0.0
 	player.hold("map")
 	await get_tree().create_timer(1.0).timeout
+	var relic := _first_pickup("relic")
+	low_ok = low_ok and relic != null
+	if relic:
+		relic.interact(player)
+	var carried := player.loot
 	player.global_position = lower.center(lower.goal) + Vector3(0, 0.1, 0)
 	await get_tree().create_timer(0.5).timeout
-	desc_ok = desc_ok and not Game.has_open_task("platform")
+	low_ok = low_ok and carried > 0 and not Game.has_open_task("platform")
+	fail_day("смоук")
+	await get_tree().create_timer(10.5).timeout
+	var bag := _first_pickup("bag")
+	low_ok = low_ok and _lower_seed == seed_before and player.loot == 0 and bag != null and bag.amount == carried
+	if bag:
+		bag.interact(player)
+	var money_low := Meta.money
 	use_old_stairs(false)
 	await get_tree().create_timer(3.0).timeout
-	player.global_position = SPAWN
-	journal.interact(player)
-	await get_tree().create_timer(10.0).timeout
-	desc_ok = desc_ok and Game.descent == 2 and not busy
-	if not desc_ok:
-		print("SMOKE FAIL: вылазка")
+	low_ok = low_ok and Meta.money == money_low + carried and player.loot == 0 and not busy
+	start_day(4)
+	await get_tree().create_timer(5.5).timeout
+	low_ok = low_ok and _first_pickup("token") != null and lower.contains(_first_pickup("token").global_position)
+	start_day(2)
+	await get_tree().create_timer(5.5).timeout
+	low_ok = low_ok and lower.cells.is_empty()
+	if not low_ok:
+		print("SMOKE FAIL: старая линия")
 	# Провал смены: начинается заново уже внизу, с рацией.
 	start_day(3)
 	await get_tree().create_timer(5.5).timeout
@@ -1787,7 +1788,7 @@ func _smoke_test() -> void:
 	await get_tree().create_timer(6.0).timeout
 	hud.close_newspaper()
 	await get_tree().create_timer(7.0).timeout
-	var ok := Game.ended and retry_ok and hide_ok and shop_ok and desc_ok
+	var ok := Game.ended and retry_ok and hide_ok and shop_ok and low_ok
 	# Концовка 3: все записки, засов решётки изнутри.
 	start_day(5)
 	await get_tree().create_timer(5.5).timeout
