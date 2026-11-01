@@ -91,6 +91,8 @@ const LOWER_CELLS := {3: 22, 4: 28, 5: 32, 6: 34}
 const LOWER_CRAWLERS := {3: 1, 4: 2, 5: 3, 6: 1}
 const LOWER_RELICS := {3: 3, 4: 4, 5: 5, 6: 4}
 const LOWER_LISTENERS := {3: 1, 4: 1, 5: 2, 6: 2}
+## Старые шкафы внизу — с пятой смены, когда туда спускается «Другой».
+const LOWER_HIDEOUTS := {5: 4, 6: 4}
 ## Находки: [название, цена]; чем дальше от лестницы, тем дороже.
 const RELICS := [["серебряные монеты", 60], ["подстаканник", 50], ["карманные часы", 90], ["путейский фонарь", 70], ["эмалированная табличка", 80]]
 ## Мелом на кирпиче — по смене. Старая линия помнит тех, кто был здесь раньше.
@@ -707,6 +709,7 @@ func _setup_lower(d: int, retry: bool) -> void:
 		l.basis = tr.basis
 		l.rotate_object_local(Vector3.FORWARD, randf_range(-0.06, 0.06))
 		l.add_to_group("day_objects")
+	_spawn_lower_hideouts(int(LOWER_HIDEOUTS.get(d, 0)))
 	for i in LOWER_CRAWLERS[d]:
 		spawn_crawler(lower.floor_spot(lower.random_cell(4)))
 	# Слушатели стоят в залах (если залов мало — в коридорах), подальше от лестницы.
@@ -717,6 +720,26 @@ func _setup_lower(d: int, retry: bool) -> void:
 	halls.shuffle()
 	for i in LOWER_LISTENERS[d]:
 		spawn_listener(lower.center(halls[i]) if i < halls.size() else lower.floor_spot(lower.random_cell(4)))
+
+
+## Шкафы у глухих стен: сначала в залах, потом в тупиках, не у самой лестницы.
+func _spawn_lower_hideouts(count: int) -> void:
+	var lower := level.lower
+	var spots: Array[Vector2i] = []
+	for c in lower.cells:
+		if c != LowerLine.ENTRY and c != lower.goal and (lower.cells[c]["kind"] == "hall" or (lower.cells[c]["links"] as Array).size() == 1):
+			spots.append(c)
+	spots.shuffle()
+	spots.sort_custom(func(a, b): return lower.cells[a]["kind"] == "hall" and lower.cells[b]["kind"] != "hall")
+	for i in mini(count, spots.size()):
+		var tr := lower.wall_mount(spots[i], 0.0)
+		if tr.origin == Vector3.ZERO:
+			continue
+		var cab := Hideout.new()
+		cab.transform = Transform3D(tr.basis, tr.origin + tr.basis.z * (Hideout.D / 2.0 + 0.03))
+		cab.position.y = LowerLine.Y
+		cab.add_to_group("day_objects")
+		add_child(cab)
 
 
 func _lower_pickup(kind: String, amount: int, pos: Vector3, title := "") -> Pickup:
@@ -741,9 +764,9 @@ func use_old_stairs(down: bool) -> void:
 	for i in 3:
 		Game.play_ui(Sfx.rung(), -6.0)
 		await get_tree().create_timer(0.35).timeout
+	# Лестница обрывает охоту: на другом ярусе он тебя потерял.
+	stalker.hide_now()
 	if down:
-		# Вниз он не ходит: охота наверху обрывается.
-		stalker.hide_now()
 		player.global_position = level.lower.center(LowerLine.ENTRY) + Vector3(0, 0.1, 0.4)
 		player.rotation.y = 0.0
 		Game.report("descend")
@@ -1797,6 +1820,45 @@ func _smoke_test() -> void:
 	start_day(4)
 	await get_tree().create_timer(5.5).timeout
 	low_ok = low_ok and _first_pickup("token") != null and lower.contains(_first_pickup("token").global_position)
+	# Пятая смена внизу: обвал не отрезает линию, «Другой» спускается, шкаф спасает и внизу.
+	start_day(5)
+	await get_tree().create_timer(5.5).timeout
+	use_old_stairs(true)
+	await get_tree().create_timer(3.0).timeout
+	var deep_ok := false
+	var lower_cabs: Array = get_tree().get_nodes_in_group("hideouts").filter(func(h): return lower.contains(h.global_position))
+	var links_before := 0
+	for c in lower.cells:
+		links_before += (lower.cells[c]["links"] as Array).size()
+	if director.start_collapse():
+		await get_tree().create_timer(Director.COLLAPSE_WARN + 0.5).timeout
+		var links_after := 0
+		for c in lower.cells:
+			links_after += (lower.cells[c]["links"] as Array).size()
+		var all_reach := true
+		for c in lower.cells:
+			all_reach = all_reach and lower._path(LowerLine.ENTRY, c).size() > 0
+		deep_ok = links_after == links_before - 2 and all_reach
+	else:
+		deep_ok = true
+		print("SMOKE note: обвалу негде случиться в этой раскладке")
+	for n in get_tree().get_nodes_in_group("creatures"):
+		if n is Listener or n is Crawler:
+			n.queue_free()
+	deep_ok = deep_ok and lower_cabs.size() > 0 and director.lower_hunt()
+	await get_tree().create_timer(4.5).timeout
+	deep_ok = deep_ok and stalker.visible and lower.contains(stalker.global_position)
+	if not lower_cabs.is_empty():
+		var cab_low: Hideout = lower_cabs[0]
+		player.global_position = cab_low.global_position + Vector3(0, 0.1, 0)
+		cab_low.interact(player)
+		stalker.global_position = player.global_position + Vector3(0.0, -0.1, 0.0) + cab_low.global_transform.basis.z * 2.0
+		await get_tree().create_timer(Stalker.HIDE_VANISH + 1.5).timeout
+		deep_ok = deep_ok and player.hiding and not stalker.visible and not busy
+		cab_low.interact(player)
+	if not deep_ok:
+		print("SMOKE FAIL: обвал или «Другой» в старой линии — шкафов %d, охота %s" % [lower_cabs.size(), stalker.visible])
+	low_ok = low_ok and deep_ok
 	start_day(2)
 	await get_tree().create_timer(5.5).timeout
 	low_ok = low_ok and lower.cells.is_empty()
