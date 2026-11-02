@@ -117,6 +117,13 @@ func _draw_lower(font: Font) -> void:
 			draw_string(font, p + Vector2(k * 0.3, 4), "пролом", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK)
 		if c == lower.goal:
 			draw_string(font, p + Vector2(k * 0.4, 4), "платформа", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, red)
+	# Служебки: решётка с номером — как только видел её из коридора.
+	for c in lower.locked:
+		var front: Vector2i = lower.cells[c]["links"][0]
+		if lower.visited.has(front):
+			var q: Vector2 = (at.call(c) as Vector2).lerp(at.call(front), 0.5)
+			draw_line(q - Vector2(k * 0.2, 0).rotated((at.call(c) - at.call(front)).angle() + PI / 2), q + Vector2(k * 0.2, 0).rotated((at.call(c) - at.call(front)).angle() + PI / 2), red, 3.0)
+			draw_string(font, q + Vector2(4, -4), "С-%d" % int(lower.locked[c]), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, red)
 	# Вы здесь.
 	var pp: Vector2 = at.call(lower.cell_of(player.global_position))
 	var f := -player.global_transform.basis.z

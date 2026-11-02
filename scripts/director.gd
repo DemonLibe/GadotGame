@@ -176,11 +176,17 @@ func start_collapse() -> bool:
 	var here := lower.cell_of(player.global_position)
 	if not lower.cells.has(here):
 		return false
+	# Сначала — проходы у самого обходчика, если обхода у них нет — до трёх клеток в сторону.
 	var cand: Array = []
-	for a in [here] + (lower.cells[here]["links"] as Array):
-		for b in lower.cells[a]["links"]:
-			if lower.has_detour(a, b):
-				cand.append([a, b])
+	for reach in [1, 3]:
+		for a in lower.cells:
+			if lower._path(here, a).size() - 1 > reach:
+				continue
+			for b in lower.cells[a]["links"]:
+				if not lower.locked.has(a) and not lower.locked.has(b) and lower.has_detour(a, b):
+					cand.append([a, b])
+		if not cand.is_empty():
+			break
 	if cand.is_empty():
 		return false
 	var pick: Array = cand.pick_random()
@@ -266,6 +272,8 @@ func lower_hunt() -> bool:
 		return false
 	var cand: Array[Vector2i] = []
 	for c in lower.cells:
+		if lower.locked.has(c):
+			continue
 		var steps := lower._path(here, c).size() - 1
 		if steps >= 4 and steps <= 7:
 			cand.append(c)
@@ -291,7 +299,7 @@ func _start_mimic(max_steps := 8) -> bool:
 		return false
 	var cand: Array[Vector2i] = []
 	for c in lower.cells:
-		if c == LowerLine.ENTRY or c == lower.goal or c == here or (lower.cells[c]["links"] as Array).size() != 1:
+		if c == LowerLine.ENTRY or c == lower.goal or c == here or lower.locked.has(c) or (lower.cells[c]["links"] as Array).size() != 1:
 			continue
 		var steps := lower._path(here, c).size() - 1
 		if steps >= 2 and steps <= max_steps:

@@ -11,8 +11,8 @@ const W := 3.0                # ширина коридора
 const H := 3.0                # высота коридора
 const HALL_H := 3.8           # высота зала
 const WALL := 0.4
-const COLS := 9
-const ROWS := 9
+const COLS := 12
+const ROWS := 12
 ## Угол сетки: клетка (c, r) — от ORIGIN на c клеток по +X (прочь от тоннеля) и на r клеток по -Z (вглубь).
 ## Сетка лежит справа от тоннеля между ПК 2 и ПК 3 — там, где нет ни комнат, ни штолен.
 const ORIGIN := Vector3(9.0, Y, -83.0)
@@ -27,6 +27,7 @@ const HALL_KINDS := ["hall", "platform"]
 var cells := {}
 var goal := ENTRY              # старая платформа — самая дальняя клетка
 var visited := {}              # обойдённые клетки (для карты)
+var locked := {}               # служебки за решёткой: клетка → номер (ни существ, ни ключа внутри)
 var rng := RandomNumberGenerator.new()
 var _m := {}                   # материалы
 var _boxes := {}               # кеш BoxMesh по размеру
@@ -55,10 +56,12 @@ func generate(seed_value: int, size: int) -> void:
 		c.queue_free()
 	cells.clear()
 	visited.clear()
+	locked.clear()
 	goal = ENTRY
 	rng.seed = seed_value
 	_grow(clampi(size, 8, COLS * ROWS - 6))
-	_add_loops(0.12)
+	_add_nooks(0.2)
+	_add_loops(0.08)
 	_measure()
 	_mark_rooms()
 	for c in cells:
@@ -95,6 +98,7 @@ func clear() -> void:
 		c.queue_free()
 	cells.clear()
 	visited.clear()
+	locked.clear()
 	goal = ENTRY
 
 
@@ -123,6 +127,24 @@ func _grow(size: int) -> void:
 		cells[n] = {"links": [c], "kind": "corridor", "dist": 0}
 		links.append(n)
 		active.append(n)
+
+
+## Закоулки: короткие тупики в одну клетку сбоку от коридора.
+func _add_nooks(chance: float) -> void:
+	for c in cells.keys():
+		var links: Array = cells[c]["links"]
+		if c == ENTRY or links.size() != 2 or rng.randf() >= chance:
+			continue
+		var opts: Array[Vector2i] = []
+		for d in DIRS:
+			var n: Vector2i = c + d
+			if _inside(n) and not cells.has(n):
+				opts.append(n)
+		if opts.is_empty():
+			continue
+		var n: Vector2i = opts[rng.randi_range(0, opts.size() - 1)]
+		cells[n] = {"links": [c], "kind": "corridor", "dist": 0}
+		links.append(n)
 
 
 ## Немного петель: чтобы от погони можно было уйти кругом.
@@ -156,7 +178,7 @@ func _mark_rooms() -> void:
 	var halls := 0
 	for c in cells:
 		var cell: Dictionary = cells[c]
-		if cell["kind"] == "corridor" and (cell["links"] as Array).size() == 1 and int(cell["dist"]) >= 3 and halls < 3 and rng.randf() < 0.6:
+		if cell["kind"] == "corridor" and (cell["links"] as Array).size() == 1 and int(cell["dist"]) >= 3 and halls < 5 and rng.randf() < 0.5:
 			cell["kind"] = "hall"
 			halls += 1
 
@@ -425,7 +447,7 @@ func axis_at(p: Vector3) -> Vector3:
 func random_cell(min_dist: int, exclude_goal := true) -> Vector2i:
 	var pool: Array[Vector2i] = []
 	for c in cells:
-		if int(cells[c]["dist"]) >= min_dist and not (exclude_goal and c == goal):
+		if int(cells[c]["dist"]) >= min_dist and not (exclude_goal and c == goal) and not locked.has(c):
 			pool.append(c)
 	if pool.is_empty():
 		return goal

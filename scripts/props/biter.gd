@@ -13,6 +13,7 @@ const LOSE_TIME := 4.0
 const SCALE := 0.6
 
 var player: Player
+var _unstuck := Unstuck.new()  # обход углов и колонн, чтобы не тёрся о стену
 var level: Level
 var _chasing := false
 var _dead := false
@@ -89,9 +90,11 @@ func _physics_process(delta: float) -> void:
 	if go.length() > stop:
 		v = go.normalized() * s
 		look_at(global_position + go, Vector3.UP)
+	v = _unstuck.steer(v, delta)
 	velocity.x = v.x
 	velocity.z = v.z
 	move_and_slide()
+	_unstuck.check(self, v, delta)
 	var moving := v.length() > 0.1
 	if _anim.current_animation != "Attack":
 		_anim.play("Walk" if moving else "Idle", 0.1)
@@ -141,7 +144,6 @@ func _die() -> void:
 		return
 	_dead = true
 	collision_layer = 0
-	Meta.earn(Meta.PAY_BITER, "паук")
 	_anim.speed_scale = 1.0
 	_anim.play("Die", 0.05)
 	Game.play_at(Sfx.hiss(), global_position, -6.0)

@@ -87,9 +87,11 @@ const PISTOL_ROUNDS := [0, 0, 0, 6, 4, 6, 6, 0]
 ## Седьмая смена: кусачие пауки на полу с самого начала; вагон метро за проломом (центр головного вагона).
 const BITERS_AT_START := 8
 ## Старая линия по сменам: сколько клеток прорастёт, сколько в ней существ и находок.
-const LOWER_CELLS := {3: 22, 4: 28, 5: 32, 6: 34}
+const LOWER_CELLS := {3: 30, 4: 40, 5: 48, 6: 54}
 const LOWER_CRAWLERS := {3: 1, 4: 2, 5: 3, 6: 1}
-const LOWER_RELICS := {3: 3, 4: 4, 5: 5, 6: 4}
+const LOWER_RELICS := {3: 4, 4: 5, 5: 6, 6: 5}
+## Служебки за решёткой: [наверняка, ещё одна с вероятностью]. Ключ от каждой — у останков где-то в линии.
+const STOREROOMS := {3: [0, 0.5], 4: [1, 0.0], 5: [1, 0.5], 6: [2, 0.0]}
 const LOWER_LISTENERS := {3: 1, 4: 1, 5: 2, 6: 2}
 ## Старые шкафы внизу — с пятой смены, когда туда спускается «Другой».
 const LOWER_HIDEOUTS := {5: 4, 6: 4}
@@ -241,6 +243,7 @@ var _debug_t := 0.0
 var _lower_seed := 0          # старая линия в эту смену (после провала — та же)
 var _lost := {}               # где остался вещмешок с находками: {pos, amount}
 var _in_lower := false        # обходчик в старой линии (для «вошёл / вынес находки»)
+var _lower_taken := {}        # что уже подобрано в старой линии в эту смену (после провала не появится снова)
 
 
 func _ready() -> void:
@@ -594,6 +597,9 @@ func _spawn_props() -> void:
 func start_day(d: int, retry := false) -> void:
 	busy = true
 	collapsing = false
+	if not retry:
+		Game.paid.clear()
+		Meta.new_shift()
 	Game.day = d
 	Game.fear = 0.0
 	Game.ended = false
@@ -706,7 +712,7 @@ func end_day() -> void:
 	if busy:
 		return
 	busy = true
-	Meta.earn(Meta.PAY_SHIFT, "смена закрыта")
+	Meta.earn(Meta.shift_pay(Game.day), "смена закрыта")
 	# Достижения за смену.
 	if Game.day == 1:
 		Achievements.unlock("shift1")
@@ -737,7 +743,9 @@ func _setup_lower(d: int, retry: bool) -> void:
 	if not retry or _lower_seed == 0:
 		_lower_seed = randi()
 		_lost = {}
+		_lower_taken = {}
 	lower.generate(_lower_seed, LOWER_CELLS[d])
+	_spawn_storerooms(d)
 	# Сюжет: на четвёртую смену в самом низу — жетон Седьмого, на шестую — патроны.
 	if d == 4 and Game.has_open_task("token"):
 		_lower_pickup("token", 1, lower.center(lower.goal) + Vector3(0.6, 0.05, 0.4))
@@ -748,9 +756,9 @@ func _setup_lower(d: int, retry: bool) -> void:
 		var c := lower.random_cell(2, false)
 		var r: Array = RELICS.pick_random()
 		var deep := float(lower.cells[c]["dist"]) / maxf(1.0, float(lower.cells[lower.goal]["dist"]))
-		_lower_pickup("relic", int(round(float(r[1]) * (0.7 + 0.8 * deep) / 5.0)) * 5, lower.floor_spot(c), r[0])
+		_lower_pickup("relic", int(round(float(r[1]) * (0.7 + 0.8 * deep) / 5.0)) * 5, lower.floor_spot(c), r[0], "relic%d" % i)
 	for kind in ["bolts", "ammo"]:
-		_lower_pickup(kind, 3, lower.floor_spot(lower.random_cell(2)))
+		_lower_pickup(kind, 3, lower.floor_spot(lower.random_cell(2)), "", "free_" + kind)
 	if not _lost.is_empty():
 		_lower_pickup("bag", int(_lost["amount"]), _lost["pos"])
 	var chalk: Array = LOWER_CHALK.get(d, [])
@@ -780,7 +788,7 @@ func _spawn_lower_hideouts(count: int) -> void:
 	var lower := level.lower
 	var spots: Array[Vector2i] = []
 	for c in lower.cells:
-		if c != LowerLine.ENTRY and c != lower.goal and (lower.cells[c]["kind"] == "hall" or (lower.cells[c]["links"] as Array).size() == 1):
+		if c != LowerLine.ENTRY and c != lower.goal and not lower.locked.has(c) and (lower.cells[c]["kind"] == "hall" or (lower.cells[c]["links"] as Array).size() == 1):
 			spots.append(c)
 	spots.shuffle()
 	spots.sort_custom(func(a, b): return lower.cells[a]["kind"] == "hall" and lower.cells[b]["kind"] != "hall")
@@ -795,8 +803,68 @@ func _spawn_lower_hideouts(count: int) -> void:
 		add_child(cab)
 
 
-func _lower_pickup(kind: String, amount: int, pos: Vector3, title := "") -> Pickup:
+## Служебки: тупик-коридор за аркой с решёткой на замке; внутри аптечка, батарейка, патроны или болты
+## и ящик с инструментом на продажу. Ключ — у останков в другом конце линии, подальше от главного хода.
+func _spawn_storerooms(d: int) -> void:
+	var lower := level.lower
+	var plan: Array = STOREROOMS.get(d, [0, 0.0])
+	var count := int(plan[0]) + (1 if lower.rng.randf() < float(plan[1]) else 0)
+	var main_path := lower._path(LowerLine.ENTRY, lower.goal)
+	var spots: Array[Vector2i] = []
+	for c in lower.cells:
+		var links: Array = lower.cells[c]["links"]
+		if c != LowerLine.ENTRY and c != lower.goal and lower.cells[c]["kind"] == "corridor" and links.size() == 1 \
+				and int(lower.cells[c]["dist"]) >= 3:
+			spots.append(c)
+	for n in mini(count, spots.size()):
+		var c: Vector2i = spots[lower.rng.randi_range(0, spots.size() - 1)]
+		spots.erase(c)
+		var number := n + 1
+		lower.locked[c] = number
+		var front: Vector2i = lower.cells[c]["links"][0]
+		var into := LowerLine.dir_world(c - front)
+		var door := StoreDoor.new()
+		door.number = number
+		door.transform = Transform3D(Basis(Vector3.UP, atan2(into.x, into.z)), lower.link_point(front, c))
+		add_child(door)
+		# Добыча — в глубине тупика.
+		var base := lower.center(c) + into * 0.6
+		var side := Vector3(into.z, 0.0, -into.x)
+		var loot := [["medkit", 1, ""], ["battery", 1, ""], ["ammo", 6, ""] if lower.rng.randf() < 0.5 else ["bolts", 4, ""],
+			["relic", 120 + 10 * lower.rng.randi_range(0, 4), "ящик с инструментом"]]
+		for k in loot.size():
+			var at := base + side * (-0.9 + 0.6 * k) + Vector3(0, 0.05, 0)
+			_lower_pickup(loot[k][0], int(loot[k][1]), at, str(loot[k][2]), "store%d_%d" % [number, k])
+		# Ключ: подальше от двери и не на главном пути — в тупике или зале, у останков.
+		var near := []
+		var far := []
+		for k2 in lower.cells:
+			if lower.locked.has(k2) or k2 == LowerLine.ENTRY or int(lower.cells[k2]["dist"]) < 3:
+				continue
+			if lower._path(k2, front).size() - 1 < 3:
+				continue
+			var nook: bool = (lower.cells[k2]["links"] as Array).size() == 1 or lower.cells[k2]["kind"] == "hall"
+			(far if nook and not main_path.has(k2) else near).append(k2)
+		var pool: Array = far if not far.is_empty() else near
+		if pool.is_empty():
+			continue
+		var kc: Vector2i = pool[lower.rng.randi_range(0, pool.size() - 1)]
+		var spot := lower.center(kc) + Vector3(lower.rng.randf_range(-0.7, 0.7), 0.0, lower.rng.randf_range(-0.7, 0.7))
+		var bones := Remains.new()
+		bones.pose = "lying"
+		bones.position = spot
+		bones.rotation.y = lower.rng.randf() * TAU
+		add_child(bones)
+		_lower_pickup("key", number, spot + bones.basis * Vector3(0.35, 0.03, -0.2), "", "key%d" % number)
+
+
+## Предмет в старой линии. id — чтобы после провала смены уже подобранное не появилось снова.
+func _lower_pickup(kind: String, amount: int, pos: Vector3, title := "", id := "") -> Pickup:
+	if id != "" and _lower_taken.has(id):
+		return null
 	var p := Pickup.new()
+	if id != "":
+		p.on_taken = func(): _lower_taken[id] = true
 	p.kind = kind
 	p.amount = amount
 	p.title = title
@@ -1652,6 +1720,15 @@ void fragment() {
 
 ## Прогон для CI (godot --headless -- --smoke): все дни, предметы, лестница, события и финал
 ## должны отработать без ошибок скрипта.
+func _count_pickups(kind: String) -> int:
+	var n := 0
+	for node in get_tree().get_nodes_in_group("day_objects"):
+		var p := node as Pickup
+		if p and p.kind == kind and not p.is_queued_for_deletion():
+			n += 1
+	return n
+
+
 func _first_pickup(kind: String) -> Pickup:
 	for n in get_tree().get_nodes_in_group("day_objects"):
 		var p := n as Pickup
@@ -1788,6 +1865,9 @@ func _smoke_test() -> void:
 	for id in Meta.UPGRADES:
 		hud._shop._buy_upgrade(id)
 	hud._shop._save(100)
+	Meta.save_for_operation(100000)
+	if Meta.sent_this_shift > Meta.OPERATION_PER_SHIFT:
+		print("SMOKE FAIL: перевод на операцию больше лимита за смену")
 	hud.close_shop()
 	await get_tree().create_timer(0.5).timeout
 	var shop_ok := Meta.money < money_before and Meta.level("boots") > 0 and not player.input_locked
@@ -1816,6 +1896,7 @@ func _smoke_test() -> void:
 	player.hold("map")
 	await get_tree().create_timer(1.0).timeout
 	var relic := _first_pickup("relic")
+	var relics_before := _count_pickups("relic")
 	low_ok = low_ok and relic != null
 	if relic:
 		relic.interact(player)
@@ -1851,6 +1932,9 @@ func _smoke_test() -> void:
 	fail_day("смоук")
 	await get_tree().create_timer(10.5).timeout
 	var bag := _first_pickup("bag")
+	if _count_pickups("relic") != relics_before - 1:
+		print("SMOKE FAIL: подобранная находка появилась снова после провала")
+		low_ok = false
 	low_ok = low_ok and _lower_seed == seed_before and player.loot == 0 and bag != null and bag.amount == carried
 	if bag:
 		bag.interact(player)
@@ -1863,6 +1947,25 @@ func _smoke_test() -> void:
 	start_day(4)
 	await get_tree().create_timer(5.5).timeout
 	low_ok = low_ok and _first_pickup("token") != null and lower.contains(_first_pickup("token").global_position)
+	# Служебка: без ключа заперто, ключ — не внутри, с ключом открывается, внутри аптечка.
+	var door: StoreDoor = null
+	for n in get_tree().get_nodes_in_group("day_objects"):
+		if n is StoreDoor and not n.is_queued_for_deletion():
+			door = n
+			break
+	var store_ok := door != null and not lower.locked.is_empty()
+	if door:
+		door.interact(player)
+		store_ok = store_ok and not door.opened
+		var key := _first_pickup("key")
+		store_ok = store_ok and key != null and not lower.locked.has(lower.cell_of(key.global_position))
+		if key:
+			key.interact(player)
+		door.interact(player)
+		store_ok = store_ok and door.opened and _first_pickup("medkit") != null
+	if not store_ok:
+		print("SMOKE FAIL: служебка")
+	low_ok = low_ok and store_ok
 	# Пятая смена внизу: обвал не отрезает линию, «Другой» спускается, шкаф спасает и внизу.
 	start_day(5)
 	await get_tree().create_timer(5.5).timeout

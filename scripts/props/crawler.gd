@@ -13,6 +13,7 @@ const LOSE_TIME := 6.0
 const LAYER := 16  # слой для пуль
 
 var player: Player
+var _unstuck := Unstuck.new()  # обход углов и колонн, чтобы не тёрся о стену
 var level: Level
 var speed := 2.2
 var hp := 2
@@ -35,10 +36,10 @@ func _ready() -> void:
 	collision_mask = 1 | Geo.WALL_LAYER
 	var shape := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
-	cap.radius = 0.35
-	cap.height = 0.9
+	# Стоячая капсула: лежачая цеплялась боками за углы при поворотах.
+	cap.radius = 0.32
+	cap.height = 0.8
 	shape.shape = cap
-	shape.rotation.x = PI / 2
 	shape.position.y = 0.4
 	add_child(shape)
 
@@ -111,9 +112,11 @@ func _physics_process(delta: float) -> void:
 		look_at(global_position + go, Vector3.UP)
 	else:
 		_arrived()
+	v = _unstuck.steer(v, delta)
 	velocity.x = v.x
 	velocity.z = v.z
 	move_and_slide()
+	_unstuck.check(self, v, delta)
 	# Бег, пока ползёт; удар не прерываем.
 	var moving := v.length() > 0.1
 	if not _anim.current_animation.begins_with("Attack"):
@@ -215,7 +218,6 @@ func _die() -> void:
 	_dead = true
 	collision_layer = 0
 	Achievements.unlock("hunter")
-	Meta.earn(Meta.PAY_CRAWLER, "ползун")
 	_anim.pause()
 	var dust := ProcTex.fire(40, 0.9)
 	var grad := Gradient.new()

@@ -89,6 +89,7 @@ var bolts := 0                # болты в кармане — бросить 
 var fuses := 0                # запасной предохранитель для щитка
 var relays := 0               # ретрансляторы рации, которые надо развесить
 var loot := 0                 # находки из старой линии при себе (₽): платят, когда вынесешь на станцию
+var keys := {}                # ключи от служебок старой линии на эту смену: номер → true
 var cranking := false         # крутит ручку динамо
 var cranked_today := 0.0      # сколько процентов накрутил за смену
 var _crank_sound: AudioStreamPlayer
@@ -139,7 +140,7 @@ var _empty_warned := false
 func _ready() -> void:
 	add_to_group("player")
 	collision_layer = 4
-	collision_mask = 1 | Geo.WALL_LAYER
+	collision_mask = 1 | Geo.WALL_LAYER | ProcTex.PROP_LAYER
 	floor_snap_length = 0.35
 
 	var shape := CollisionShape3D.new()
@@ -454,6 +455,7 @@ func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
 	fuses = 0
 	relays = 0
 	set_loot(0)
+	keys = {}
 	cranking = false
 	cranked_today = 0.0
 	_crank_sound.stop()
