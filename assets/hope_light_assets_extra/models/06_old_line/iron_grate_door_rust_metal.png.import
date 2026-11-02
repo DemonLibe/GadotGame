@@ -1,0 +1,37 @@
+[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+uid="uid://xidu4iuxhidr"
+path="res://.godot/imported/iron_grate_door_rust_metal.png-cafefaf90b4cad5b708275b2f380440d.ctex"
+metadata={
+"vram_texture": false
+}
+generator_parameters={
+"md5": "1b45f50096990477cbb46e5aa93f7c7c"
+}
+
+[deps]
+
+source_file="res://assets/hope_light_assets_extra/models/06_old_line/iron_grate_door_rust_metal.png"
+dest_files=["res://.godot/imported/iron_grate_door_rust_metal.png-cafefaf90b4cad5b708275b2f380440d.ctex"]
+
+[params]
+
+compress/mode=0
+compress/high_quality=false
+compress/lossy_quality=0.7
+compress/hdr_compression=1
+compress/normal_map=0
+compress/channel_pack=0
+mipmaps/generate=true
+mipmaps/limit=-1
+roughness/mode=0
+roughness/src_normal=""
+process/fix_alpha_border=true
+process/premult_alpha=false
+process/normal_map_invert_y=false
+process/hdr_as_srgb=false
+process/hdr_clamp_exposure=false
+process/size_limit=0
+detect_3d/compress_to=1

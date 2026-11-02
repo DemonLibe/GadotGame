@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/sign_plate.png" id="1_4soqa"]
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/sign_plate_n.png" id="2_aq2mm"]
+
+[resource]
+resource_name = "M_sign_plate"
+albedo_texture = ExtResource("1_4soqa")
+roughness = 0.5
+normal_enabled = true
+normal_scale = 0.6
+normal_texture = ExtResource("2_aq2mm")
+texture_filter = 2

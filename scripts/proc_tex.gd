@@ -183,6 +183,43 @@ static func fire(amount := 32, lifetime := 0.5) -> CPUParticles3D:
 # Картинки собираются нативными операциями Image (fill_rect / blend_rect),
 # а цвет задаётся оттенком материала — так генерация быстрая и в браузере.
 
+# --- Набор ассетов Hope Light (assets/hope_light_assets_extra) -----------------
+## Пиксельные текстуры набора (64 px ≈ 1 м) с world-triplanar: ложатся на любые коробки и CSG без UV.
+
+const KIT := "res://assets/hope_light_assets_extra/"
+const BRICK_TINT := Color(0.62, 0.56, 0.52)  # кирпич набора ярковат для подземелья
+
+
+## Материал набора: name — как в materials/triplanar (например, "brick_red").
+## tint — приглушить под мрачную палитру игры (копия материала, кешируется).
+static func kit(name: String, tint := Color.WHITE) -> StandardMaterial3D:
+	var m := load(KIT + "materials/triplanar/M_%s_tri.tres" % name) as StandardMaterial3D
+	if tint == Color.WHITE:
+		return m
+	var key := "kit_%s_%s" % [name, tint.to_html()]
+	if not _cache.has(key):
+		var d := m.duplicate() as StandardMaterial3D
+		d.albedo_color = tint
+		_cache[key] = d
+	return _cache[key]
+
+
+static func _kit_ok(name: String) -> bool:
+	return ResourceLoader.exists(KIT + "materials/triplanar/M_%s_tri.tres" % name)
+
+
+## Модель набора как есть (со своими материалами и коллизиями): path — от models/, например "common/fuel_barrel".
+## collide = false — без коллизий модели (для предметов, у которых своя форма, например подбираемых).
+static func kit_model(parent: Node, path: String, pos := Vector3.ZERO, yaw := 0.0, collide := true) -> Node3D:
+	var m := (load(KIT + "models/%s.glb" % path) as PackedScene).instantiate() as Node3D
+	m.transform = Transform3D(Basis(Vector3.UP, yaw), pos)
+	if not collide:
+		for body in m.find_children("*", "CollisionObject3D", true, false):
+			body.free()
+	parent.add_child(m)
+	return m
+
+
 ## Чугунные тюбинги тоннеля метро: фланцы, рёбра, болты, ржавые потёки.
 ## Материал рассчитан на UV трубы (одна картинка = один тюбинг).
 static func tubbing() -> StandardMaterial3D:
@@ -225,6 +262,9 @@ static func tubbing_triplanar() -> StandardMaterial3D:
 static func tiles() -> StandardMaterial3D:
 	if _cache.has("tiles"):
 		return _cache["tiles"]
+	if _kit_ok("tile_white_clean"):
+		_cache["tiles"] = kit("tile_white_clean", Color(0.78, 0.77, 0.72))
+		return _cache["tiles"]
 	var s := 256
 	var img := _noise(s, 0.05, 3)
 	img.adjust_bcs(1.6, 0.2, 1.0)
@@ -247,6 +287,9 @@ static func tiles() -> StandardMaterial3D:
 ## Старая кирпичная кладка нижней линии: тёмный кирпич, чёрный раствор, потёки.
 static func bricks() -> StandardMaterial3D:
 	if _cache.has("bricks"):
+		return _cache["bricks"]
+	if _kit_ok("brick_red"):
+		_cache["bricks"] = kit("brick_red", BRICK_TINT)
 		return _cache["bricks"]
 	var s := 256
 	var img := _noise(s, 0.08, 3)
@@ -271,6 +314,9 @@ static func bricks() -> StandardMaterial3D:
 static func granite() -> StandardMaterial3D:
 	if _cache.has("granite"):
 		return _cache["granite"]
+	if _kit_ok("concrete_floor_cracked"):
+		_cache["granite"] = kit("concrete_floor_cracked")
+		return _cache["granite"]
 	var s := 256
 	var img := _noise(s, 0.12, 2, FastNoiseLite.TYPE_CELLULAR)
 	img.adjust_bcs(0.9, 0.5, 1.0)
@@ -283,6 +329,9 @@ static func granite() -> StandardMaterial3D:
 ## Щебень путевого полотна.
 static func ballast() -> StandardMaterial3D:
 	if _cache.has("ballast"):
+		return _cache["ballast"]
+	if _kit_ok("gravel"):
+		_cache["ballast"] = kit("gravel")
 		return _cache["ballast"]
 	var img := _noise(256, 0.09, 1, FastNoiseLite.TYPE_CELLULAR)
 	img.adjust_bcs(1.0, 0.8, 1.0)
@@ -388,6 +437,9 @@ static func _textured(key: String, albedo: Image, tint: Color, roughness: float,
 static func linoleum() -> StandardMaterial3D:
 	if _cache.has("linoleum"):
 		return _cache["linoleum"]
+	if _kit_ok("linoleum"):
+		_cache["linoleum"] = kit("linoleum")
+		return _cache["linoleum"]
 	var s := 256
 	var img := _noise(s, 0.03, 3)
 	img.adjust_bcs(1.2, 0.25, 1.0)
@@ -404,6 +456,9 @@ static func linoleum() -> StandardMaterial3D:
 ## Жёлто-чёрная предупреждающая разметка.
 static func hazard() -> StandardMaterial3D:
 	if _cache.has("hazard"):
+		return _cache["hazard"]
+	if _kit_ok("warning_stripes"):
+		_cache["hazard"] = kit("warning_stripes")
 		return _cache["hazard"]
 	var s := 128
 	var img := Image.create(s, s, false, Image.FORMAT_RGBA8)

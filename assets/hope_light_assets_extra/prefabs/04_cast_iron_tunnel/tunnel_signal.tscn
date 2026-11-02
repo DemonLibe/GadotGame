@@ -1,0 +1,12 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/hope_light_assets_extra/models/04_cast_iron_tunnel/tunnel_signal.glb" id="1_mgl6w"]
+
+[node name="TunnelSignal" type="Node3D"]
+
+[node name="Model" type="Node3D" parent="." instance=ExtResource("1_mgl6w")]
+
+[node name="RedLight" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.11, 0.5)
+light_color = Color(1, 0.08, 0.03, 1)
+omni_range = 3.0

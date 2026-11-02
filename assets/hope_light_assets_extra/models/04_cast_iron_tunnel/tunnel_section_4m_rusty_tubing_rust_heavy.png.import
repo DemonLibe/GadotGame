@@ -1,0 +1,37 @@
+[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+uid="uid://bf7px0666xutg"
+path="res://.godot/imported/tunnel_section_4m_rusty_tubing_rust_heavy.png-a2df1b8c62b210d0e9bbfa94fa77144f.ctex"
+metadata={
+"vram_texture": false
+}
+generator_parameters={
+"md5": "0ea20c46cfee2c6db4d97a9b90da785d"
+}
+
+[deps]
+
+source_file="res://assets/hope_light_assets_extra/models/04_cast_iron_tunnel/tunnel_section_4m_rusty_tubing_rust_heavy.png"
+dest_files=["res://.godot/imported/tunnel_section_4m_rusty_tubing_rust_heavy.png-a2df1b8c62b210d0e9bbfa94fa77144f.ctex"]
+
+[params]
+
+compress/mode=0
+compress/high_quality=false
+compress/lossy_quality=0.7
+compress/hdr_compression=1
+compress/normal_map=0
+compress/channel_pack=0
+mipmaps/generate=true
+mipmaps/limit=-1
+roughness/mode=0
+roughness/src_normal=""
+process/fix_alpha_border=true
+process/premult_alpha=false
+process/normal_map_invert_y=false
+process/hdr_as_srgb=false
+process/hdr_clamp_exposure=false
+process/size_limit=0
+detect_3d/compress_to=1

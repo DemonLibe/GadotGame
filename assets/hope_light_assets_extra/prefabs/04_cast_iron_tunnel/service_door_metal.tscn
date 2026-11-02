@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/hope_light_assets_extra/models/04_cast_iron_tunnel/service_door_metal.glb" id="1_5xlb8"]
+
+[node name="ServiceDoorMetal" type="Node3D"]
+
+[node name="Model" type="Node3D" parent="." instance=ExtResource("1_5xlb8")]

@@ -1,0 +1,15 @@
+[gd_resource type="StandardMaterial3D" load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/blanket_wool.png" id="1_2oqad"]
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/blanket_wool_n.png" id="2_rfbph"]
+
+[resource]
+resource_name = "M_blanket_wool"
+albedo_texture = ExtResource("1_2oqad")
+roughness = 0.9
+normal_enabled = true
+normal_scale = 0.6
+normal_texture = ExtResource("2_rfbph")
+uv1_triplanar = true
+uv1_world_triplanar = true
+texture_filter = 2

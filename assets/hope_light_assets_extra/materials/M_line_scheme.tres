@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/line_scheme.png" id="1_gfgwb"]
+
+[resource]
+resource_name = "M_line_scheme"
+albedo_texture = ExtResource("1_gfgwb")
+roughness = 0.9
+texture_filter = 2

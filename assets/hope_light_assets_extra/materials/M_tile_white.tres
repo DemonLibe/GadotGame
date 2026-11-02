@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/tile_white.png" id="1_hkd02"]
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/tile_white_n.png" id="2_kwl4s"]
+
+[resource]
+resource_name = "M_tile_white"
+albedo_texture = ExtResource("1_hkd02")
+roughness = 0.4
+normal_enabled = true
+normal_scale = 0.6
+normal_texture = ExtResource("2_kwl4s")
+texture_filter = 2

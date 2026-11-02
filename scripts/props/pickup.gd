@@ -20,10 +20,14 @@ func _ready() -> void:
 			Geo.model_fit(self, "res://models/items/pistol.glb", skin, 0.22, Vector3(0, 0.11, 0), Basis(Vector3.RIGHT, -PI / 2))
 			Geo.collider_box(self, Vector3(0.42, 0.16, 0.3), Vector3(0, 0.08, 0))
 		"fuel":
-			var red := ProcTex.flat(Color(0.6, 0.08, 0.06), 0.5, 0.3)
-			Geo.box(self, Vector3(0, 0.22, 0), Vector3(0.18, 0.44, 0.34), red, false)
-			Geo.box(self, Vector3(0, 0.47, 0.06), Vector3(0.04, 0.05, 0.16), red, false)
-			Geo.cylinder(self, Vector3(0, 0.48, -0.12), 0.03, 0.08, ProcTex.flat(Color(0.2, 0.2, 0.2), 0.5, 0.8))
+			if ResourceLoader.exists(ProcTex.KIT + "models/common/fuel_canister.glb"):
+				# Армейская канистра из набора ассетов.
+				ProcTex.kit_model(self, "common/fuel_canister", Vector3.ZERO, 0.0, false)
+			else:
+				var red := ProcTex.flat(Color(0.6, 0.08, 0.06), 0.5, 0.3)
+				Geo.box(self, Vector3(0, 0.22, 0), Vector3(0.18, 0.44, 0.34), red, false)
+				Geo.box(self, Vector3(0, 0.47, 0.06), Vector3(0.04, 0.05, 0.16), red, false)
+				Geo.cylinder(self, Vector3(0, 0.48, -0.12), 0.03, 0.08, ProcTex.flat(Color(0.2, 0.2, 0.2), 0.5, 0.8))
 			Geo.collider_box(self, Vector3(0.3, 0.55, 0.4), Vector3(0, 0.27, 0))
 		"bolts":
 			# Горсть болтов в жестяной коробке.

@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/hope_light_assets_extra/models/01_duty_room/room_ceiling_4x4.glb" id="1_gv4uc"]
+
+[node name="RoomCeiling4x4" type="Node3D"]
+
+[node name="Model" type="Node3D" parent="." instance=ExtResource("1_gv4uc")]

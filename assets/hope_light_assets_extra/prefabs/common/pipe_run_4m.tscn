@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/hope_light_assets_extra/models/common/pipe_run_4m.glb" id="1_5ffxf"]
+
+[node name="PipeRun4m" type="Node3D"]
+
+[node name="Model" type="Node3D" parent="." instance=ExtResource("1_5ffxf")]

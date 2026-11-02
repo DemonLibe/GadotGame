@@ -37,10 +37,12 @@ var _body: StaticBody3D
 func _materials() -> void:
 	if not _m.is_empty():
 		return
+	# Кладка из набора ассетов: красный кирпич в коридорах, замшелый — в залах, закопчённый свод, земляной пол.
 	_m["brick"] = ProcTex.bricks()
-	_m["floor"] = ProcTex.concrete(Color(0.26, 0.24, 0.22), 0.5)
-	_m["ceiling"] = ProcTex.bricks()
-	_m["stone"] = ProcTex.granite()
+	_m["brick_hall"] = ProcTex.kit("brick_moss", ProcTex.BRICK_TINT) if ProcTex._kit_ok("brick_moss") else _m["brick"]
+	_m["floor"] = ProcTex.kit("dirt_floor", Color(0.8, 0.78, 0.75)) if ProcTex._kit_ok("dirt_floor") else ProcTex.concrete(Color(0.26, 0.24, 0.22), 0.5)
+	_m["ceiling"] = ProcTex.kit("brick_soot", Color(0.8, 0.76, 0.72)) if ProcTex._kit_ok("brick_soot") else _m["brick"]
+	_m["stone"] = ProcTex.kit("tile_white") if ProcTex._kit_ok("tile_white") else ProcTex.granite()
 	_m["rust"] = ProcTex.flat(Color(0.33, 0.19, 0.11), 0.85, 0.4)
 
 
@@ -234,10 +236,10 @@ func _build_hall(c: Vector2i, root: Node3D) -> void:
 			# Проём шириной с коридор, над ним — перемычка до высоты зала.
 			var side := (CELL - W) / 2.0
 			for s in [-1.0, 1.0]:
-				_box("brick", at + perp * s * (W / 2.0 + side / 2.0) + Vector3(0, HALL_H / 2.0, 0), dw.abs() * WALL + perp * side + Vector3(0, HALL_H, 0))
-			_box("brick", at + Vector3(0, (H + HALL_H) / 2.0, 0), dw.abs() * WALL + perp * W + Vector3(0, HALL_H - H, 0))
+				_box("brick_hall", at + perp * s * (W / 2.0 + side / 2.0) + Vector3(0, HALL_H / 2.0, 0), dw.abs() * WALL + perp * side + Vector3(0, HALL_H, 0))
+			_box("brick_hall", at + Vector3(0, (H + HALL_H) / 2.0, 0), dw.abs() * WALL + perp * W + Vector3(0, HALL_H - H, 0))
 		else:
-			_box("brick", at + Vector3(0, HALL_H / 2.0, 0), dw.abs() * WALL + perp * CELL + Vector3(0, HALL_H, 0))
+			_box("brick_hall", at + Vector3(0, HALL_H / 2.0, 0), dw.abs() * WALL + perp * CELL + Vector3(0, HALL_H, 0))
 	# Колонны по углам зала.
 	for x in [-1.0, 1.0]:
 		for z in [-1.0, 1.0]:
@@ -280,10 +282,45 @@ func _decorate(c: Vector2i, root: Node3D) -> void:
 		var p := Vector3(rng.randf_range(-1.1, 1.1), 0.08, rng.randf_range(-1.1, 1.1))
 		var b := Geo.box(root, p, Vector3(0.25, 0.12, 0.12), _m["brick"], false)
 		b.rotation = Vector3(rng.randf() * 0.4, rng.randf() * TAU, rng.randf() * 0.4)
+	_props(c, kind, root)
 	if kind == "platform":
 		# Старая платформа: край в жёлтых плитках и вывеска с «ятями».
 		Geo.box(root, Vector3(0, 0.005, -1.8), Vector3(CELL - 1.0, 0.01, 0.2), ProcTex.flat(Color(0.6, 0.5, 0.12), 0.7), false)
 		Geo.label(root, Vector3(0, 2.6, -CELL / 2.0 + WALL + 0.02), "СТ. ТИХАЯ\n1913", 0, 72, Color(0.85, 0.8, 0.65), true, 0.004)
+
+
+## Модели из набора ассетов: в залах — остов дрезины и бочки, в коридорах — стрелочные рычаги, бочки, лужи.
+## Всё у стен, чтобы не мешать проходу.
+func _props(c: Vector2i, kind: String, root: Node3D) -> void:
+	if not ResourceLoader.exists(ProcTex.KIT + "models/06_old_line/wooden_barrel.glb"):
+		return
+	var links: Array = cells[c]["links"]
+	var dead: Array[Vector3] = []  # глухие стены (направления)
+	for d in DIRS:
+		if not links.has(c + d) and not (c == ENTRY and d == Vector2i(-1, 0)):
+			dead.append(dir_world(d))
+	if HALL_KINDS.has(kind):
+		if kind == "hall" and not dead.is_empty() and rng.randf() < 0.6:
+			var w: Vector3 = dead[rng.randi_range(0, dead.size() - 1)]
+			ProcTex.kit_model(root, "06_old_line/handcar_wreck", w * 1.85, atan2(w.z, -w.x) + rng.randf_range(-0.2, 0.2))
+		for i in rng.randi_range(1, 2):
+			var corner := Vector3(2.05 * (1.0 if rng.randf() < 0.5 else -1.0), 0.0, 2.05 * (1.0 if rng.randf() < 0.5 else -1.0))
+			ProcTex.kit_model(root, "06_old_line/wooden_barrel", corner, rng.randf() * TAU)
+		if kind == "platform":
+			var w2: Vector3 = dead[0] if not dead.is_empty() else Vector3.RIGHT
+			var side := Vector3(w2.z, 0.0, -w2.x)
+			ProcTex.kit_model(root, "06_old_line/switch_lever", w2 * 2.1 + side * 1.0, atan2(-w2.x, -w2.z))
+		return
+	if dead.is_empty():
+		return
+	var w: Vector3 = dead[rng.randi_range(0, dead.size() - 1)]
+	var roll := rng.randf()
+	if roll < 0.12:
+		ProcTex.kit_model(root, "06_old_line/switch_lever", w * (W / 2.0 - 0.3), atan2(-w.x, -w.z))
+	elif roll < 0.22:
+		ProcTex.kit_model(root, "06_old_line/wooden_barrel", w * (W / 2.0 - 0.4), rng.randf() * TAU)
+	elif roll < 0.4:
+		ProcTex.kit_model(root, "common/puddle_decal", Vector3(rng.randf_range(-0.4, 0.4), 0.01, rng.randf_range(-0.4, 0.4)), rng.randf() * TAU)
 
 
 # --- Навигация ----------------------------------------------------------------
