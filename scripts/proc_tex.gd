@@ -187,6 +187,7 @@ static func fire(amount := 32, lifetime := 0.5) -> CPUParticles3D:
 ## Пиксельные текстуры набора (64 px ≈ 1 м) с world-triplanar: ложатся на любые коробки и CSG без UV.
 
 const KIT := "res://assets/hope_light_assets_extra/"
+const PROP_LAYER := 32  # коллизии обстановки из набора (их видит только обходчик)
 const BRICK_TINT := Color(0.62, 0.56, 0.52)  # кирпич набора ярковат для подземелья
 
 
@@ -213,9 +214,13 @@ static func _kit_ok(name: String) -> bool:
 static func kit_model(parent: Node, path: String, pos := Vector3.ZERO, yaw := 0.0, collide := true) -> Node3D:
 	var m := (load(KIT + "models/%s.glb" % path) as PackedScene).instantiate() as Node3D
 	m.transform = Transform3D(Basis(Vector3.UP, yaw), pos)
-	if not collide:
-		for body in m.find_children("*", "CollisionObject3D", true, false):
+	for body in m.find_children("*", "CollisionObject3D", true, false):
+		if not collide:
 			body.free()
+		else:
+			# Отдельный слой: обходчик об обстановку спотыкается, а существа её не замечают и не застревают.
+			(body as CollisionObject3D).collision_layer = PROP_LAYER
+			(body as CollisionObject3D).collision_mask = 0
 	parent.add_child(m)
 	return m
 

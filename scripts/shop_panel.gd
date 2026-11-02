@@ -56,7 +56,7 @@ func _ready() -> void:
 	_fund = _label("", 15, DIM, true)
 	fund_row.add_child(_fund)
 	fund_row.add_child(_button("Отложить 100 ₽", func(): _save(100)))
-	fund_row.add_child(_button("Отложить всё", func(): _save(Meta.money)))
+	fund_row.add_child(_button("Отложить сколько можно", func(): _save(Meta.money)))
 	var bottom := HBoxContainer.new()
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_child(bottom)
@@ -101,7 +101,8 @@ func _rebuild() -> void:
 		else:
 			_row(title, str(u[1]), "%d ₽" % price, "Купить", price <= Meta.money, _buy_upgrade.bind(id))
 	_bar.value = 100.0 * Meta.savings / Meta.OPERATION_COST
-	_fund.text = "Отложено %d из %d ₽" % [Meta.savings, Meta.OPERATION_COST] + ("  ·  хватает!" if Meta.operation_paid() else "")
+	_fund.text = "Отложено %d из %d ₽" % [Meta.savings, Meta.OPERATION_COST] + ("  ·  хватает!" if Meta.operation_paid() \
+		else "  ·  в эту смену ещё до %d ₽" % Meta.can_send())
 
 
 func _row(title: String, desc: String, price: String, action: String, enabled: bool, on_buy: Callable) -> void:

@@ -14,6 +14,7 @@ const TOUCH := 1.0          # вплотную чувствует и без зв
 const LOUD := 10.0          # громкий звук (бег, прыжок, ручка, болт, выстрел) — бросается сразу
 
 var player: Player
+var _unstuck := Unstuck.new()  # обход углов и колонн, чтобы не тёрся о стену
 var level: Level
 var state := "listen"  # listen / alert / charge / search
 var _alert := 0.0
@@ -157,9 +158,11 @@ func _physics_process(delta: float) -> void:
 				_head.rotation.y = sin(_t * 3.0) * 0.4
 				if _search <= 0.0:
 					state = "listen"
+	v = _unstuck.steer(v, delta)
 	velocity.x = v.x
 	velocity.z = v.z
 	move_and_slide()
+	_unstuck.check(self, v, delta)
 	# Вплотную он чувствует и тишину.
 	var to_p := player.global_position - global_position
 	to_p.y = 0.0

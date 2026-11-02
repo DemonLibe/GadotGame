@@ -1,6 +1,7 @@
 class_name Generator
 extends StaticBody3D
-## Дизель-генератор на платформе. Без него лампы в тоннелях не горят.
+## Дизель-генератор на платформе: свет в тоннелях и старой линии и вентиляция (воздух).
+## Без него лампы не горят, а в тоннеле становится нечем дышать.
 ## Топливо кончается — нужны канистры. Запуск слышно на весь тоннель.
 ## Передняя панель смотрит по локальной +Z.
 
@@ -102,7 +103,7 @@ func _process(delta: float) -> void:
 	_body.position = Vector3(sin(_shake) * 0.004, absf(sin(_shake * 1.3)) * 0.004, 0)
 	if fuel <= 0.0:
 		stall()
-		Game.say("Генератор заглох — кончилось топливо. В тоннеле погас свет.", Game.THOUGHT, 4.0)
+		Game.say("Генератор заглох — кончилось топливо. Погас свет, встала вентиляция.", Game.THOUGHT, 4.0)
 	elif fuel < 15.0:
 		Game.say_once("fuel_low", "Генератор чихает. Топливо на исходе — нужна канистра.", Game.THOUGHT, 3.5)
 
@@ -159,7 +160,7 @@ func hold_interact(player, delta: float) -> float:
 			_set_running(true)
 			Game.make_noise(global_position, 25.0)
 			Game.report("generator")
-			Game.say_once("gen_on", "Завёлся. Грохот на весь тоннель... зато есть свет.", Game.THOUGHT, 3.5)
+			Game.say_once("gen_on", "Завёлся. Грохот на весь тоннель... зато есть свет, и вентиляция загудела.", Game.THOUGHT, 3.5)
 	return -1.0
 
 

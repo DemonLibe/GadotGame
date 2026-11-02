@@ -89,6 +89,10 @@ var bolts := 0                # болты в кармане — бросить 
 var fuses := 0                # запасной предохранитель для щитка
 var relays := 0               # ретрансляторы рации, которые надо развесить
 var loot := 0                 # находки из старой линии при себе (₽): платят, когда вынесешь на станцию
+var keys := {}                # ключи от служебок старой линии на эту смену: номер → true
+## Воздух: вентиляцию крутит генератор. Без него в тоннеле душно, в старой линии вентиляции нет вовсе.
+const AIR_MAX := 100.0
+var air := AIR_MAX
 var cranking := false         # крутит ручку динамо
 var cranked_today := 0.0      # сколько процентов накрутил за смену
 var _crank_sound: AudioStreamPlayer
@@ -139,7 +143,7 @@ var _empty_warned := false
 func _ready() -> void:
 	add_to_group("player")
 	collision_layer = 4
-	collision_mask = 1 | Geo.WALL_LAYER
+	collision_mask = 1 | Geo.WALL_LAYER | ProcTex.PROP_LAYER
 	floor_snap_length = 0.35
 
 	var shape := CollisionShape3D.new()
@@ -454,6 +458,8 @@ func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
 	fuses = 0
 	relays = 0
 	set_loot(0)
+	keys = {}
+	air = AIR_MAX
 	cranking = false
 	cranked_today = 0.0
 	_crank_sound.stop()
@@ -525,7 +531,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		_stamina_wait -= delta
 		if _stamina_wait <= 0.0:
-			stamina = minf(STAMINA_MAX, stamina + STAMINA_REGEN * delta)
+			stamina = minf(STAMINA_MAX, stamina + STAMINA_REGEN * air_regen() * delta)
 	if _exhausted and stamina >= 30.0:
 		_exhausted = false
 	if Input.is_action_just_pressed("jump") and not input_locked and not crouching and is_on_floor() and stamina >= STAMINA_JUMP:
@@ -616,7 +622,7 @@ func _hide_update(delta: float) -> void:
 	else:
 		_stamina_wait -= delta
 		if _stamina_wait <= 0.0:
-			stamina = minf(STAMINA_MAX, stamina + STAMINA_REGEN * delta)
+			stamina = minf(STAMINA_MAX, stamina + STAMINA_REGEN * air_regen() * delta)
 	camera.position = Vector3.ZERO
 
 
@@ -699,6 +705,7 @@ func _process(delta: float) -> void:
 		hud.set_health(health / HEALTH_MAX)
 		hud.set_map_visible(held() == "map" and not input_locked)
 		hud.set_stamina(stamina / STAMINA_MAX, _exhausted)
+		hud.set_air(air / AIR_MAX)
 		var st := ""
 		if cranking:
 			st = "КРУТИШЬ ДИНАМО · треск слышно" + (" (в шкафу — тише)" if hiding else "")
@@ -706,14 +713,18 @@ func _process(delta: float) -> void:
 			st = "В ШКАФУ · ДЫХАНИЕ ЗАДЕРЖАНО" if holding_breath else "В ШКАФУ · держи Space — не дышать"
 		elif crouching:
 			st = "ПРИСЕЛ · шаги почти не слышны"
-		if canisters > 0:
-			st += ("   " if st != "" else "") + "канистр: %d" % canisters
+		# Что в карманах помимо инвентаря — одной строкой под состоянием.
+		var pockets: PackedStringArray = []
 		if bolts > 0:
-			st += ("   " if st != "" else "") + "болтов: %d (G)" % bolts
+			pockets.append("болты %d (G)" % bolts)
 		if fuses > 0:
-			st += ("   " if st != "" else "") + "предохранитель"
+			pockets.append("предохранитель")
 		if relays > 0:
-			st += ("   " if st != "" else "") + "ретрансляторов: %d" % relays
+			pockets.append("ретрансляторы %d" % relays)
+		if not keys.is_empty():
+			pockets.append("ключи " + ", ".join(keys.keys().map(func(k): return "С-%d" % k)))
+		if not pockets.is_empty():
+			st += ("\n" if st != "" else "") + " · ".join(pockets)
 		hud.set_status(st)
 
 
@@ -869,6 +880,11 @@ func throw_bolt() -> void:
 	var fwd := -camera.global_transform.basis.z
 	b.throw(camera.global_position + fwd * 0.4, fwd)
 	Game.say_once("bolt_thrown", "Звякнет — и они пойдут туда. Не ко мне.", Game.THOUGHT, 3.0)
+
+
+## Чем меньше воздуха, тем хуже отдышаться.
+func air_regen() -> float:
+	return clampf(air / 40.0, 0.3, 1.0)
 
 
 func take_damage(amount: float) -> void:

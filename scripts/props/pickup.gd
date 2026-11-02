@@ -3,9 +3,10 @@ extends StaticBody3D
 ## Предмет, который подбирают одним нажатием: коробка патронов, оружейный ящик с пистолетом,
 ## канистра с топливом или жетон пропавшего обходчика.
 
-var kind := "ammo"  # ammo / pistol / fuel / token / bolts / fuse / relays / relic / bag
+var kind := "ammo"  # ammo / pistol / fuel / token / bolts / fuse / relays / relic / bag / key / medkit / battery
 var amount := 4
 var title := ""  # находка из старой линии: что это
+var on_taken: Callable  # вызывается, когда предмет подобран целиком
 
 
 func _ready() -> void:
@@ -52,6 +53,25 @@ func _ready() -> void:
 			Geo.collider_box(self, Vector3(0.55, 0.35, 0.4), Vector3(0, 0.17, 0))
 		"relic":
 			_relic_model()
+		"key":
+			# Старый ключ на кольце с жестяной биркой «С-N».
+			var iron := ProcTex.flat(Color(0.32, 0.26, 0.18), 0.6, 0.7)
+			Geo.cylinder(self, Vector3(0, 0.01, 0), 0.035, 0.008, iron)
+			Geo.box(self, Vector3(0.08, 0.01, 0), Vector3(0.11, 0.012, 0.016), iron, false)
+			Geo.box(self, Vector3(0.13, 0.01, 0.015), Vector3(0.02, 0.012, 0.03), iron, false)
+			Geo.box(self, Vector3(-0.06, 0.006, 0.03), Vector3(0.05, 0.003, 0.035), ProcTex.flat(Color(0.75, 0.72, 0.6), 0.5, 0.6), false)
+			Geo.collider_box(self, Vector3(0.3, 0.12, 0.25), Vector3(0, 0.05, 0))
+		"medkit":
+			if ResourceLoader.exists(ProcTex.KIT + "models/01_duty_room/first_aid_box.glb"):
+				var box := ProcTex.kit_model(self, "01_duty_room/first_aid_box", Vector3(0, 0.0, 0), 0.0, false)
+				box.rotation.x = -PI / 2
+				box.position.y = 0.07
+			else:
+				Geo.box(self, Vector3(0, 0.07, 0), Vector3(0.35, 0.14, 0.3), ProcTex.flat(Color(0.85, 0.85, 0.8), 0.6), false)
+			Geo.collider_box(self, Vector3(0.4, 0.2, 0.4), Vector3(0, 0.1, 0))
+		"battery":
+			Geo.model_fit(self, "res://models/items/battery.glb", ProcTex.model_skin("res://models/items/survival_palette.png", Color(0.85, 0.85, 0.85), 0.5, 0.2), 0.12, Vector3(0, 0.02, 0), Basis(Vector3.FORWARD, PI / 2))
+			Geo.collider_box(self, Vector3(0.25, 0.15, 0.25), Vector3(0, 0.06, 0))
 		"bag":
 			# Свой же вещмешок — там, где упал в прошлый раз.
 			var cloth := ProcTex.flat(Color(0.24, 0.24, 0.17), 0.95)
@@ -76,7 +96,12 @@ func _relic_model() -> void:
 	var brass := ProcTex.flat(Color(0.62, 0.48, 0.22), 0.35, 0.9)
 	var silver := ProcTex.flat(Color(0.7, 0.7, 0.72), 0.3, 0.9)
 	var glow := ProcTex.emissive(Color(1.0, 0.8, 0.4), 0.6)
-	if title.contains("монет"):
+	if title.contains("ящик"):
+		# Красный ящик с инструментом, ручка сверху.
+		var red := ProcTex.flat(Color(0.5, 0.1, 0.07), 0.6, 0.3)
+		Geo.box(self, Vector3(0, 0.09, 0), Vector3(0.45, 0.18, 0.2), red, false)
+		Geo.box(self, Vector3(0, 0.2, 0), Vector3(0.22, 0.03, 0.03), ProcTex.flat(Color(0.15, 0.15, 0.15), 0.5, 0.6), false)
+	elif title.contains("монет"):
 		for k in 3:
 			Geo.cylinder(self, Vector3(randf_range(-0.05, 0.05), 0.004 + k * 0.007, randf_range(-0.05, 0.05)), 0.03, 0.006, silver)
 	elif title.contains("подстаканник"):
@@ -101,6 +126,12 @@ func get_prompt(_player) -> String:
 	match kind:
 		"relic":
 			return "E — взять: %s" % title
+		"key":
+			return "E — взять ключ «С-%d»" % amount
+		"medkit":
+			return "E — аптечка"
+		"battery":
+			return "E — взять батарейку"
 		"bag":
 			return "E — забрать свой вещмешок"
 		"pistol":
@@ -123,7 +154,7 @@ func interact(player) -> void:
 		player.canisters += 1
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
 		Game.say_once("fuel_pick", "Канистра солярки. Для генератора на станции.", Game.THOUGHT, 3.0)
-		queue_free()
+		_gone()
 		return
 	if kind == "bolts":
 		var took := mini(amount, player.max_bolts() - player.bolts)
@@ -135,19 +166,43 @@ func interact(player) -> void:
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
 		Game.say_once("bolts_pick", "Болты. Бросить (G) — звякнут там, где упадут.", Game.THOUGHT, 3.5)
 		if amount <= 0:
-			queue_free()
+			_gone()
 		return
 	if kind == "fuse":
 		player.fuses += 1
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
 		Game.say("Предохранитель. Теперь — к щитку.", Game.THOUGHT, 3.0)
-		queue_free()
+		_gone()
 		return
 	if kind == "relays":
 		player.relays += amount
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
 		Game.say("Три ретранслятора. Кронштейны для них — по тоннелю, на карте отмечены.", Game.THOUGHT, 4.0)
-		queue_free()
+		_gone()
+		return
+	if kind == "key":
+		player.keys[amount] = true
+		Game.play_at(Sfx.pickup(), global_position, -6.0)
+		Game.say("Ключ с биркой «С-%d». Где-то здесь служебка с таким номером." % amount, Game.THOUGHT, 4.0)
+		_gone()
+		return
+	if kind == "medkit":
+		if player.health >= Player.HEALTH_MAX - 1.0:
+			Game.say("Цел. Аптечку — на потом.", Game.THOUGHT, 2.0)
+			return
+		player.health = minf(Player.HEALTH_MAX, player.health + 60.0)
+		Game.play_at(Sfx.pickup(), global_position, -6.0)
+		Game.say_once("medkit_use", "Бинт, йод, анальгин. Жить можно.", Game.THOUGHT, 3.0)
+		_gone()
+		return
+	if kind == "battery":
+		if player.batteries >= player.max_batteries():
+			Game.say("Карманы полны — батарейка не влезет.", Game.THOUGHT, 2.0)
+			return
+		player.batteries += 1
+		Game.report("gear:battery")  # в шестую смену — в запас на седьмую
+		Game.play_at(Sfx.pickup(), global_position, -6.0)
+		_gone()
 		return
 	if kind == "relic" or kind == "bag":
 		player.add_loot(amount)
@@ -156,13 +211,13 @@ func interact(player) -> void:
 			Game.say("Мой вещмешок. Всё на месте — кроме меня в прошлый раз.", Game.THOUGHT, 3.5)
 		else:
 			Game.say_once("relic_pick", title.left(1).to_upper() + title.substr(1) + ". Наверху за такое заплатят — если вынесу.", Game.THOUGHT, 3.5)
-		queue_free()
+		_gone()
 		return
 	if kind == "token":
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
 		Game.report("token")
 		Game.say("Жетон № 7. На обороте нацарапано: «ВОСЬМОЙ, НЕ ВЕРЬ ГОЛОСУ».", Game.THOUGHT, 5.0)
-		queue_free()
+		_gone()
 		return
 	if kind == "pistol":
 		player.has_pistol = true
@@ -172,4 +227,11 @@ func interact(player) -> void:
 		Game.report("gear:ammo")
 	player.ammo += amount
 	Game.play_at(Sfx.pickup(), global_position, -6.0)
+	_gone()
+
+
+## Предмет забрали целиком: сообщить хозяину (старая линия помнит, что уже вынесено) и исчезнуть.
+func _gone() -> void:
+	if on_taken.is_valid():
+		on_taken.call()
 	queue_free()

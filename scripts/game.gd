@@ -33,6 +33,7 @@ var valve_order: Array = [1, 2, 3]  # в каком порядке перекр�
 var gear := {}  # что собрано в шестую смену и взято в седьмую: pistol, ammo, batteries
 const NOTES_TOTAL := 9
 var _said := {}
+var paid := {}  # какие поручения уже оплачены в эту смену (не сбрасывается при повторе после провала)
 
 
 func _ready() -> void:
@@ -146,8 +147,10 @@ func report(kind: String, amount := 1) -> void:
 				t["done"] = true
 				if kind != "return":
 					say("Выполнено: " + str(t["text"]), SYSTEM, 3.0)
-				if kind != "return" and kind != "radio":
-					Meta.earn(Meta.PAY_TASK, "поручение")
+				if not paid.has(kind):
+					# Платят один раз за смену: повтор после провала уже не оплачивается.
+					paid[kind] = true
+					Meta.earn(Meta.task_pay(kind), "поручение")
 			changed = true
 	if changed:
 		tasks_changed.emit()
@@ -298,6 +301,7 @@ func _setup_input() -> void:
 	_bind("jump", [KEY_SPACE])
 	_bind("crouch", [KEY_C, KEY_CTRL])
 	_bind("slot_8", [KEY_8])
+	_bind("tasks", [KEY_TAB])
 	if not InputMap.has_action("burn"):
 		InputMap.add_action("burn")
 	var mb := InputEventMouseButton.new()

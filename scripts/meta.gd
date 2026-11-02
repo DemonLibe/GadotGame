@@ -9,13 +9,20 @@ signal earned(amount: int, reason: String)
 const SAVE_PATH := "user://meta.cfg"
 const OPERATION_COST := 5000
 
-## Сколько платят.
-const PAY_TASK := 40      # за выполненное поручение
-const PAY_SHIFT := 150    # за закрытую смену
+## Сколько платят. Поручение — по трудности; каждое — один раз за смену (повтор после провала не платят).
+## За убитых существ не платят: обходчик — не охотник, патроны дороже.
+const PAY_TASK := 40      # обычное поручение
+const TASK_PAY := {
+	"generator": 15, "crank": 10, "descend": 20, "radio": 0, "return": 0, "exit": 0,
+	"platform": 70, "token": 90, "valves": 60, "relay": 60, "cartpush": 50, "photo": 50,
+	"fuse": 50, "cable": 50, "water": 50, "filters": 40, "webs": 40, "sensor": 40,
+}
+const PAY_SHIFT := 100    # за закрытую смену…
+const PAY_SHIFT_PER_DAY := 40  # …и сверху за каждую следующую: чем глубже, тем дороже
 const PAY_FIND := 100     # за находку
 const PAY_NOTE := 25      # за впервые прочитанную записку
-const PAY_CRAWLER := 30
-const PAY_BITER := 5
+## Перевод на операцию — не больше стольких рублей за смену (почта принимает раз в смену).
+const OPERATION_PER_SHIFT := 1000
 
 ## Расходники в шкафчике снабжения: id → [название, описание, цена].
 const SUPPLIES := {
@@ -35,6 +42,7 @@ const UPGRADES := {
 var money := 0
 var savings := 0                 # отложено на операцию (это прохождение)
 var _levels := {}                # id улучшения → уровень
+var sent_this_shift := 0         # сколько уже отложено на операцию в эту смену
 
 
 func _ready() -> void:
@@ -93,13 +101,40 @@ func buy_upgrade(id: String) -> bool:
 	return true
 
 
-## Отложить на операцию (не больше, чем осталось собрать).
+## Плата за поручение (осмотры и сборы шестой смены — по 30 и 0).
+func task_pay(kind: String) -> int:
+	if TASK_PAY.has(kind):
+		return int(TASK_PAY[kind])
+	if kind.begins_with("inspect:"):
+		return 30
+	if kind.begins_with("gear:"):
+		return 0
+	return PAY_TASK
+
+
+func shift_pay(day: int) -> int:
+	return PAY_SHIFT + PAY_SHIFT_PER_DAY * (day - 1)
+
+
+## Новая смена: перевод на операцию снова открыт.
+func new_shift() -> void:
+	sent_this_shift = 0
+	changed.emit()
+
+
+## Сколько ещё можно отложить в эту смену.
+func can_send() -> int:
+	return maxi(0, mini(OPERATION_PER_SHIFT - sent_this_shift, OPERATION_COST - savings))
+
+
+## Отложить на операцию (не больше, чем осталось собрать и чем примут за смену).
 func save_for_operation(amount: int) -> int:
-	var put := mini(mini(amount, money), OPERATION_COST - savings)
+	var put := mini(mini(amount, money), can_send())
 	if put <= 0:
 		return 0
 	money -= put
 	savings += put
+	sent_this_shift += put
 	_save()
 	changed.emit()
 	return put
