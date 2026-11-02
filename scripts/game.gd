@@ -301,6 +301,7 @@ func _setup_input() -> void:
 	_bind("jump", [KEY_SPACE])
 	_bind("crouch", [KEY_C, KEY_CTRL])
 	_bind("slot_8", [KEY_8])
+	_bind("tasks", [KEY_TAB])
 	if not InputMap.has_action("burn"):
 		InputMap.add_action("burn")
 	var mb := InputEventMouseButton.new()

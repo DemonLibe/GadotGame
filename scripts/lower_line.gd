@@ -298,7 +298,13 @@ func _decorate(c: Vector2i, root: Node3D) -> void:
 		l.add_to_group("fear_light")
 		l.add_to_group("cull_light")
 		root.add_child(l)
-		Geo.sphere(root, l.position + Vector3(0, 0.15, 0), 0.07, ProcTex.emissive(Color(1.0, 0.65, 0.3), 2.0))
+		# Переноски от генератора: кабель протянут через пролом. Нет тока — в старой линии темно.
+		var bulb := Geo.sphere(root, l.position + Vector3(0, 0.15, 0), 0.07, ProcTex.emissive(Color(1.0, 0.65, 0.3), 2.0))
+		var lamp_node := Node3D.new()
+		root.add_child(lamp_node)
+		l.reparent(lamp_node, false)
+		bulb.reparent(lamp_node, false)
+		lamp_node.add_to_group("lower_lamp")
 	# Осыпавшийся кирпич у стен.
 	for i in rng.randi_range(0, 3):
 		var p := Vector3(rng.randf_range(-1.1, 1.1), 0.08, rng.randf_range(-1.1, 1.1))

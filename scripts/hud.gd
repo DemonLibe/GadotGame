@@ -9,16 +9,20 @@ signal diary_closed
 const VIGNETTE_SHADER := """
 shader_type canvas_item;
 uniform float fear = 0.0;
+uniform float air = 0.0;  // удушье: темнеет в глазах, края сжимаются в такт дыханию
 void fragment() {
 	vec2 uv = UV - vec2(0.5);
 	float d = length(uv * vec2(1.6, 1.0));
 	float pulse = 0.5 + 0.5 * sin(TIME * (2.0 + fear * 5.0));
-	float edge = smoothstep(0.35 - fear * 0.25, 1.0, d);
-	float a = clamp(edge * (0.55 + fear * 0.45 + pulse * fear * 0.2), 0.0, 1.0);
-	COLOR = vec4(0.12 * fear, 0.0, 0.0, a);
+	float breath = 0.5 + 0.5 * sin(TIME * 1.6);
+	float edge = smoothstep(0.35 - fear * 0.25 - air * (0.3 + breath * 0.08), 1.0, d);
+	float a = clamp(edge * (0.55 + fear * 0.45 + pulse * fear * 0.2 + air * 0.6), 0.0, 1.0);
+	COLOR = vec4(0.12 * fear * (1.0 - air), 0.0, 0.0, a);
 }
 """
 const AMBER := Color(1.0, 0.75, 0.3)
+const TEXT := Color(0.86, 0.84, 0.78)
+const DIM := Color(0.6, 0.58, 0.54)
 
 var _root: Control
 var _ingame: Control
@@ -73,6 +77,14 @@ var _scream: Label
 var _paper_open := false
 var player: Player
 var _subtitle: Label
+var _subtitle_box: PanelContainer
+var _air_bar: ProgressBar
+var _air_fill: StyleBoxFlat
+var _air_label: Label
+var _health_label: Label
+var _tasks_full := false
+var _tasks_shown_full := false
+var _slot_counts: Array[Label] = []
 var _fade: ColorRect
 var _title: Label
 var _title_sub: Label
@@ -102,66 +114,70 @@ func _ready() -> void:
 	_place(dot, 0.5, 0.5, 0.5, 0.5, -2, -2, 2, 2)
 	_ingame.add_child(dot)
 
-	_prompt = _make_label(_ingame, 20, HORIZONTAL_ALIGNMENT_CENTER)
-	_place(_prompt, 0, 0.5, 1, 0.5, 0, 40, 0, 72)
+	_prompt = _make_label(_ingame, 18, HORIZONTAL_ALIGNMENT_CENTER)
+	_place(_prompt, 0, 0.5, 1, 0.5, 0, 36, 0, 64)
 
 	_hold = ProgressBar.new()
 	_hold.show_percentage = false
 	_hold.max_value = 1.0
 	_hold.visible = false
 	_hold.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_place(_hold, 0.5, 0.5, 0.5, 0.5, -90, 80, 90, 88)
+	_place(_hold, 0.5, 0.5, 0.5, 0.5, -90, 70, 90, 76)
 	_ingame.add_child(_hold)
 
-	# Список дел — на маленьком бумажном планшете с зажимом.
+	# Список дел — компактная полупрозрачная панель слева сверху: только то, что осталось.
+	# Tab — весь список, с выполненным.
 	var board := PanelContainer.new()
 	board.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var board_style := StyleBoxFlat.new()
-	board_style.bg_color = Color(0.36, 0.25, 0.15)
-	board_style.set_corner_radius_all(6)
-	board_style.set_content_margin_all(8)
-	board_style.content_margin_top = 18
-	board_style.shadow_color = Color(0, 0, 0, 0.5)
-	board_style.shadow_size = 6
-	board.add_theme_stylebox_override("panel", board_style)
-	_place(board, 0, 0, 0, 0, 18, 14, 330, 14)
-	board.rotation = deg_to_rad(-1.5)
+	board.add_theme_stylebox_override("panel", _panel_style(Color(0.03, 0.03, 0.03, 0.55), 10))
+	_place(board, 0, 0, 0, 0, 16, 16, 336, 16)
 	_ingame.add_child(board)
-	var sheet := PanelContainer.new()
-	sheet.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sheet_style := StyleBoxFlat.new()
-	sheet_style.bg_color = Color(0.88, 0.85, 0.74)
-	sheet_style.set_content_margin_all(10)
-	sheet.add_theme_stylebox_override("panel", sheet_style)
-	board.add_child(sheet)
-	var clip := ColorRect.new()
-	clip.color = Color(0.55, 0.56, 0.58)
-	clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_place(clip, 0, 0, 0, 0, 140, 8, 200, 24)
-	_ingame.add_child(clip)
 	_tasks = RichTextLabel.new()
 	_tasks.bbcode_enabled = true
 	_tasks.fit_content = true
 	_tasks.scroll_active = false
-	_tasks.custom_minimum_size = Vector2(290, 0)
+	_tasks.custom_minimum_size = Vector2(300, 0)
 	_tasks.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tasks.add_theme_font_size_override("normal_font_size", 14)
-	_tasks.add_theme_font_size_override("bold_font_size", 15)
-	_tasks.add_theme_color_override("default_color", Color(0.15, 0.13, 0.12))
-	sheet.add_child(_tasks)
+	_tasks.add_theme_font_size_override("bold_font_size", 14)
+	_tasks.add_theme_color_override("default_color", TEXT)
+	_tasks.add_theme_constant_override("line_separation", 3)
+	board.add_child(_tasks)
 
-	# Состояние: присел, в шкафу, задержал дыхание.
-	_status = _make_label(_ingame, 16, HORIZONTAL_ALIGNMENT_LEFT)
-	_place(_status, 0, 1, 0, 1, 24, -80, 420, -56)
-
-	_battery_label = _make_label(_ingame, 18, HORIZONTAL_ALIGNMENT_RIGHT)
-	_place(_battery_label, 1, 1, 1, 1, -300, -80, -24, -56)
-	# Деньги (Meta) и «+40 ₽ · поручение», когда заплатили.
+	# Показатели — слева снизу: фонарь, воздух, здоровье; над ними — состояние и что в карманах.
+	var vit := PanelContainer.new()
+	vit.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vit.add_theme_stylebox_override("panel", _panel_style(Color(0.03, 0.03, 0.03, 0.5), 10))
+	vit.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_place(vit, 0, 1, 0, 1, 16, -16, 246, -16)
+	_ingame.add_child(vit)
+	var vbox := VBoxContainer.new()
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_theme_constant_override("separation", 4)
+	vit.add_child(vbox)
+	_status = Label.new()
+	_status.add_theme_font_size_override("font_size", 13)
+	_status.add_theme_color_override("font_color", DIM)
+	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_status.custom_minimum_size = Vector2(210, 0)
+	vbox.add_child(_status)
+	var row := _vital_row(vbox, "ФОНАРЬ", Color(0.95, 0.85, 0.4))
+	_battery_label = row[0]
+	_battery = row[1]
+	_battery_fill = _battery.get_theme_stylebox("fill") as StyleBoxFlat
+	row = _vital_row(vbox, "ВОЗДУХ", Color(0.55, 0.78, 0.9))
+	_air_label = row[0]
+	_air_bar = row[1]
+	_air_fill = _air_bar.get_theme_stylebox("fill") as StyleBoxFlat
+	row = _vital_row(vbox, "ЗДОРОВЬЕ", Color(0.78, 0.22, 0.18))
+	_health_label = row[0]
+	_health_bar = row[1]
+	# Деньги — справа снизу, над ними — «+40 ₽ · поручение».
 	_money = _make_label(_ingame, 16, HORIZONTAL_ALIGNMENT_RIGHT)
-	_place(_money, 1, 1, 1, 1, -520, -108, -24, -84)
-	_coin = _make_label(_ingame, 16, HORIZONTAL_ALIGNMENT_RIGHT)
+	_place(_money, 1, 1, 1, 1, -520, -46, -20, -20)
+	_coin = _make_label(_ingame, 15, HORIZONTAL_ALIGNMENT_RIGHT)
 	_coin.add_theme_color_override("font_color", AMBER)
-	_place(_coin, 1, 1, 1, 1, -420, -136, -24, -112)
+	_place(_coin, 1, 1, 1, 1, -520, -72, -20, -48)
 	_coin.modulate.a = 0.0
 	Meta.changed.connect(_refresh_money)
 	Meta.earned.connect(func(amount: int, reason: String):
@@ -169,31 +185,16 @@ func _ready() -> void:
 		_coin_t = 3.0
 		Game.play_ui(Sfx.pickup(), -16.0))
 	_refresh_money()
-	_battery = ProgressBar.new()
-	_battery.show_percentage = false
-	_battery.max_value = 100.0
-	_battery.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0, 0, 0, 0.5)
-	_battery.add_theme_stylebox_override("background", bg)
-	_battery_fill = StyleBoxFlat.new()
-	_battery_fill.bg_color = Color(0.95, 0.85, 0.4)
-	_battery.add_theme_stylebox_override("fill", _battery_fill)
-	_place(_battery, 1, 1, 1, 1, -224, -48, -24, -36)
-	_ingame.add_child(_battery)
 
 	# Шкала страха — сверху по центру.
-	var fear_label := _make_label(_ingame, 14, HORIZONTAL_ALIGNMENT_CENTER)
+	var fear_label := _make_label(_ingame, 11, HORIZONTAL_ALIGNMENT_CENTER)
 	fear_label.text = "СТРАХ"
-	fear_label.add_theme_color_override("font_color", Color(0.85, 0.6, 0.55))
-	_place(fear_label, 0.5, 0, 0.5, 0, -150, 10, 150, 28)
+	fear_label.add_theme_color_override("font_color", Color(0.85, 0.6, 0.55, 0.85))
+	_place(fear_label, 0.5, 0, 0.5, 0, -120, 12, 120, 26)
 	_fear_bar = _bar(Color(0.55, 0.08, 0.06))
 	_fear_fill = _fear_bar.get_theme_stylebox("fill") as StyleBoxFlat
-	_place(_fear_bar, 0.5, 0, 0.5, 0, -150, 32, 150, 42)
+	_place(_fear_bar, 0.5, 0, 0.5, 0, -120, 28, 120, 34)
 	_ingame.add_child(_fear_bar)
-	_health_bar = _bar(Color(0.75, 0.2, 0.18))
-	_place(_health_bar, 0.5, 0, 0.5, 0, -150, 48, 150, 54)
-	_ingame.add_child(_health_bar)
 	# Карта в руках — бумажная схема справа.
 	_map = MapView.new()
 	_map.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -203,17 +204,28 @@ func _ready() -> void:
 	# Выносливость — тонкая полоска над инвентарём.
 	_stamina_bar = _bar(Color(0.8, 0.82, 0.75))
 	_stamina_fill = _stamina_bar.get_theme_stylebox("fill") as StyleBoxFlat
-	_place(_stamina_bar, 0.5, 1, 0.5, 1, -160, -112, 160, -106)
+	_place(_stamina_bar, 0.5, 1, 0.5, 1, -140, -94, 140, -90)
 	_ingame.add_child(_stamina_bar)
 
 	_fade = ColorRect.new()
 	_fade.color = Color.BLACK
 	_add_full(_fade)
 
-	_subtitle = _make_label(_root, 22, HORIZONTAL_ALIGNMENT_CENTER)
-	_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_subtitle.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	_place(_subtitle, 0, 1, 1, 1, 140, -230, -140, -150)
+	# Субтитры — над инвентарём, на тёмной подложке по ширине текста.
+	var sub_row := CenterContainer.new()
+	sub_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_place(sub_row, 0, 1, 1, 1, 0, -210, 0, -104)
+	_root.add_child(sub_row)
+	_subtitle_box = PanelContainer.new()
+	_subtitle_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_subtitle_box.add_theme_stylebox_override("panel", _panel_style(Color(0, 0, 0, 0.6), 8))
+	_subtitle_box.size_flags_vertical = Control.SIZE_SHRINK_END
+	sub_row.add_child(_subtitle_box)
+	_subtitle = Label.new()
+	_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_subtitle.add_theme_font_size_override("font_size", 19)
+	_subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_subtitle_box.add_child(_subtitle)
 
 	_title = _make_label(_root, 56, HORIZONTAL_ALIGNMENT_CENTER)
 	_place(_title, 0, 0.5, 1, 0.5, 0, -130, 0, -50)
@@ -287,10 +299,10 @@ func _ready() -> void:
 ## Панель инвентаря внизу по центру: в каждом слоте — вращающаяся модель предмета.
 func setup_hotbar(player: Player, with_icons := true) -> void:
 	var bar := HBoxContainer.new()
-	bar.add_theme_constant_override("separation", 8)
+	bar.add_theme_constant_override("separation", 6)
 	bar.alignment = BoxContainer.ALIGNMENT_CENTER
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_place(bar, 0, 1, 1, 1, 0, -100, 0, -20)
+	_place(bar, 0, 1, 1, 1, 0, -82, 0, -18)
 	_ingame.add_child(bar)
 	for i in Player.ITEMS.size():
 		var item: String = Player.ITEMS[i]
@@ -300,7 +312,7 @@ func setup_hotbar(player: Player, with_icons := true) -> void:
 		style.border_color = Color(1, 1, 1, 0.15)
 		style.set_corner_radius_all(4)
 		var panel := PanelContainer.new()
-		panel.custom_minimum_size = Vector2(96, 76)
+		panel.custom_minimum_size = Vector2(76, 62)
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_theme_stylebox_override("panel", style)
 		bar.add_child(panel)
@@ -324,7 +336,7 @@ func setup_hotbar(player: Player, with_icons := true) -> void:
 		var vp := SubViewport.new()
 		vp.own_world_3d = true
 		vp.transparent_bg = true
-		vp.size = Vector2i(96, 76)
+		vp.size = Vector2i(76, 62)
 		vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		holder.add_child(vp)
 		var cam := Camera3D.new()
@@ -356,11 +368,22 @@ func setup_hotbar(player: Player, with_icons := true) -> void:
 		# Номер клавиши и количество поверх картинки.
 		var label := Label.new()
 		label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-		label.add_theme_font_size_override("font_size", 13)
+		label.add_theme_font_size_override("font_size", 12)
 		label.add_theme_constant_override("outline_size", 4)
 		label.add_theme_color_override("font_outline_color", Color.BLACK)
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_child(label)
+		# Количество — в правом нижнем углу.
+		var count := Label.new()
+		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		count.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+		count.add_theme_font_size_override("font_size", 12)
+		count.add_theme_constant_override("outline_size", 4)
+		count.add_theme_color_override("font_outline_color", Color.BLACK)
+		count.add_theme_color_override("font_color", AMBER)
+		count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(count)
+		_slot_counts.append(count)
 		_slots.append(panel)
 		_slot_styles.append(style)
 		_slot_labels.append(label)
@@ -370,10 +393,13 @@ func _process(delta: float) -> void:
 	_sub_left -= delta
 	if _sub_left <= 0.0 and not _queue.is_empty():
 		var m: Array = _queue.pop_front()
-		_subtitle.text = m[0]
+		_subtitle.text = _wrap(str(m[0]), 70)
 		_subtitle.add_theme_color_override("font_color", m[1])
 		_sub_left = m[2]
-	_subtitle.modulate.a = clampf(_sub_left * 2.0, 0.0, 1.0)
+	_subtitle_box.modulate.a = clampf(_sub_left * 2.0, 0.0, 1.0)
+	_tasks_full = Input.is_action_pressed("tasks")
+	if _tasks_full != _tasks_shown_full:
+		_refresh_tasks()
 	_toast_t -= delta
 	_toast.modulate.a = clampf(_toast_t, 0.0, 1.0)
 	_flash.color.a = move_toward(_flash.color.a, 0.0, delta * 2.5)
@@ -409,7 +435,7 @@ func set_hold(progress: float) -> void:
 
 func set_battery(value: float, on: bool) -> void:
 	_battery.value = value
-	_battery_label.text = "ФОНАРЬ %d%%%s" % [int(ceil(value)), "" if on else " (выкл.)"]
+	_battery_label.text = "ФОНАРЬ  %d%%%s" % [int(ceil(value)), "" if on else " · выкл."]
 	_battery_fill.bg_color = Color(0.9, 0.2, 0.15).lerp(Color(0.95, 0.85, 0.4), clampf(value / 40.0, 0.0, 1.0))
 
 
@@ -420,12 +446,15 @@ func set_hotbar(selected: int, counts: Array, ammo: int) -> void:
 	_hotbar_state = state
 	for i in _slots.size():
 		var n: int = counts[i]
-		var text := " %d" % (i + 1)
-		if Player.ITEMS[i] == "filter" or Player.ITEMS[i] == "battery":
-			text += "           × %d" % n
-		elif Player.ITEMS[i] == "pistol" and n > 0:
-			text += "         пт %d" % ammo
-		_slot_labels[i].text = text
+		_slot_labels[i].text = " %d" % (i + 1)
+		if i < _slot_counts.size():
+			var c := ""
+			if Player.ITEMS[i] == "filter" or Player.ITEMS[i] == "battery" or (Player.ITEMS[i] == "canister" and n > 1):
+				c = "×%d " % n
+			elif Player.ITEMS[i] == "pistol" and n > 0:
+				c = "%d пт " % ammo
+			_slot_counts[i].text = c
+			_slot_counts[i].modulate.a = 1.0 if n > 0 else 0.35
 		_slot_icons[i].visible = n > 0
 		_slot_labels[i].modulate.a = 1.0 if n > 0 else 0.35
 		_slot_styles[i].border_color = AMBER if i == selected else Color(1, 1, 1, 0.15)
@@ -440,7 +469,14 @@ func set_fear(value: float) -> void:
 
 func set_health(value: float) -> void:
 	_health_bar.value = value * 100.0
-	_health_bar.modulate.a = 0.0 if value >= 0.999 else 1.0
+	_health_label.text = "ЗДОРОВЬЕ  %d" % int(ceil(value * 100.0))
+
+
+func set_air(value: float) -> void:
+	_air_bar.value = value * 100.0
+	_air_label.text = "ВОЗДУХ  %d%%" % int(ceil(value * 100.0))
+	_air_fill.bg_color = Color(0.85, 0.3, 0.2).lerp(Color(0.55, 0.78, 0.9), clampf(value / 0.45, 0.0, 1.0))
+	_vignette_mat.set_shader_parameter("air", clampf(1.0 - value / 0.35, 0.0, 1.0))
 
 
 func set_map_visible(value: bool) -> void:
@@ -819,6 +855,7 @@ func show_toast(text: String) -> void:
 
 func set_status(text: String) -> void:
 	_status.text = text
+	_status.visible = text != ""
 
 
 func set_stamina(value: float, exhausted: bool) -> void:
@@ -878,19 +915,70 @@ func _on_message(text: String, color: Color, duration: float) -> void:
 
 
 func _refresh_tasks() -> void:
-	var head := "СМЕНА № %d" % Game.day
-	var lines: PackedStringArray = ["[b]%s — СПИСОК ДЕЛ[/b]" % head, ""]
+	_tasks_shown_full = _tasks_full
+	var open := 0
+	for t in Game.tasks:
+		if not t["done"]:
+			open += 1
+	var lines: PackedStringArray = ["[color=#%s][b]СМЕНА %d[/b][/color]   [color=#%s]%s[/color]" % [AMBER.to_html(false), Game.day,
+		DIM.to_html(false), ("осталось %d" % open) if open > 0 else "всё сделано"]]
+	var shown := 0
+	var hidden := 0
 	for t in Game.tasks:
 		var text := str(t["text"])
 		if int(t["target"]) > 1:
-			text += " (%d/%d)" % [int(t["progress"]), int(t["target"])]
+			text += "  %d/%d" % [int(t["progress"]), int(t["target"])]
 		if t["done"]:
-			lines.append("[color=#6b6a5e][s]%s[/s][/color]" % text)
-		else:
-			lines.append("— " + text)
-	lines.append("")
-	lines.append("[color=#6b5a48]записки: %d из %d[/color]" % [Game.notes_count(), Game.NOTES_TOTAL])
+			if _tasks_full:
+				lines.append("[color=#6b6a5e][s]%s[/s][/color]" % text)
+			continue
+		if not _tasks_full and shown >= 5:
+			hidden += 1
+			continue
+		lines.append("[color=#%s]•[/color] %s" % [AMBER.to_html(false), text])
+		shown += 1
+	if hidden > 0:
+		lines.append("[color=#%s]…и ещё %d — Tab[/color]" % [DIM.to_html(false), hidden])
+	lines.append("[font_size=12][color=#%s]записки %d/%d%s[/color][/font_size]" % [DIM.to_html(false), Game.notes_count(), Game.NOTES_TOTAL,
+		"" if _tasks_full else "   ·   Tab — весь список"])
 	_tasks.text = "\n".join(lines)
+
+
+## Полупрозрачная тёмная плашка.
+func _panel_style(bg: Color, margin: float) -> StyleBoxFlat:
+	var st := StyleBoxFlat.new()
+	st.bg_color = bg
+	st.set_corner_radius_all(4)
+	st.set_content_margin_all(margin)
+	return st
+
+
+## Строка показателя: подпись и тонкая полоска под ней.
+func _vital_row(parent: Control, title: String, color: Color) -> Array:
+	var l := Label.new()
+	l.text = title
+	l.add_theme_font_size_override("font_size", 12)
+	l.add_theme_color_override("font_color", TEXT)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(l)
+	var bar := _bar(color)
+	bar.custom_minimum_size = Vector2(210, 6)
+	parent.add_child(bar)
+	return [l, bar]
+
+
+## Перенос субтитра по словам (ширина подложки — по тексту).
+static func _wrap(text: String, width: int) -> String:
+	var out: PackedStringArray = []
+	var line := ""
+	for w in text.split(" "):
+		if line.length() + w.length() + 1 > width and line != "":
+			out.append(line)
+			line = w
+		else:
+			line = w if line == "" else line + " " + w
+	out.append(line)
+	return "\n".join(out)
 
 
 func _bar(color: Color) -> ProgressBar:

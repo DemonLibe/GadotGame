@@ -356,6 +356,8 @@ func _process(delta: float) -> void:
 	if collapsing and not busy:
 		_update_collapse(delta)
 	_update_water()
+	if not busy:
+		_update_air(delta)
 	if busy or _smoke:
 		return
 	# Сорвался в шахту.
@@ -1638,6 +1640,51 @@ func take_photo(spot: TaskDevice) -> void:
 
 
 ## Вода в затопленной штольне замедляет и хлюпает.
+## Воздух и свет от генератора. Работает — вентиляция гонит воздух в тоннель и горят лампы
+## (в том числе протянутые в старую линию). Заглох — в тоннеле становится душно, а в старой линии темно.
+## В старой линии своей вентиляции нет: воздух уходит всегда, без генератора — вдвое быстрее.
+const AIR_TUNNEL_ON := 8.0       # в тоннеле с генератором — продувает
+const AIR_TUNNEL_OFF := -0.55    # без него — три минуты до удушья
+const AIR_OLD_ON := -0.3         # старая линия с генератором (тянет из пролома)
+const AIR_OLD_OFF := -0.7
+var _breath_t := 0.0
+var _lamps_power := true
+
+
+func _update_air(delta: float) -> void:
+	var p := player.global_position
+	var lower := level.lower
+	var on := generator.running
+	if on != _lamps_power:
+		_lamps_power = on
+		for l in get_tree().get_nodes_in_group("lower_lamp"):
+			(l as Node3D).visible = on
+	var rate := 25.0
+	if p.y < Level.FLOOR_Y + 5.0:
+		if lower.contains(p) or lower.in_passage(p):
+			rate = AIR_OLD_ON if on else AIR_OLD_OFF
+		else:
+			rate = AIR_TUNNEL_ON if on else AIR_TUNNEL_OFF
+			if Game.day == Game.LAST_DAY and not on:
+				rate = -0.18  # седьмая: из пролома к вагону тянет тёплым воздухом
+	if player.climbing:
+		rate = maxf(rate, 4.0)  # в шахте тянет сквозняком
+	player.air = clampf(player.air + rate * delta, 0.0, Player.AIR_MAX)
+	if player.air < 45.0 and rate < 0.0:
+		Game.say_once("air_low_%d" % Game.day, "Душно... Воздух тяжёлый. Генератор не гонит вентиляцию — или я слишком глубоко.", Game.THOUGHT, 4.5)
+	if player.air < 30.0:
+		_breath_t -= delta
+		if _breath_t <= 0.0:
+			_breath_t = lerpf(1.2, 3.0, player.air / 30.0)
+			Game.play_ui(Sfx.gasp(), -14.0 + (30.0 - player.air) * 0.3)
+	if player.air < 12.0 and not _smoke:
+		player.health -= delta * lerpf(6.0, 1.5, player.air / 12.0)
+		player._hurt_wait = 6.0
+		if player.health <= 0.0:
+			player.health = 0.0
+			fail_day("Воздух кончился. Перед глазами поплыло, и ты осел на рельсы.")
+
+
 func _update_water() -> void:
 	var slow := 1.0
 	if pump != null and is_instance_valid(pump) and pump.water_level > 0.05:
@@ -1873,6 +1920,18 @@ func _smoke_test() -> void:
 	var shop_ok := Meta.money < money_before and Meta.level("boots") > 0 and not player.input_locked
 	if not shop_ok:
 		print("SMOKE FAIL: снабжение")
+	# Воздух: без генератора в тоннеле убывает, с ним — продувает; в старой линии убывает всегда.
+	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -70.0)
+	generator.stall()
+	player.air = 50.0
+	await get_tree().create_timer(1.0).timeout
+	var air_ok := player.air < 50.0
+	generator.run()
+	await get_tree().create_timer(1.0).timeout
+	air_ok = air_ok and player.air > 50.0
+	if not air_ok:
+		print("SMOKE FAIL: воздух от генератора")
+	shop_ok = shop_ok and air_ok
 	# Старая линия в третью смену: спуск, находка, платформа; провал — линия та же и вещмешок на месте;
 	# вынес находки наверх — заплатили.
 	start_day(3)

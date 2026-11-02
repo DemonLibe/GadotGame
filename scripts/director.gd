@@ -390,9 +390,13 @@ func _update_fear(delta: float) -> void:
 	if player.climbing:
 		Game.add_fear(-delta * 2.0)
 		return
-	var lit := player.has_light() or level.is_lit_near(pos) or pos.y > Level.ROOM_Y - 1.0
-	if lit:
-		Game.add_fear(-delta * (6.0 if pos.z > Level.TUN_Z0 or pos.y > Level.ROOM_Y - 1.0 else 2.5))
+	# Лампы (ток от генератора) успокаивают по-настоящему, один налобник — едва-едва.
+	var lamp := level.is_lit_near(pos) or pos.y > Level.ROOM_Y - 1.0
+	var lit := lamp or player.has_light()
+	if lamp:
+		Game.add_fear(-delta * (6.0 if pos.z > Level.TUN_Z0 or pos.y > Level.ROOM_Y - 1.0 else 3.5))
+	elif lit:
+		Game.add_fear(-delta * 0.8)
 	else:
 		# Шестая смена — тихая, страх копится как в первую.
 		var d := 1 if Game.day == Game.LAST_DAY - 1 else Game.day
