@@ -456,7 +456,68 @@ func _floor(tunnel: int, along: float, lateral: float) -> Vector3:
 	return level.floor_point(tunnel, along, lateral)
 
 
+## Обстановка из набора ассетов (assets/hope_light_assets_extra): модели стоят всё время, как стены.
+## Передняя сторона моделей набора — +Z.
+func _spawn_kit_props() -> void:
+	if not ResourceLoader.exists(ProcTex.KIT + "models/common/fuel_barrel.glb"):
+		return
+	var k := ProcTex.kit_model
+	var ry := Level.ROOM_Y
+	var x0 := Level.SHAFT_X - 3.5
+	var x1 := Level.SHAFT_X + 3.5
+	var z0 := Level.SHAFT_Z - 3.5
+	var z1 := Level.SHAFT_Z + 3.5
+	# Дежурка: схема линии на южной стене, раскладушка под ней, плитка с чайником на столе журнала,
+	# аптечка и график обхода на восточной стене.
+	k.call(level, "common/line_scheme_board", Vector3(x0 + 1.2, ry + 1.45, z0 + 0.03), 0.0)
+	k.call(level, "01_duty_room/cot", Vector3(x0 + 1.05, ry, z0 + 0.6), PI / 2)
+	k.call(level, "01_duty_room/stove_kettle", Vector3(x1 - 0.6, ry + 0.805, z0 + 1.45), -PI / 2)
+	k.call(level, "01_duty_room/first_aid_box", Vector3(x1 - 0.08, ry + 1.5, z0 + 0.7), -PI / 2)
+	k.call(level, "common/wall_poster_schedule", Vector3(x1 - 0.02, ry + 1.5, z1 - 1.2), -PI / 2)
+	k.call(level, "common/fire_extinguisher", Vector3(x0 + 0.25, ry, z0 + 1.6), PI / 2)
+	# Станция: упор в конце пути, бочка и огнетушитель у генератора, щит с инструментом, плакат,
+	# светофор у портала тоннеля.
+	var fy := Level.FLOOR_Y
+	k.call(level, "03_platform/buffer_stop", Vector3(Level.TUN_CX, fy, -30.9), PI)
+	k.call(level, "common/fuel_barrel", Vector3(-2.45, fy, -47.4), 0.4)
+	k.call(level, "common/fire_extinguisher", Vector3(-2.85, fy, -41.6), PI / 2)
+	k.call(level, "03_platform/tool_board", Vector3(-2.97, fy + 0.9, -36.6), PI / 2)
+	k.call(level, "common/wall_poster_safety", Vector3(2.98, fy + 1.5, -44.0), -PI / 2)
+	_kit_light_prop("04_cast_iron_tunnel/tunnel_signal", Vector3(2.6, fy + 2.3, -49.4), 0.0)
+	# Тоннель: лужи на лотке, светофор у решётки.
+	for z in [-61.0, -96.0, -143.0, -181.0, -228.0, -268.0, -301.0]:
+		k.call(level, "common/puddle_decal", Vector3(Level.TUN_CX - 0.9, fy + 0.012, z), randf() * TAU)
+	_kit_light_prop("04_cast_iron_tunnel/tunnel_signal", Vector3(Level.TUN_CX + 1.75, fy + 2.0, Level.GRATE_Z + 6.0), -PI / 2)
+	# Служебные комнаты: подстилка (на ней потом лежат кости), кровать или табурет с ведром, полка.
+	for i in level.rooms.size():
+		var room: Dictionary = level.rooms[i]
+		var c: Vector3 = room["center"]
+		var b: Basis = room["basis"]
+		var put := func(path: String, local: Vector3, yaw: float) -> void:
+			var m: Node3D = ProcTex.kit_model(level, path)
+			m.transform = Transform3D(b * Basis(Vector3.UP, yaw), c + b * local)
+		put.call("05_service_room/remains_bedding", Vector3(0.6, 0.0, -1.1), 0.0)
+		put.call("05_service_room/wall_shelf", Vector3(1.58, 1.3, 0.1), -PI / 2)
+		if i % 2 == 0:
+			put.call("05_service_room/iron_bed", Vector3(-1.25, 0.0, -0.55), 0.0)
+		else:
+			put.call("05_service_room/stool", Vector3(-1.2, 0.0, 1.15), 0.3)
+			put.call("05_service_room/bucket", Vector3(1.35, 0.0, -0.35), 0.0)
+
+
+## Модель-префаб набора со своим светом (светофор): свет гасится вдали, как лампы.
+func _kit_light_prop(path: String, pos: Vector3, yaw: float) -> void:
+	var scene := load(ProcTex.KIT + "prefabs/%s.tscn" % path) as PackedScene
+	var n := scene.instantiate() as Node3D
+	n.transform = Transform3D(Basis(Vector3.UP, yaw), pos)
+	level.add_child(n)
+	for l in n.find_children("*", "Light3D", true, false):
+		(l as Light3D).add_to_group("cull_light")
+		(l as Light3D).shadow_enabled = false
+
+
 func _spawn_props() -> void:
+	_spawn_kit_props()
 	ladder = Ladder.new()
 	# Лестница — у стены напротив петель люка (петли на северной кромке).
 	ladder.setup(Level.SHAFT_X, Level.SHAFT_Z + Level.SHAFT_HALF, -1.0, Level.FLOOR_Y, Level.ROOM_Y,

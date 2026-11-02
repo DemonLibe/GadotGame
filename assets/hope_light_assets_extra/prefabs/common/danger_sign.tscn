@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/hope_light_assets_extra/models/common/danger_sign.glb" id="1_1rqwt"]
+
+[node name="DangerSign" type="Node3D"]
+
+[node name="Model" type="Node3D" parent="." instance=ExtResource("1_1rqwt")]

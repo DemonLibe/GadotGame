@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/hope_light_assets_extra/models/01_duty_room/ceiling_dome_lamp.glb" id="1_vvv2l"]
+
+[node name="CeilingDomeLamp" type="Node3D"]
+
+[node name="Model" type="Node3D" parent="." instance=ExtResource("1_vvv2l")]
+
+[node name="Light" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 0)
+light_color = Color(1, 0.72, 0.4, 1)
+shadow_enabled = true
+omni_range = 6.0

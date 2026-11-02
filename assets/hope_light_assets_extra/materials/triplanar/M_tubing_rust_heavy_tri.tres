@@ -1,0 +1,16 @@
+[gd_resource type="StandardMaterial3D" load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/tubing_rust_heavy.png" id="1_hvms4"]
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/tubing_rust_heavy_n.png" id="2_6qevn"]
+
+[resource]
+resource_name = "M_tubing_rust_heavy"
+albedo_texture = ExtResource("1_hvms4")
+metallic = 0.5
+roughness = 0.9
+normal_enabled = true
+normal_scale = 0.6
+normal_texture = ExtResource("2_6qevn")
+uv1_triplanar = true
+uv1_world_triplanar = true
+texture_filter = 2

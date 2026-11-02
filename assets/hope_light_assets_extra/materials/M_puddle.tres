@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/puddle.png" id="1_y7qx5"]
+
+[resource]
+resource_name = "M_puddle"
+transparency = 2
+alpha_scissor_threshold = 0.5
+alpha_antialiasing_mode = 0
+cull_mode = 2
+albedo_texture = ExtResource("1_y7qx5")
+roughness = 0.05
+texture_filter = 2

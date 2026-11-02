@@ -1,0 +1,14 @@
+[gd_resource type="StandardMaterial3D" load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/cast_iron.png" id="1_5w2k2"]
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/cast_iron_n.png" id="2_modaw"]
+
+[resource]
+resource_name = "M_cast_iron"
+albedo_texture = ExtResource("1_5w2k2")
+metallic = 0.6
+roughness = 0.7
+normal_enabled = true
+normal_scale = 0.6
+normal_texture = ExtResource("2_modaw")
+texture_filter = 2

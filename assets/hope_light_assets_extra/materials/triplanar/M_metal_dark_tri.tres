@@ -1,0 +1,16 @@
+[gd_resource type="StandardMaterial3D" load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/metal_dark.png" id="1_y31qk"]
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/metal_dark_n.png" id="2_t6ggv"]
+
+[resource]
+resource_name = "M_metal_dark"
+albedo_texture = ExtResource("1_y31qk")
+metallic = 0.7
+roughness = 0.6
+normal_enabled = true
+normal_scale = 0.6
+normal_texture = ExtResource("2_t6ggv")
+uv1_triplanar = true
+uv1_world_triplanar = true
+texture_filter = 2

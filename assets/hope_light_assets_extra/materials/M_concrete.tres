@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/concrete.png" id="1_il26c"]
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/concrete_n.png" id="2_vfupv"]
+
+[resource]
+resource_name = "M_concrete"
+albedo_texture = ExtResource("1_il26c")
+roughness = 0.9
+normal_enabled = true
+normal_scale = 0.6
+normal_texture = ExtResource("2_vfupv")
+texture_filter = 2
