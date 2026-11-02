@@ -358,6 +358,10 @@ func _process(delta: float) -> void:
 	_update_water()
 	if not busy:
 		_update_air(delta)
+	_loc_t -= delta
+	if _loc_t <= 0.0:
+		_loc_t = 0.4
+		hud.set_location(_location_text())
 	if busy or _smoke:
 		return
 	# Сорвался в шахту.
@@ -426,12 +430,14 @@ func _pause() -> void:
 	if state != "playing" or busy:
 		return
 	state = "paused"
+	hud.visible = false  # меню паузы — без интерфейса и субтитров поверх
 	get_tree().paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	menu.show_pause()
 
 
 func _on_resume() -> void:
+	hud.visible = true
 	menu.hide_all()
 	get_tree().paused = false
 	state = "playing"
@@ -1640,6 +1646,29 @@ func take_photo(spot: TaskDevice) -> void:
 
 
 ## Вода в затопленной штольне замедляет и хлюпает.
+var _loc_t := 0.0
+
+
+## Табличка «где я» в интерфейсе.
+func _location_text() -> String:
+	var p := player.global_position
+	if p.y > Level.ROOM_Y - 2.0:
+		return "ДЕЖУРКА"
+	if p.y > Level.FLOOR_Y + 4.0:
+		return "ШАХТА № 3 · %d М" % int(Level.ROOM_Y - p.y)
+	if level.lower.contains(p):
+		return "СТАРАЯ ЛИНИЯ"
+	if level.lower.in_passage(p):
+		return "ПРОЛОМ"
+	if p.z > Level.TUN_Z0:
+		return "СТАНЦИЯ «ТИХАЯ»"
+	var seg := level._segment_index(p)
+	if seg > 0 and seg <= Level.BRANCHES.size():
+		return str(Level.BRANCHES[seg - 1]["name"])
+	var pk := int(round((Level.TUN_Z0 - p.z) / Level.PICKET_STEP))
+	return "ТОННЕЛЬ · ПК %d" % pk if pk > 0 else "ТОННЕЛЬ"
+
+
 ## Воздух и свет от генератора. Работает — вентиляция гонит воздух в тоннель и горят лампы
 ## (в том числе протянутые в старую линию). Заглох — в тоннеле становится душно, а в старой линии темно.
 ## В старой линии своей вентиляции нет: воздух уходит всегда, без генератора — вдвое быстрее.

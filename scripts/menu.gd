@@ -43,6 +43,7 @@ func _ready() -> void:
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.theme = HudWidgets.theme()  # шрифты — как в игре
 	add_child(center)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 14)

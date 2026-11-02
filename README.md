@@ -117,3 +117,6 @@ voice/          озвучка диспетчера и Маши
 | Музыка меню | [At the End of Hope](https://opengameart.org/content/at-the-end-of-hope) | Emma_MA |
 
 Голоса диспетчера и Маши — нейросетевой синтез [Piper](https://github.com/rhasspy/piper).
+
+**Шрифты** (`assets/fonts/`, [SIL OFL 1.1](https://openfontlicense.org)): [Oswald](https://github.com/googlefonts/OswaldFont)
+(The Oswald Project Authors) — интерфейс, [PT Mono](https://www.paratype.com/public) (ParaType) — путевой лист.

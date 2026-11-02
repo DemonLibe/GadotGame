@@ -28,10 +28,17 @@ var _root: Control
 var _ingame: Control
 var _vignette_mat: ShaderMaterial
 var _prompt: Label
+var _prompt_key: PanelContainer
+var _prompt_key_label: Label
 var _hold: ProgressBar
 var _tasks: RichTextLabel
-var _battery: ProgressBar
-var _battery_fill: StyleBoxFlat
+var _slip: HudWidgets.Slip
+var _location: Label
+var _pulse: HudWidgets.Pulse
+var _item_name: Label
+var _item_t := 0.0
+var _last_selected := -2
+var _battery: HudWidgets.SegBar
 var _battery_label: Label
 var _slots: Array[PanelContainer] = []
 var _slot_styles: Array[StyleBoxFlat] = []
@@ -39,11 +46,8 @@ var _slot_labels: Array[Label] = []
 const ICON_SIZE := 0.3  # наибольший размер модели в иконке слота, м
 var _slot_icons: Array[Node3D] = []
 var _hotbar_state := ""
-var _fear_bar: ProgressBar
-var _fear_fill: StyleBoxFlat
-var _stamina_bar: ProgressBar
-var _stamina_fill: StyleBoxFlat
-var _health_bar: ProgressBar
+var _stamina_bar: HudWidgets.SegBar
+var _health_bar: HudWidgets.SegBar
 var _map: MapView
 var _note_panel: PanelContainer
 var _note_title: Label
@@ -78,8 +82,7 @@ var _paper_open := false
 var player: Player
 var _subtitle: Label
 var _subtitle_box: PanelContainer
-var _air_bar: ProgressBar
-var _air_fill: StyleBoxFlat
+var _air_bar: HudWidgets.SegBar
 var _air_label: Label
 var _health_label: Label
 var _tasks_full := false
@@ -95,6 +98,7 @@ var _sub_left := 0.0
 func _ready() -> void:
 	layer = 10
 	_root = _full_control()
+	_root.theme = HudWidgets.theme()
 	add_child(_root)
 
 	var vig := ColorRect.new()
@@ -114,70 +118,106 @@ func _ready() -> void:
 	_place(dot, 0.5, 0.5, 0.5, 0.5, -2, -2, 2, 2)
 	_ingame.add_child(dot)
 
-	_prompt = _make_label(_ingame, 18, HORIZONTAL_ALIGNMENT_CENTER)
-	_place(_prompt, 0, 0.5, 1, 0.5, 0, 36, 0, 64)
+	# Подсказка под прицелом: клавиша — «клавишей», текст — рядом.
+	var prompt_row := CenterContainer.new()
+	prompt_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_place(prompt_row, 0, 0.5, 1, 0.5, 0, 30, 0, 66)
+	_ingame.add_child(prompt_row)
+	var prompt_box := HBoxContainer.new()
+	prompt_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	prompt_box.add_theme_constant_override("separation", 8)
+	prompt_row.add_child(prompt_box)
+	_prompt_key = PanelContainer.new()
+	_prompt_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var keycap := StyleBoxFlat.new()
+	keycap.bg_color = Color(0.85, 0.82, 0.72)
+	keycap.border_color = Color(0.4, 0.38, 0.33)
+	keycap.border_width_bottom = 3
+	keycap.set_corner_radius_all(3)
+	keycap.content_margin_left = 7
+	keycap.content_margin_right = 7
+	_prompt_key.add_theme_stylebox_override("panel", keycap)
+	_prompt_key_label = HudWidgets.label("E", 16, Color(0.1, 0.09, 0.08), HudWidgets.oswald(600))
+	_prompt_key_label.add_theme_constant_override("outline_size", 0)
+	_prompt_key.add_child(_prompt_key_label)
+	prompt_box.add_child(_prompt_key)
+	_prompt = HudWidgets.label("", 18, TEXT)
+	prompt_box.add_child(_prompt)
 
 	_hold = ProgressBar.new()
 	_hold.show_percentage = false
 	_hold.max_value = 1.0
 	_hold.visible = false
 	_hold.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_place(_hold, 0.5, 0.5, 0.5, 0.5, -90, 70, 90, 76)
+	_hold.add_theme_stylebox_override("background", _panel_style(Color(0, 0, 0, 0.6), 0))
+	var hold_fill := StyleBoxFlat.new()
+	hold_fill.bg_color = AMBER
+	_hold.add_theme_stylebox_override("fill", hold_fill)
+	_place(_hold, 0.5, 0.5, 0.5, 0.5, -90, 72, 90, 77)
 	_ingame.add_child(_hold)
 
-	# Список дел — компактная полупрозрачная панель слева сверху: только то, что осталось.
-	# Tab — весь список, с выполненным.
-	var board := PanelContainer.new()
-	board.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	board.add_theme_stylebox_override("panel", _panel_style(Color(0.03, 0.03, 0.03, 0.55), 10))
-	_place(board, 0, 0, 0, 0, 16, 16, 336, 16)
-	_ingame.add_child(board)
+	# Путевой лист — слева сверху: что осталось сделать (Tab — весь лист).
+	_slip = HudWidgets.Slip.new()
+	_place(_slip, 0, 0, 0, 0, 18, 16, 332, 16)
+	_slip.rotation = deg_to_rad(-0.8)
+	_ingame.add_child(_slip)
 	_tasks = RichTextLabel.new()
 	_tasks.bbcode_enabled = true
 	_tasks.fit_content = true
 	_tasks.scroll_active = false
-	_tasks.custom_minimum_size = Vector2(300, 0)
+	_tasks.custom_minimum_size = Vector2(290, 0)
 	_tasks.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_tasks.add_theme_font_size_override("normal_font_size", 14)
-	_tasks.add_theme_font_size_override("bold_font_size", 14)
-	_tasks.add_theme_color_override("default_color", TEXT)
-	_tasks.add_theme_constant_override("line_separation", 3)
-	board.add_child(_tasks)
+	_tasks.add_theme_font_override("normal_font", HudWidgets.mono())
+	_tasks.add_theme_font_override("bold_font", HudWidgets.mono())
+	_tasks.add_theme_font_size_override("normal_font_size", 13)
+	_tasks.add_theme_font_size_override("bold_font_size", 13)
+	_tasks.add_theme_color_override("default_color", HudWidgets.INK)
+	_tasks.add_theme_constant_override("line_separation", 2)
+	_slip.add_child(_tasks)
 
-	# Показатели — слева снизу: фонарь, воздух, здоровье; над ними — состояние и что в карманах.
-	var vit := PanelContainer.new()
-	vit.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vit.add_theme_stylebox_override("panel", _panel_style(Color(0.03, 0.03, 0.03, 0.5), 10))
+	# Где ты — табличка справа сверху.
+	var where := HudWidgets.Plate.new(6)
+	where.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_place(where, 1, 0, 1, 0, -18, 16, -18, 16)
+	_ingame.add_child(where)
+	_location = HudWidgets.label("", 15, AMBER, HudWidgets.oswald(500))
+	where.add_child(_location)
+
+	# Приборный щиток — слева снизу: фонарь, воздух, здоровье; над ним — состояние и карманы.
+	_status = HudWidgets.label("", 13, DIM)
+	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_status.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	_place(_status, 0, 1, 0, 1, 20, -190, 300, -138)
+	_ingame.add_child(_status)
+	var vit := HudWidgets.Plate.new(8)
 	vit.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_place(vit, 0, 1, 0, 1, 16, -16, 246, -16)
+	_place(vit, 0, 1, 0, 1, 16, -16, 16, -16)
 	_ingame.add_child(vit)
 	var vbox := VBoxContainer.new()
 	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_theme_constant_override("separation", 4)
+	vbox.add_theme_constant_override("separation", 3)
 	vit.add_child(vbox)
-	_status = Label.new()
-	_status.add_theme_font_size_override("font_size", 13)
-	_status.add_theme_color_override("font_color", DIM)
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.custom_minimum_size = Vector2(210, 0)
-	vbox.add_child(_status)
-	var row := _vital_row(vbox, "ФОНАРЬ", Color(0.95, 0.85, 0.4))
+	var row := _vital_row(vbox, "ФОНАРЬ", Color(1.0, 0.82, 0.35))
 	_battery_label = row[0]
 	_battery = row[1]
-	_battery_fill = _battery.get_theme_stylebox("fill") as StyleBoxFlat
-	row = _vital_row(vbox, "ВОЗДУХ", Color(0.55, 0.78, 0.9))
+	row = _vital_row(vbox, "ВОЗДУХ", Color(0.5, 0.82, 0.95))
 	_air_label = row[0]
 	_air_bar = row[1]
-	_air_fill = _air_bar.get_theme_stylebox("fill") as StyleBoxFlat
-	row = _vital_row(vbox, "ЗДОРОВЬЕ", Color(0.78, 0.22, 0.18))
+	row = _vital_row(vbox, "ЗДОРОВЬЕ", Color(0.9, 0.25, 0.2))
 	_health_label = row[0]
 	_health_bar = row[1]
+
 	# Деньги — справа снизу, над ними — «+40 ₽ · поручение».
-	_money = _make_label(_ingame, 16, HORIZONTAL_ALIGNMENT_RIGHT)
-	_place(_money, 1, 1, 1, 1, -520, -46, -20, -20)
+	var purse := HudWidgets.Plate.new(6)
+	purse.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	purse.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_place(purse, 1, 1, 1, 1, -16, -16, -16, -16)
+	_ingame.add_child(purse)
+	_money = HudWidgets.label("", 18, TEXT, HudWidgets.oswald(500))
+	purse.add_child(_money)
 	_coin = _make_label(_ingame, 15, HORIZONTAL_ALIGNMENT_RIGHT)
 	_coin.add_theme_color_override("font_color", AMBER)
-	_place(_coin, 1, 1, 1, 1, -520, -72, -20, -48)
+	_place(_coin, 1, 1, 1, 1, -520, -84, -22, -60)
 	_coin.modulate.a = 0.0
 	Meta.changed.connect(_refresh_money)
 	Meta.earned.connect(func(amount: int, reason: String):
@@ -186,26 +226,33 @@ func _ready() -> void:
 		Game.play_ui(Sfx.pickup(), -16.0))
 	_refresh_money()
 
-	# Шкала страха — сверху по центру.
-	var fear_label := _make_label(_ingame, 11, HORIZONTAL_ALIGNMENT_CENTER)
-	fear_label.text = "СТРАХ"
-	fear_label.add_theme_color_override("font_color", Color(0.85, 0.6, 0.55, 0.85))
-	_place(fear_label, 0.5, 0, 0.5, 0, -120, 12, 120, 26)
-	_fear_bar = _bar(Color(0.55, 0.08, 0.06))
-	_fear_fill = _fear_bar.get_theme_stylebox("fill") as StyleBoxFlat
-	_place(_fear_bar, 0.5, 0, 0.5, 0, -120, 28, 120, 34)
-	_ingame.add_child(_fear_bar)
+	# Пульс вместо шкалы страха — сверху по центру.
+	var monitor := HudWidgets.Plate.new(5)
+	_place(monitor, 0.5, 0, 0.5, 0, -110, 12, 110, 12)
+	_ingame.add_child(monitor)
+	var mrow := HBoxContainer.new()
+	mrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mrow.add_theme_constant_override("separation", 8)
+	monitor.add_child(mrow)
+	mrow.add_child(HudWidgets.label("ПУЛЬС", 12, Color(0.55, 0.85, 0.55), HudWidgets.oswald(500)))
+	_pulse = HudWidgets.Pulse.new()
+	mrow.add_child(_pulse)
 	# Карта в руках — бумажная схема справа.
 	_map = MapView.new()
 	_map.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_map.visible = false
 	_place(_map, 1, 0.5, 1, 0.5, -400, -250, -40, 250)
 	_ingame.add_child(_map)
-	# Выносливость — тонкая полоска над инвентарём.
-	_stamina_bar = _bar(Color(0.8, 0.82, 0.75))
-	_stamina_fill = _stamina_bar.get_theme_stylebox("fill") as StyleBoxFlat
+	# Выносливость — тонкая шкала над инвентарём; название предмета в руках — над ней.
+	_stamina_bar = HudWidgets.SegBar.new(Color(0.85, 0.85, 0.78), 280.0, 4.0)
+	_stamina_bar.segments = 28
+	_stamina_bar.warn = 0.0
 	_place(_stamina_bar, 0.5, 1, 0.5, 1, -140, -94, 140, -90)
 	_ingame.add_child(_stamina_bar)
+	_item_name = _make_label(_ingame, 15, HORIZONTAL_ALIGNMENT_CENTER)
+	_item_name.add_theme_color_override("font_color", AMBER)
+	_place(_item_name, 0, 1, 1, 1, 0, -120, 0, -98)
+	_item_name.modulate.a = 0.0
 
 	_fade = ColorRect.new()
 	_fade.color = Color.BLACK
@@ -405,6 +452,8 @@ func _process(delta: float) -> void:
 	_flash.color.a = move_toward(_flash.color.a, 0.0, delta * 2.5)
 	_coin_t -= delta
 	_coin.modulate.a = clampf(_coin_t, 0.0, 1.0)
+	_item_t -= delta
+	_item_name.modulate.a = clampf(_item_t * 2.0, 0.0, 1.0)
 	_photo_t -= delta
 	_photo.modulate.a = clampf(_photo_t, 0.0, 1.0)
 	_photo.visible = _photo_t > 0.0
@@ -425,7 +474,16 @@ func set_ingame(value: bool) -> void:
 
 
 func set_prompt(text: String) -> void:
-	_prompt.text = text
+	# «E — …» и «Удерживай E — …»: клавишу — на клавишу, остальное — текстом.
+	var key := ""
+	var rest := text
+	for pre in ["Удерживай E — ", "удерживай E — ", "E — "]:
+		if text.begins_with(pre):
+			key = "E"
+			rest = ("держать: " if pre.to_lower().begins_with("удерж") else "") + text.substr(pre.length())
+			break
+	_prompt_key.visible = key != ""
+	_prompt.text = rest
 
 
 func set_hold(progress: float) -> void:
@@ -434,9 +492,9 @@ func set_hold(progress: float) -> void:
 
 
 func set_battery(value: float, on: bool) -> void:
-	_battery.value = value
-	_battery_label.text = "ФОНАРЬ  %d%%%s" % [int(ceil(value)), "" if on else " · выкл."]
-	_battery_fill.bg_color = Color(0.9, 0.2, 0.15).lerp(Color(0.95, 0.85, 0.4), clampf(value / 40.0, 0.0, 1.0))
+	_battery.set_value(value / 100.0)
+	_battery.modulate.a = 1.0 if on else 0.45
+	_battery_label.text = "%d%%%s" % [int(ceil(value)), "" if on else " · выкл"]
 
 
 func set_hotbar(selected: int, counts: Array, ammo: int) -> void:
@@ -457,25 +515,28 @@ func set_hotbar(selected: int, counts: Array, ammo: int) -> void:
 			_slot_counts[i].modulate.a = 1.0 if n > 0 else 0.35
 		_slot_icons[i].visible = n > 0
 		_slot_labels[i].modulate.a = 1.0 if n > 0 else 0.35
-		_slot_styles[i].border_color = AMBER if i == selected else Color(1, 1, 1, 0.15)
-		_slot_styles[i].bg_color = Color(0.25, 0.17, 0.05, 0.6) if i == selected else Color(0, 0, 0, 0.5)
+		_slot_styles[i].border_color = AMBER if i == selected else HudWidgets.STEEL_EDGE
+		_slot_styles[i].bg_color = Color(0.28, 0.19, 0.06, 0.85) if i == selected else HudWidgets.STEEL
+	if selected != _last_selected:
+		_last_selected = selected
+		if selected >= 0:
+			_item_name.text = str(Player.ITEM_NAMES[selected]).to_upper()
+			_item_t = 1.6
 
 
 func set_fear(value: float) -> void:
 	_vignette_mat.set_shader_parameter("fear", value)
-	_fear_bar.value = value * 100.0
-	_fear_fill.bg_color = Color(0.45, 0.08, 0.06).lerp(Color(1.0, 0.15, 0.1), value)
+	_pulse.fear = value
 
 
 func set_health(value: float) -> void:
-	_health_bar.value = value * 100.0
-	_health_label.text = "ЗДОРОВЬЕ  %d" % int(ceil(value * 100.0))
+	_health_bar.set_value(value)
+	_health_label.text = "%d" % int(ceil(value * 100.0))
 
 
 func set_air(value: float) -> void:
-	_air_bar.value = value * 100.0
-	_air_label.text = "ВОЗДУХ  %d%%" % int(ceil(value * 100.0))
-	_air_fill.bg_color = Color(0.85, 0.3, 0.2).lerp(Color(0.55, 0.78, 0.9), clampf(value / 0.45, 0.0, 1.0))
+	_air_bar.set_value(value)
+	_air_label.text = "%d%%" % int(ceil(value * 100.0))
 	_vignette_mat.set_shader_parameter("air", clampf(1.0 - value / 0.35, 0.0, 1.0))
 
 
@@ -544,7 +605,17 @@ var _loot := 0
 
 
 func _refresh_money() -> void:
-	_money.text = "%d ₽" % Meta.money + ("  · при себе находок на %d ₽" % _loot if _loot > 0 else "")
+	_money.text = _rub(Meta.money) + ("   ·   в мешке на " + _rub(_loot) if _loot > 0 else "")
+
+
+## 127720 → «127 720 ₽».
+static func _rub(n: int) -> String:
+	var t := str(absi(n))
+	var out := ""
+	while t.length() > 3:
+		out = " " + t.substr(t.length() - 3) + out
+		t = t.substr(0, t.length() - 3)
+	return ("-" if n < 0 else "") + t + out + " ₽"
 
 
 ## Находки из старой линии при себе: платят, когда вынесешь их на станцию.
@@ -859,9 +930,14 @@ func set_status(text: String) -> void:
 
 
 func set_stamina(value: float, exhausted: bool) -> void:
-	_stamina_bar.value = value * 100.0
-	_stamina_bar.modulate.a = 0.25 if value >= 0.999 else 1.0
-	_stamina_fill.bg_color = Color(0.9, 0.35, 0.2) if exhausted else Color(0.8, 0.82, 0.75)
+	_stamina_bar.set_value(value)
+	_stamina_bar.modulate.a = 0.0 if value >= 0.999 else 1.0
+	_stamina_bar.color = Color(0.95, 0.4, 0.25) if exhausted else Color(0.85, 0.85, 0.78)
+
+
+## Где обходчик: «ТОННЕЛЬ · ПК 3», «СТАРАЯ ЛИНИЯ»…
+func set_location(text: String) -> void:
+	_location.text = text
 
 
 func hide_vignette() -> void:
@@ -920,27 +996,31 @@ func _refresh_tasks() -> void:
 	for t in Game.tasks:
 		if not t["done"]:
 			open += 1
-	var lines: PackedStringArray = ["[color=#%s][b]СМЕНА %d[/b][/color]   [color=#%s]%s[/color]" % [AMBER.to_html(false), Game.day,
-		DIM.to_html(false), ("осталось %d" % open) if open > 0 else "всё сделано"]]
+	_slip.stamp = "СМЕНА № %d" % Game.day
+	_slip.queue_redraw()
+	var faded := Color(HudWidgets.INK, 0.45).to_html()
+	var lines: PackedStringArray = []
 	var shown := 0
 	var hidden := 0
 	for t in Game.tasks:
 		var text := str(t["text"])
 		if int(t["target"]) > 1:
-			text += "  %d/%d" % [int(t["progress"]), int(t["target"])]
+			text += " [%d/%d]" % [int(t["progress"]), int(t["target"])]
 		if t["done"]:
 			if _tasks_full:
-				lines.append("[color=#6b6a5e][s]%s[/s][/color]" % text)
+				lines.append("[color=#%s][s]— %s[/s][/color]" % [faded, text])
 			continue
 		if not _tasks_full and shown >= 5:
 			hidden += 1
 			continue
-		lines.append("[color=#%s]•[/color] %s" % [AMBER.to_html(false), text])
+		lines.append("— " + text)
 		shown += 1
+	if open == 0:
+		lines.append("Всё сделано. Доложить.")
 	if hidden > 0:
-		lines.append("[color=#%s]…и ещё %d — Tab[/color]" % [DIM.to_html(false), hidden])
-	lines.append("[font_size=12][color=#%s]записки %d/%d%s[/color][/font_size]" % [DIM.to_html(false), Game.notes_count(), Game.NOTES_TOTAL,
-		"" if _tasks_full else "   ·   Tab — весь список"])
+		lines.append("[color=#%s]…ещё %d (Tab)[/color]" % [faded, hidden])
+	lines.append("[font_size=11][color=#%s]записки %d/%d%s[/color][/font_size]" % [faded, Game.notes_count(), Game.NOTES_TOTAL,
+		"" if _tasks_full else " · Tab — весь лист"])
 	_tasks.text = "\n".join(lines)
 
 
@@ -953,18 +1033,20 @@ func _panel_style(bg: Color, margin: float) -> StyleBoxFlat:
 	return st
 
 
-## Строка показателя: подпись и тонкая полоска под ней.
+## Строка прибора: название слева, значение справа, сегментная шкала под ними. Возвращает [значение, шкала].
 func _vital_row(parent: Control, title: String, color: Color) -> Array:
-	var l := Label.new()
-	l.text = title
-	l.add_theme_font_size_override("font_size", 12)
-	l.add_theme_color_override("font_color", TEXT)
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(l)
-	var bar := _bar(color)
-	bar.custom_minimum_size = Vector2(210, 6)
+	var head := HBoxContainer.new()
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(head)
+	var name_l := HudWidgets.label(title, 12, DIM, HudWidgets.oswald(500))
+	name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(name_l)
+	var val := HudWidgets.label("", 13, color, HudWidgets.oswald(600))
+	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	head.add_child(val)
+	var bar := HudWidgets.SegBar.new(color, 168.0, 8.0)
 	parent.add_child(bar)
-	return [l, bar]
+	return [val, bar]
 
 
 ## Перенос субтитра по словам (ширина подложки — по тексту).
