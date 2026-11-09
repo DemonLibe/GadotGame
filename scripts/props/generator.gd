@@ -1,16 +1,18 @@
 class_name Generator
 extends StaticBody3D
-## Дизель-генератор на платформе: свет в тоннелях и старой линии и вентиляция (воздух).
-## Без него лампы не горят, а в тоннеле становится нечем дышать.
+## Дизель-генератор: свет в тоннелях и старой линии и вентиляция (воздух). Главный — на платформе,
+## резервные — в генераторных по тоннелю: пока работает хоть один, есть ток и воздух.
+## Без них лампы не горят, а в тоннеле становится нечем дышать.
 ## Топливо кончается — нужны канистры. Запуск слышно на весь тоннель.
 ## Передняя панель смотрит по локальной +Z.
 
 const HOLD_START := 1.5
 const HOLD_STOP := 1.0
 const HOLD_FUEL := 2.0
-const BURN_TIME := 420.0  # полный бак — семь минут
+const BURN_TIME := 1200.0  # полный бак — двадцать минут
 
 var level: Level
+var reserve := false   # резервный (в генераторной) — его запуск не закрывает поручение «на станции»
 var fuel := 100.0
 var running := false
 var _progress := 0.0
@@ -24,6 +26,7 @@ var _body: Node3D
 
 
 func _ready() -> void:
+	add_to_group("generators")
 	var yellow := ProcTex.flat(Color(0.62, 0.48, 0.12), 0.6, 0.4)
 	var dark := ProcTex.flat(Color(0.08, 0.08, 0.08), 0.8)
 	var steel := ProcTex.flat(Color(0.3, 0.31, 0.3), 0.5, 0.7)
@@ -48,7 +51,7 @@ func _ready() -> void:
 	_lamp_mat = ProcTex.emissive(Color(1.0, 0.2, 0.1), 2.0)
 	Geo.sphere(_body, Vector3(0.12, 0.62, 0.52), 0.025, _lamp_mat)
 	Geo.box(_body, Vector3(0.12, 0.48, 0.53), Vector3(0.1, 0.03, 0.03), dark, false)
-	Geo.label(_body, Vector3(0, 0.9, 0.506), "ДГ-12", 0, 30, Color(0.1, 0.1, 0.1), true, 0.003)
+	Geo.label(_body, Vector3(0, 0.9, 0.506), "ДГ-4 РЕЗЕРВ" if reserve else "ДГ-12", 0, 30, Color(0.1, 0.1, 0.1), true, 0.003)
 	Geo.collider_box(self, Vector3(0.85, 1.0, 1.1), Vector3(0, 0.5, 0))
 	_engine = AudioStreamPlayer3D.new()
 	_engine.stream = Sfx.engine()
@@ -68,7 +71,7 @@ func reset(start_fuel: float) -> void:
 func _set_running(value: bool) -> void:
 	running = value
 	if level:
-		level.power_on = value
+		level.refresh_power()
 	if not is_node_ready():
 		return
 	if value:
@@ -103,9 +106,11 @@ func _process(delta: float) -> void:
 	_body.position = Vector3(sin(_shake) * 0.004, absf(sin(_shake * 1.3)) * 0.004, 0)
 	if fuel <= 0.0:
 		stall()
-		Game.say("Генератор заглох: кончилось топливо. Нет света и вентиляции.", Game.SYSTEM, 4.0)
+		if level and not level.power_on:
+			Game.say("Генератор заглох: кончилось топливо. Нет света и вентиляции.", Game.SYSTEM, 4.0)
 	elif fuel < 15.0:
-		Game.say_once("fuel_low", "Генератор чихает — топливо на исходе, нужна канистра.", Game.SYSTEM, 3.5)
+		if not reserve:
+			Game.say_once("fuel_low", "Генератор чихает — топливо на исходе, нужна канистра. Или резервный — в генераторной.", Game.SYSTEM, 3.5)
 
 
 func _wanted(player) -> String:
@@ -159,6 +164,9 @@ func hold_interact(player, delta: float) -> float:
 				return -1.0
 			_set_running(true)
 			Game.make_noise(global_position, 25.0)
+			if reserve:
+				Game.say_once("gen_reserve", "Резервный дизель взялся. Свет и вентиляция — на весь тоннель, пока есть солярка.", Game.THOUGHT, 3.5)
+				return -1.0
 			Game.report("generator")
 			Game.say_once("gen_on", "Завёлся. Грохот на весь тоннель... зато есть свет, и вентиляция загудела.", Game.THOUGHT, 3.5)
 	return -1.0

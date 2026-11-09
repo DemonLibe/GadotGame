@@ -113,7 +113,7 @@ func _foreign_text() -> String:
 	var cand: Array[String] = []
 	if player.loot > 0:
 		cand.append("Чужое не выносят. Положи, где взял.")
-	if not main.generator.running:
+	if not level.power_on:
 		cand.append("Тебе темно? Мне — нет.")
 	if lower.contains(p):
 		cand.append("Здесь я дома. А ты — в гостях.")
