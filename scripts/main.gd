@@ -315,25 +315,8 @@ static func is_web_renderer() -> bool:
 	return str(ProjectSettings.get_setting_with_override("rendering/renderer/rendering_method")) == "gl_compatibility"
 
 
-var _fps_t := 0.0
-var _tick_t := 0
-
-
-func _tick(label: String) -> void:
-	if _smoke:
-		var now := Time.get_ticks_msec()
-		if now - _tick_t > 300:
-			print("TICK %s %dms" % [label, now - _tick_t])
-		_tick_t = Time.get_ticks_msec()
-
-
 func _process(delta: float) -> void:
 	_grace -= delta
-	if _smoke:
-		_fps_t += delta
-		if _fps_t > 10.0:
-			_fps_t = 0.0
-			print("FPS %d day %d nodes %d" % [Engine.get_frames_per_second(), Game.day, get_tree().get_node_count()])
 	if _debug_log:
 		_debug_t -= delta
 		if _debug_t <= 0.0:
@@ -935,19 +918,12 @@ func start_day(d: int, retry := false) -> void:
 	if not debug_flag("norooms"):
 		_setup_rooms(d)
 	_spawn_finds(d)
-	_tick("_spawn_finds")
 	_spawn_threats(d, retry)
-	_tick("_spawn_threats")
 	_setup_lower(d, retry)
-	_tick("_setup_lower")
 	_spawn_lurkers(d)
-	_tick("_spawn_lurkers")
 	_photo_changes(d)
-	_tick("_photo_changes")
 	_setup_power(d)
-	_tick("_setup_power")
 	_spawn_task_devices(d)
-	_tick("_spawn_task_devices")
 	_reported = false
 	_station_t = 0.0
 	dispatcher.collapse_mode = false
@@ -2219,9 +2195,7 @@ func _smoke_test() -> void:
 	state = "playing"
 	hud.set_ingame(true)
 	for d in range(1, Game.LAST_DAY + 1):
-		_tick("smoke-prev")
 		start_day(d)
-		_tick("start_day")
 		await get_tree().create_timer(5.5).timeout
 		hatch.hold_interact(player, 2.0)
 		radio.interact(player)
@@ -2234,7 +2208,6 @@ func _smoke_test() -> void:
 		for ev in ["footsteps", "sighting", "behind", "lamps", "whisper", "regrow", "interfere", "crawler", "hunt", "swarm",
 				"masha", "double", "silence", "picket", "name"]:
 			director._run(ev)
-			_tick("ev " + ev)
 		if PHONE_CALLS.has(d):
 			phone.ring(PHONE_CALLS[d])
 			phone.interact(player)
