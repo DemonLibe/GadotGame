@@ -34,6 +34,7 @@
 | 1–7, колесо | предмет в руках: горелка, фильтр, батарейка, рация, карта, пистолет, канистра |
 | ЛКМ | использовать предмет (рация — подсказка или доклад) |
 | Tab | весь список дел |
+| J | дневник обходчика |
 | Esc | пауза |
 
 ## Как играть
@@ -56,7 +57,12 @@
 - **Деньги** не пропадают ни при провале, ни при новой игре. Платят по трудности поручения (один раз за смену)
   и за смену — чем глубже, тем больше; за убитых существ не платят. Шкафчик снабжения в дежурке: расходники
   на смену, снаряжение навсегда и копилка на операцию Маши — переводить на неё можно до 1000 ₽ за смену.
-- **Записки** за дверями служебных комнат складываются в историю «Тихой». Концовок три.
+- **Дневник** (J). Герой не говорит вслух — он записывает: что увидел, что понял, чего боится.
+  Свежая запись на секунду мелькает почерком справа сверху.
+- **Темнота живая.** Без фонаря вдали от ламп долго не простоишь. Лампы умеют гаснуть сами — и не все сразу.
+  В шкафу тоже бывает не так уж спокойно. А в дневнике иногда появляются строчки, которых ты не писал.
+- **Записки** за дверями служебных комнат — бытовки, склада, мастерской, медпункта, щитовой и кабинета —
+  складываются в историю «Тихой». Концовок три.
 - **Находки и достижения** сохраняются навсегда (18 достижений, экран — в меню).
 
 ## Разработка
@@ -91,7 +97,8 @@ voice/          озвучка диспетчера и Маши
 | Вагонетка, путь | [Mine Object collection](https://opengameart.org/content/mine-object-collection) | loafbrr_1 | CC0 |
 | Ползуны | [Alien Bug Animated](https://opengameart.org/content/alien-bug-animated) | CDmir | CC0 |
 | Пауки | [Low Poly Spider (Glest)](https://opengameart.org/content/low-poly-spider-glest) | Wciow, John.d.h | [CC-BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/), изменённая `spider.glb` — на тех же условиях |
-| «Другой» | [Angler Man 3D](https://opengameart.org/content/angler-man-3d) | piacenti | [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/), анимации добавлены |
+| «Другой» | [3D Horror Game Monster](https://opengameart.org/content/3d-horror-game-monster) | HorrorGameMaker.com | CC0 — анимации собраны в один файл |
+| «Другой» (запасная модель) | [Angler Man 3D](https://opengameart.org/content/angler-man-3d) | piacenti | [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/), анимации добавлены |
 | Слушатель | [Blind Hunter Creature](https://opengameart.org/content/blind-hunter-creature) | Mophs | [CC-BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) / [4.0](https://creativecommons.org/licenses/by-sa/4.0/), изменённая `listener.obj` — на тех же условиях |
 | Декорации | [Train Kit](https://opengameart.org/content/train-kit) | Kenney | CC0 |
 | Останки | [3D Dungeon Debris — Skull and Bones](https://opengameart.org/content/3d-dungeon-debris-skull-and-bones) | Paul Wortmann | CC0 |
@@ -99,7 +106,12 @@ voice/          озвучка диспетчера и Маши
 | Пистолет | [Pistol](https://opengameart.org/content/pistol-5) | loafbrr_1 | CC0 |
 | Батарейка | [Lowpoly Survival Item Pack](https://opengameart.org/content/lowpoly-survival-item-pack) | artie31 | CC0 |
 | Рация | [Radio](https://opengameart.org/content/radio-0) | laleksic | CC0 |
+| Двойник | [Universal Base Characters](https://quaternius.com) (Standard) | Quaternius | CC0 |
 | Таблетки | [Pills 3D models](https://opengameart.org/content/pills-3d-models) | mxc2 | CC0 |
+
+**Присланные автором проекта** (лицензия — та, под которой их скачали; в архивах её не было):
+мусор — Trash and Debris (`models/trash/`), скамья, урна, схема, плакаты и вагон метро — Metro PSX
+(`models/metro_psx/`), паук-охотник — Huntsman Spider (`models/huntsman/`).
 
 **Звуки и музыка с [OpenGameArt](https://opengameart.org)**, все CC0 (остальное синтезируется кодом):
 
@@ -115,8 +127,10 @@ voice/          озвучка диспетчера и Маши
 | Шаги, скрип | [50 RPG sound effects](https://opengameart.org/content/50-rpg-sound-effects) | Kenney |
 | Тревога | [Panic mode](https://opengameart.org/content/panic-mode) | Breadman |
 | Музыка меню | [At the End of Hope](https://opengameart.org/content/at-the-end-of-hope) | Emma_MA |
+| Лязг, перекладины, щелчки, выстрел, подбор, сердце, дыхание, дождь, ветер, гул, капель, замок, бумага | [500 game sound effects](sounds/LICENSES-500-game-sfx.txt) — подборка CC0 (Kenney, qubodup, Iwan Gabovitch и др.) | см. LICENSES |
 
 Голоса диспетчера и Маши — нейросетевой синтез [Piper](https://github.com/rhasspy/piper).
 
 **Шрифты** (`assets/fonts/`, [SIL OFL 1.1](https://openfontlicense.org)): [Oswald](https://github.com/googlefonts/OswaldFont)
-(The Oswald Project Authors) — интерфейс, [PT Mono](https://www.paratype.com/public) (ParaType) — путевой лист.
+(The Oswald Project Authors) — интерфейс, [PT Mono](https://www.paratype.com/public) (ParaType) — путевой лист и записки,
+[Caveat](https://github.com/googlefonts/caveat) (The Caveat Project Authors) — дневник.

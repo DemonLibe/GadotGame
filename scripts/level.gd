@@ -23,9 +23,19 @@ const JUNCTION_MAIN := 8.0   # развилка: ± столько метров 
 const JUNCTION_BRANCH := 10.0  # ...и столько метров штольни от оси тоннеля
 const WALL_T := 0.3          # толщина обделки (для CSG-развилок)
 const ROOM_SECTION := 4.0    # ± столько метров трубы у двери в комнату строится через CSG
-const ROOM_W := 3.4          # служебная комната: ширина, глубина, высота
+const ROOM_W := 3.4          # служебная комната: ширина, глубина, высота (по умолчанию)
 const ROOM_D := 3.4
 const ROOM_H := 2.6
+## Комнаты по порядку постройки (0–2 — сбоку от тоннеля, 3–5 — в тупиках штолен):
+## назначение, ширина, глубина, высота, стены, пол. Первая не глубже 4,4 м — за ней старая линия.
+const ROOM_KINDS := [
+	{"theme": "bytovka", "w": 5.0, "d": 4.4, "h": 2.8, "wall": "plaster_peeling", "floor": "linoleum"},
+	{"theme": "sklad", "w": 4.6, "d": 5.4, "h": 3.0, "wall": "concrete_wet", "floor": "concrete_floor_cracked"},
+	{"theme": "workshop", "w": 6.0, "d": 4.4, "h": 3.0, "wall": "brick_soot", "floor": "concrete_floor_cracked"},
+	{"theme": "medpunkt", "w": 4.4, "d": 5.0, "h": 2.7, "wall": "tile_green", "floor": "tile_white_clean"},
+	{"theme": "shield", "w": 5.2, "d": 4.6, "h": 3.0, "wall": "concrete", "floor": "rubber_mat"},
+	{"theme": "office", "w": 4.8, "d": 4.8, "h": 2.7, "wall": "wood_planks_dark", "floor": "linoleum"},
+]
 ## Комнаты сбоку от основного тоннеля (ещё по одной — в конце каждой штольни).
 const SIDE_ROOMS := [
 	{"z": -83.0, "side": 1},
@@ -121,7 +131,8 @@ func _process(delta: float) -> void:
 		var light: OmniLight3D = l["light"]
 		var mat: StandardMaterial3D = l["mat"]
 		var mode: String = l["mode"]
-		var on: bool = mode != "broken" and not blackout and not (l["tunnel"] and (tunnel_lights_off or not power_on))
+		var on: bool = mode != "broken" and not blackout and not (l["tunnel"] and (tunnel_lights_off or not power_on)) \
+			and not l.get("off", false)
 		var f := 1.0 if on else 0.0
 		if on and mode == "flicker":
 			var phase: float = l["t"]
@@ -751,10 +762,11 @@ func _build_side_room(r: Dictionary) -> void:
 	var axis := Vector3(TUN_CX, TUBE_CY, zr)
 	var main_basis := Basis(Vector3.RIGHT, PI / 2)
 	var room_basis := Basis(Vector3.UP, atan2(-side, 0.0))  # +Z комнаты — к тоннелю
-	var center := Vector3(TUN_CX + side * (TUBE_R + WALL_T + ROOM_D / 2), FLOOR_Y, zr)
+	var kind := _room_kind()
+	var center := Vector3(TUN_CX + side * (TUBE_R + WALL_T + float(kind["d"]) / 2), FLOOR_Y, zr)
 	var csg := _new_csg()
 	_csg_tube(csg, TUBE_R + WALL_T, ROOM_SECTION * 2, Transform3D(main_basis, axis), m_concrete, false)
-	_csg_room(csg, center, room_basis)
+	_csg_room(csg, center, room_basis, kind)
 	_csg_tube(csg, TUBE_R, ROOM_SECTION * 2 + 0.04, Transform3D(main_basis, axis), m_tubbing_tri, true)
 	var d_in := 1.4
 	var d_out := TUBE_R + WALL_T + 0.1
@@ -762,8 +774,8 @@ func _build_side_room(r: Dictionary) -> void:
 	var chord := _tube_half(FLOOR_Y) * 2.0
 	Geo.box(self, Vector3(TUN_CX, FLOOR_Y - 0.15, zr), Vector3(chord, 0.3, ROOM_SECTION * 2), m_floor)
 	Geo.box(self, Vector3(TUN_CX + side * 1.95, FLOOR_Y - 0.152, zr), Vector3(1.3, 0.3, 1.3), m_floor)
-	_room_floor(center, room_basis)
-	rooms.append({"center": center, "basis": room_basis,
+	_room_floor(center, room_basis, kind)
+	rooms.append({"center": center, "basis": room_basis, "kind": kind,
 		"door": Transform3D(room_basis, Vector3(TUN_CX + side * (TUBE_R + WALL_T - 0.05), FLOOR_Y, zr))})
 
 
@@ -820,29 +832,49 @@ func _build_end_room(index: int) -> void:
 	var room_basis := Basis(Vector3.UP, yaw)  # +Z — обратно по штольне, к двери
 	var axis := origin + Vector3(0, TUBE_CY - FLOOR_Y, 0)
 	var pipe := Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, -PI / 2)
-	var center := origin + d * (length + WALL_T + ROOM_D / 2)
+	var kind := _room_kind()
+	var center := origin + d * (length + WALL_T + float(kind["d"]) / 2)
 	var csg := _new_csg()
 	# Наружная труба заходит на толщину стенки дальше — получается глухой торец.
 	_csg_tube(csg, TUBE_R + WALL_T, ROOM_SECTION + WALL_T, Transform3D(pipe, axis + d * (length - ROOM_SECTION / 2 + WALL_T / 2)), m_concrete, false)
-	_csg_room(csg, center, room_basis)
+	_csg_room(csg, center, room_basis, kind)
 	_csg_tube(csg, TUBE_R, ROOM_SECTION + 0.02, Transform3D(pipe, axis + d * (length - ROOM_SECTION / 2 - 0.01)), m_tubbing_tri, true)
 	_csg_box(csg, Vector3(1.3, 2.2, 0.8), Transform3D(room_basis, origin + d * (length + WALL_T / 2) + Vector3(0, 1.1, 0)), m_concrete, true)
 	var chord := _tube_half(FLOOR_Y) * 2.0
 	Geo.box(self, origin + d * (length - ROOM_SECTION / 2) + Vector3(0, -0.155, 0), Vector3(chord, 0.3, ROOM_SECTION), m_floor, true, room_basis)
 	Geo.box(self, origin + d * (length + 0.15) + Vector3(0, -0.152, 0), Vector3(1.3, 0.3, 0.8), m_floor, true, room_basis)
-	_room_floor(center, room_basis)
-	rooms.append({"center": center, "basis": room_basis,
+	_room_floor(center, room_basis, kind)
+	rooms.append({"center": center, "basis": room_basis, "kind": kind,
 		"door": Transform3D(room_basis, origin + d * (length + WALL_T - 0.05))})
 
 
-func _csg_room(csg: Node, center: Vector3, basis: Basis) -> void:
-	var c := center + Vector3(0, ROOM_H / 2, 0)
-	_csg_box(csg, Vector3(ROOM_W + WALL_T * 2, ROOM_H + WALL_T * 2, ROOM_D + WALL_T * 2), Transform3D(basis, c), m_concrete, false)
-	_csg_box(csg, Vector3(ROOM_W, ROOM_H, ROOM_D), Transform3D(basis, c), m_room, true)
+## Размеры и отделка следующей комнаты (по порядку постройки).
+func _room_kind() -> Dictionary:
+	var i := rooms.size()
+	if i < ROOM_KINDS.size():
+		return ROOM_KINDS[i]
+	return {"theme": "bytovka", "w": ROOM_W, "d": ROOM_D, "h": ROOM_H, "wall": "", "floor": ""}
 
 
-func _room_floor(center: Vector3, basis: Basis) -> void:
-	Geo.box(self, center + Vector3(0, -0.15, 0), Vector3(ROOM_W, 0.3, ROOM_D), m_floor, true, basis)
+static func _kit_or(name: String, fallback: Material) -> Material:
+	var tint := Color(0.6, 0.58, 0.55) if name == "plaster_peeling" else Color(0.78, 0.76, 0.72)
+	return ProcTex.kit(name, tint) if name != "" and ProcTex._kit_ok(name) else fallback
+
+
+func _csg_room(csg: Node, center: Vector3, basis: Basis, kind: Dictionary) -> void:
+	var w := float(kind["w"])
+	var d := float(kind["d"])
+	var h := float(kind["h"])
+	var c := center + Vector3(0, h / 2, 0)
+	_csg_box(csg, Vector3(w + WALL_T * 2, h + WALL_T * 2, d + WALL_T * 2), Transform3D(basis, c), m_concrete, false)
+	_csg_box(csg, Vector3(w, h, d), Transform3D(basis, c), _kit_or(str(kind["wall"]), m_room), true)
+	# Потолок — подвесными панелями (у мастерской и склада — голый бетон).
+	if kind["theme"] != "workshop" and kind["theme"] != "sklad":
+		Geo.box(self, center + Vector3(0, h - 0.02, 0), Vector3(w - 0.02, 0.03, d - 0.02), _kit_or("ceiling_panels", m_concrete), false, basis)
+
+
+func _room_floor(center: Vector3, basis: Basis, kind: Dictionary) -> void:
+	Geo.box(self, center + Vector3(0, -0.15, 0), Vector3(float(kind["w"]), 0.3, float(kind["d"])), _kit_or(str(kind["floor"]), m_floor), true, basis)
 
 
 func _new_csg() -> CSGCombiner3D:
@@ -1005,6 +1037,32 @@ func _build_breach() -> void:
 	for side in [-1.0, 1.0]:
 		Geo.box(_breach, Vector3(TUN_CX + side * 1.25, FLOOR_Y + 1.0, z - 0.6), Vector3(0.6, 2.0, 0.5), brick, false)
 	_breach.visible = false
+
+
+## Волна темноты: лампы тоннеля впереди гаснут одна за другой — от дальней к ближней, с лязгом.
+## Возвращает точку у последней погасшей (там можно поставить фигуру) или Vector3.INF.
+func dark_wave(from: Vector3, dir_z: float) -> Vector3:
+	var picked: Array = []
+	for l in lamps:
+		if not l["tunnel"] or l["mode"] == "broken":
+			continue
+		var lz: float = (l["light"] as OmniLight3D).global_position.z
+		var ahead: float = (lz - from.z) * dir_z
+		if ahead > 6.0 and ahead < 70.0 and absf((l["light"] as OmniLight3D).global_position.x - TUN_CX) < 4.0:
+			picked.append(l)
+	if picked.size() < 3:
+		return Vector3.INF
+	picked.sort_custom(func(a, b): return absf((a["light"] as OmniLight3D).global_position.z - from.z) > absf((b["light"] as OmniLight3D).global_position.z - from.z))
+	for i in picked.size():
+		var l: Dictionary = picked[i]
+		get_tree().create_timer(0.45 * i).timeout.connect(func():
+			l["off"] = true
+			Game.play_at(Sfx.click(), (l["light"] as OmniLight3D).global_position, -2.0))
+	var last: Vector3 = (picked[-1]["light"] as OmniLight3D).global_position
+	get_tree().create_timer(0.45 * picked.size() + 9.0).timeout.connect(func():
+		for l in picked:
+			l["off"] = false)
+	return Vector3(TUN_CX, FLOOR_Y, last.z)
 
 
 ## Тоннельный светильник в сетке на стене. inward — куда смотрит (внутрь тоннеля).

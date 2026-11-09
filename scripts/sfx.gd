@@ -11,8 +11,12 @@ const RECORDED := {
 	"drone": 1, "pad": 1, "drips": 1, "scream": 1, "hiss": 1,
 	"scuttle": 4, "groan": 5, "step": 10, "creak": 3,
 	"stalker_growl": 4, "stalker_roar": 2, "threat": 1,
+	# Из «500 game sound effects» (CC0): вместо синтезированных.
+	"clank": 4, "rung": 3, "click": 3, "gunshot": 2, "pickup": 3, "heartbeat": 1, "gasp": 1,
+	"rain": 1, "wind": 1, "rumble": 3, "drip": 3, "unlock": 2, "paper": 3,
+	"breath": 1, "sniff": 1, "scrape": 2, "knock": 2, "moan": 3, "eerie": 2,
 }
-const LOOPED := ["drone", "pad", "drips", "threat"]
+const LOOPED := ["drone", "pad", "drips", "threat", "rain", "wind"]
 
 static var _cache := {}
 
@@ -164,6 +168,46 @@ static func threat() -> AudioStream:
 
 
 ## Капель в тоннеле — петля (только записью).
+## Медленное дыхание у самого уха.
+static func breath() -> AudioStream:
+	return _stream("breath")
+
+
+## Кто-то втягивает воздух носом — принюхивается.
+static func sniff() -> AudioStream:
+	return _stream("sniff")
+
+
+## Когти по железу.
+static func scrape() -> AudioStream:
+	return _stream("scrape")
+
+
+## Удар по трубе.
+static func knock() -> AudioStream:
+	return _stream("knock")
+
+
+## Далёкий стон.
+static func moan() -> AudioStream:
+	return _stream("moan")
+
+
+## Жуткая фоновая петля (не зациклена в файле — играть целиком).
+static func eerie() -> AudioStream:
+	return _stream("eerie")
+
+
+## Ключ поворачивается в замке.
+static func unlock() -> AudioStream:
+	return _stream("unlock")
+
+
+## Шелест бумаги (записки, газета).
+static func paper() -> AudioStream:
+	return _stream("paper")
+
+
 static func drips() -> AudioStream:
 	return _stream("drips")
 

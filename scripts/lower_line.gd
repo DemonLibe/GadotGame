@@ -341,6 +341,11 @@ func _props(c: Vector2i, kind: String, root: Node3D) -> void:
 		return
 	if dead.is_empty():
 		return
+	# Строительный мусор у стен: кирпич, обломки, арматура, битое стекло.
+	for i in rng.randi_range(0, 2):
+		var wd: Vector3 = dead[rng.randi_range(0, dead.size() - 1)]
+		var along := Vector3(wd.z, 0.0, -wd.x) * rng.randf_range(-1.0, 1.0)
+		ExtModels.trash(root, ExtModels.OLD_TRASH[rng.randi_range(0, ExtModels.OLD_TRASH.size() - 1)], wd * (W / 2.0 - 0.35) + along, rng.randf() * TAU)
 	var w: Vector3 = dead[rng.randi_range(0, dead.size() - 1)]
 	var roll := rng.randf()
 	if roll < 0.12:

@@ -34,6 +34,10 @@ var _hold: ProgressBar
 var _tasks: RichTextLabel
 var _slip: HudWidgets.Slip
 var _location: Label
+var _scribble: Label
+var _scribble_t := 0.0
+var _book: PanelContainer
+var _book_text: RichTextLabel
 var _pulse: HudWidgets.Pulse
 var _item_name: Label
 var _item_t := 0.0
@@ -182,6 +186,15 @@ func _ready() -> void:
 	_ingame.add_child(where)
 	_location = HudWidgets.label("", 15, AMBER, HudWidgets.oswald(500))
 	where.add_child(_location)
+	# Свежая запись в дневнике — почерком, под табличкой; весь дневник — по J.
+	_scribble = HudWidgets.label("", 21, Color(0.88, 0.83, 0.7), HudWidgets.hand())
+	_scribble.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_scribble.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_place(_scribble, 1, 0, 1, 0, -460, 58, -20, 200)
+	_scribble.modulate.a = 0.0
+	_ingame.add_child(_scribble)
+	Game.diary_written.connect(_on_diary)
+	_build_diary_book()
 
 	# Приборный щиток — слева снизу: фонарь, воздух, здоровье; над ним — состояние и карманы.
 	_status = HudWidgets.label("", 13, DIM)
@@ -285,7 +298,7 @@ func _ready() -> void:
 	# Записка во весь экран.
 	_note_panel = PanelContainer.new()
 	var ns := StyleBoxFlat.new()
-	ns.bg_color = Color(0.84, 0.8, 0.66)
+	ns.bg_color = Color(0.5, 0.46, 0.37)  # старая бумага в полутьме — не слепит
 	ns.set_content_margin_all(28)
 	ns.shadow_color = Color(0, 0, 0, 0.6)
 	ns.shadow_size = 12
@@ -299,7 +312,7 @@ func _ready() -> void:
 	_note_panel.add_child(nbox)
 	_note_title = Label.new()
 	_note_title.add_theme_font_size_override("font_size", 22)
-	_note_title.add_theme_color_override("font_color", Color(0.2, 0.12, 0.08))
+	_note_title.add_theme_color_override("font_color", Color(0.12, 0.08, 0.05))
 	nbox.add_child(_note_title)
 	# Длинные записки прокручиваются колесом мыши или W / S.
 	_note_scroll = ScrollContainer.new()
@@ -310,12 +323,13 @@ func _ready() -> void:
 	_note_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_note_text.custom_minimum_size = Vector2(640, 0)
 	_note_text.add_theme_font_size_override("font_size", 17)
-	_note_text.add_theme_color_override("font_color", Color(0.15, 0.13, 0.12))
+	_note_text.add_theme_color_override("font_color", Color(0.1, 0.08, 0.07))
+	_note_text.add_theme_font_override("font", HudWidgets.mono())
 	_note_scroll.add_child(_note_text)
 	var hint := Label.new()
 	hint.text = "колесо мыши / W, S — листать        E / Esc — убрать"
 	hint.add_theme_font_size_override("font_size", 13)
-	hint.add_theme_color_override("font_color", Color(0.4, 0.35, 0.3))
+	hint.add_theme_color_override("font_color", Color(0.22, 0.19, 0.15))
 	nbox.add_child(hint)
 
 	_build_newspaper()
@@ -454,6 +468,13 @@ func _process(delta: float) -> void:
 	_coin.modulate.a = clampf(_coin_t, 0.0, 1.0)
 	_item_t -= delta
 	_item_name.modulate.a = clampf(_item_t * 2.0, 0.0, 1.0)
+	_scribble_t -= delta
+	_scribble.modulate.a = clampf(_scribble_t, 0.0, 1.0)
+	if _ingame.visible and not _reading and Input.is_action_just_pressed("diary"):
+		_book.visible = not _book.visible
+		if _book.visible:
+			_fill_book()
+			Game.play_ui(Sfx.paper(), -10.0)
 	_photo_t -= delta
 	_photo.modulate.a = clampf(_photo_t, 0.0, 1.0)
 	_photo.visible = _photo_t > 0.0
@@ -845,6 +866,7 @@ var _newspapers := {
 
 
 func show_newspaper(variant := "A") -> void:
+	Game.play_ui(Sfx.paper(), -4.0)
 	var paper: Array = _newspapers.get(variant, _newspapers["A"])
 	_paper_head.text = paper[0]
 	_paper_cap.text = paper[1]
@@ -875,6 +897,7 @@ func is_reading() -> bool:
 
 
 func show_note(title: String, text: String) -> void:
+	Game.play_ui(Sfx.paper(), -6.0)
 	_note_title.text = title
 	_note_text.text = text
 	_note_scroll.scroll_vertical = 0
@@ -1022,6 +1045,78 @@ func _refresh_tasks() -> void:
 	lines.append("[font_size=11][color=#%s]записки %d/%d%s[/color][/font_size]" % [faded, Game.notes_count(), Game.NOTES_TOTAL,
 		"" if _tasks_full else " · Tab — весь лист"])
 	_tasks.text = "\n".join(lines)
+
+
+func _on_diary(text: String, foreign: bool) -> void:
+	_scribble.text = ("" if foreign else "— ") + text
+	# Чужая рука — бурыми чернилами, крупнее и дольше.
+	_scribble.add_theme_color_override("font_color", Color(0.7, 0.18, 0.12) if foreign else Color(0.88, 0.83, 0.7))
+	_scribble.add_theme_font_size_override("font_size", 25 if foreign else 21)
+	_scribble_t = clampf(2.5 + text.length() * 0.05, 3.5, 8.0) + (2.0 if foreign else 0.0)
+	if _book.visible:
+		_fill_book()
+
+
+## Дневник обходчика: потрёпанная тетрадь слева, записи почерком с временем смены.
+func _build_diary_book() -> void:
+	_book = PanelContainer.new()
+	_book.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.48, 0.44, 0.35, 0.97)
+	st.border_color = Color(0.22, 0.17, 0.12)
+	st.border_width_left = 10
+	st.set_content_margin_all(18)
+	st.content_margin_left = 26
+	st.shadow_color = Color(0, 0, 0, 0.6)
+	st.shadow_size = 10
+	_book.add_theme_stylebox_override("panel", st)
+	_place(_book, 0, 0.5, 0, 0.5, 40, -280, 560, 280)
+	_book.rotation = deg_to_rad(-0.6)
+	_book.visible = false
+	_ingame.add_child(_book)
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_theme_constant_override("separation", 8)
+	_book.add_child(box)
+	var head := HudWidgets.label("ДНЕВНИК ОБХОДЧИКА", 16, HudWidgets.INK, HudWidgets.oswald(600))
+	head.add_theme_constant_override("outline_size", 0)
+	box.add_child(head)
+	_book_text = RichTextLabel.new()
+	_book_text.bbcode_enabled = true
+	_book_text.scroll_following = true
+	_book_text.custom_minimum_size = Vector2(480, 470)
+	_book_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_book_text.add_theme_font_override("normal_font", HudWidgets.hand())
+	_book_text.add_theme_font_override("bold_font", HudWidgets.oswald(600))
+	_book_text.add_theme_font_size_override("normal_font_size", 22)
+	_book_text.add_theme_font_size_override("bold_font_size", 14)
+	_book_text.add_theme_color_override("default_color", Color(0.1, 0.08, 0.06))
+	box.add_child(_book_text)
+	var foot := HudWidgets.label("J — закрыть", 12, Color(0.2, 0.17, 0.13), HudWidgets.oswald(500))
+	foot.add_theme_constant_override("outline_size", 0)
+	box.add_child(foot)
+
+
+func _fill_book() -> void:
+	var lines: PackedStringArray = []
+	var last_day := -1
+	var from := maxi(0, Game.diary.size() - 40)
+	for i in range(from, Game.diary.size()):
+		var e: Array = Game.diary[i]
+		if int(e[0]) != last_day:
+			last_day = int(e[0])
+			lines.append("[b]СМЕНА № %d[/b]" % last_day)
+		if e.size() > 3 and bool(e[3]):
+			lines.append("[color=#6b1a10][font_size=26]%s[/font_size][/color]" % e[2])
+		else:
+			lines.append("[color=#4a3a2a]%s[/color]  %s" % [e[1], e[2]])
+	if lines.is_empty():
+		lines.append("Пусто. Пока.")
+	_book_text.text = "\n".join(lines)
+
+
+func is_diary_open() -> bool:
+	return _book.visible
 
 
 ## Полупрозрачная тёмная плашка.

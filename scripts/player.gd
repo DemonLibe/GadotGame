@@ -591,7 +591,7 @@ func enter_hide(hideout) -> void:
 	head.rotation.x = 0.0
 	head.position.y = HEAD_STAND
 	Game.play_at(Sfx.clank(), global_position + Vector3(0, 1, 0), -14.0)
-	Game.say_once("hide", "Тихо. Если оно рядом — задержать дыхание (Space).", Game.THOUGHT, 3.5)
+	Game.say_once("hide", "В шкафу: держи Space — задержать дыхание.", Game.SYSTEM, 3.5)
 
 
 func exit_hide() -> void:
@@ -618,7 +618,7 @@ func _hide_update(delta: float) -> void:
 			_breath_block = 2.5
 			Game.play_at(Sfx.gasp(), global_position + Vector3(0, 1.5, 0), 0.0)
 			Game.make_noise(global_position, 7.0)
-			Game.say_once("gasp", "Не могу... воздуха...", Game.THOUGHT, 2.0)
+			Game.say_once("gasp", "Задыхаюсь. Воздуха не хватает.", Game.THOUGHT, 2.0)
 	else:
 		_stamina_wait -= delta
 		if _stamina_wait <= 0.0:
@@ -761,7 +761,7 @@ func _update_battery(delta: float) -> void:
 		battery = maxf(0.0, battery - DRAIN_PER_SEC * drain_mult * upgrade_drain * delta)
 		if battery <= 0.0 and not _empty_warned:
 			_empty_warned = true
-			Game.say("Фонарь сел. Батарейка — или крутить ручку (R). Быстро.")
+			Game.say("Фонарь сел: батарейка (3) или ручка динамо (R).", Game.SYSTEM)
 	if on and battery < 20.0:
 		Game.say_once("crank_hint", "Фонарь садится. R — крутить ручку динамо. Только треск слышно далеко.", Game.SYSTEM, 5.0)
 	var energy := 4.0 * clampf(battery / 30.0, 0.25, 1.0)
@@ -791,7 +791,7 @@ func _update_burner(delta: float) -> void:
 	var aiming_web: bool = _target != null and is_instance_valid(_target) and _target.has_method("burn")
 	if Input.is_action_just_pressed("burn") and held() == "burner" and not aiming_web and not input_locked:
 		_click_sound.play()
-		Game.say_once("burner_hint", "Газа мало. Горелку зажигаю только у паутины.", Game.THOUGHT, 3.0)
+		Game.say_once("burner_hint", "Горелка зажигается только у паутины — газа мало.", Game.SYSTEM, 3.0)
 	var want := Input.is_action_pressed("burn") and not input_locked and held() == "burner" and aiming_web and not cranking
 	if want != _burning:
 		_burning = want
@@ -851,7 +851,7 @@ func _shoot() -> void:
 	_shot_cd = 0.45
 	if ammo <= 0:
 		_click_sound.play()
-		Game.say_once("no_ammo", "Пусто. Патроны — в ящиках по тоннелю.", Game.THOUGHT, 3.0)
+		Game.say_once("no_ammo", "Патронов нет — коробки лежат по тоннелю.", Game.SYSTEM, 3.0)
 		return
 	ammo -= 1
 	Game.play_ui(Sfx.gunshot(), -2.0)
@@ -872,14 +872,14 @@ func _shoot() -> void:
 func throw_bolt() -> void:
 	if bolts <= 0 or hiding or climbing or cranking:
 		if bolts <= 0:
-			Game.say_once("no_bolts", "Болтов нет. Они валяются по тоннелю — в коробках у стен.", Game.THOUGHT, 3.0)
+			Game.say_once("no_bolts", "Болтов нет — коробки у стен тоннеля.", Game.SYSTEM, 3.0)
 		return
 	bolts -= 1
 	var b := Bolt.new()
 	get_tree().current_scene.add_child(b)
 	var fwd := -camera.global_transform.basis.z
 	b.throw(camera.global_position + fwd * 0.4, fwd)
-	Game.say_once("bolt_thrown", "Звякнет — и они пойдут туда. Не ко мне.", Game.THOUGHT, 3.0)
+	Game.say_once("bolt_thrown", "Брошенный болт звякнет — всё, что слышит, пойдёт туда.", Game.SYSTEM, 3.0)
 
 
 ## Чем меньше воздуха, тем хуже отдышаться.
@@ -894,7 +894,7 @@ func take_damage(amount: float) -> void:
 	if health <= 0.0:
 		died.emit()
 	else:
-		Game.say_once("hurt", "Оно меня задело... Кровь. Надо держаться света.", Game.THOUGHT, 3.0)
+		Game.say_once("hurt", "Задело. Кровь. Держаться света.", Game.THOUGHT, 3.0)
 
 
 func is_burning() -> bool:

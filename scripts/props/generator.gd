@@ -103,9 +103,9 @@ func _process(delta: float) -> void:
 	_body.position = Vector3(sin(_shake) * 0.004, absf(sin(_shake * 1.3)) * 0.004, 0)
 	if fuel <= 0.0:
 		stall()
-		Game.say("Генератор заглох — кончилось топливо. Погас свет, встала вентиляция.", Game.THOUGHT, 4.0)
+		Game.say("Генератор заглох: кончилось топливо. Нет света и вентиляции.", Game.SYSTEM, 4.0)
 	elif fuel < 15.0:
-		Game.say_once("fuel_low", "Генератор чихает. Топливо на исходе — нужна канистра.", Game.THOUGHT, 3.5)
+		Game.say_once("fuel_low", "Генератор чихает — топливо на исходе, нужна канистра.", Game.SYSTEM, 3.5)
 
 
 func _wanted(player) -> String:

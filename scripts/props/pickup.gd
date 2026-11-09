@@ -153,31 +153,31 @@ func interact(player) -> void:
 	if kind == "fuel":
 		player.canisters += 1
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
-		Game.say_once("fuel_pick", "Канистра солярки. Для генератора на станции.", Game.THOUGHT, 3.0)
+		Game.say_once("fuel_pick", "Канистра солярки — для генератора на станции.", Game.SYSTEM, 3.0)
 		_gone()
 		return
 	if kind == "bolts":
 		var took := mini(amount, player.max_bolts() - player.bolts)
 		if took <= 0:
-			Game.say("Карман и так полон болтов.", Game.THOUGHT, 2.0)
+			Game.say("Карман полон болтов.", Game.SYSTEM, 2.0)
 			return
 		player.bolts += took
 		amount -= took
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
-		Game.say_once("bolts_pick", "Болты. Бросить (G) — звякнут там, где упадут.", Game.THOUGHT, 3.5)
+		Game.say_once("bolts_pick", "Болты: G — бросить, звякнут там, где упадут.", Game.SYSTEM, 3.5)
 		if amount <= 0:
 			_gone()
 		return
 	if kind == "fuse":
 		player.fuses += 1
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
-		Game.say("Предохранитель. Теперь — к щитку.", Game.THOUGHT, 3.0)
+		Game.say("Предохранитель — к щитку.", Game.SYSTEM, 3.0)
 		_gone()
 		return
 	if kind == "relays":
 		player.relays += amount
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
-		Game.say("Три ретранслятора. Кронштейны для них — по тоннелю, на карте отмечены.", Game.THOUGHT, 4.0)
+		Game.say("Ретрансляторы ×3 — кронштейны по тоннелю, отмечены на карте.", Game.SYSTEM, 4.0)
 		_gone()
 		return
 	if kind == "key":
@@ -188,7 +188,7 @@ func interact(player) -> void:
 		return
 	if kind == "medkit":
 		if player.health >= Player.HEALTH_MAX - 1.0:
-			Game.say("Цел. Аптечку — на потом.", Game.THOUGHT, 2.0)
+			Game.say("Здоровье полное — аптечка подождёт.", Game.SYSTEM, 2.0)
 			return
 		player.health = minf(Player.HEALTH_MAX, player.health + 60.0)
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
@@ -197,7 +197,7 @@ func interact(player) -> void:
 		return
 	if kind == "battery":
 		if player.batteries >= player.max_batteries():
-			Game.say("Карманы полны — батарейка не влезет.", Game.THOUGHT, 2.0)
+			Game.say("Карманы полны — батарейка не влезет.", Game.SYSTEM, 2.0)
 			return
 		player.batteries += 1
 		Game.report("gear:battery")  # в шестую смену — в запас на седьмую

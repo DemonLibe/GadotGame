@@ -157,7 +157,7 @@ func _perceive() -> void:
 		if state != "chase":
 			_hiss.play()
 			Game.add_fear(10.0)
-			Game.say_once("crawler_first", "Что это?! Оно ползёт ко мне!")
+			Game.say_once("crawler_first", "Из темноты выползло что-то бледное. На четвереньках. Ко мне.")
 		state = "chase"
 		_unseen = 0.0
 		_goal = player.global_position
@@ -172,7 +172,7 @@ func _perceive() -> void:
 func _lose() -> void:
 	state = "investigate"
 	_wait = 0.0
-	Game.say_once("crawler_lost", "Оно... потеряло меня? Не шевелиться.", Game.THOUGHT, 3.0)
+	Game.say_once("crawler_lost", "Оно потеряло меня. Стою и не шевелюсь.", Game.THOUGHT, 3.0)
 
 
 func _arrived() -> void:

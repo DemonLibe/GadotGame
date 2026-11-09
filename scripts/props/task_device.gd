@@ -201,7 +201,7 @@ func hold_interact(player, delta: float) -> float:
 		player.take_damage(15.0)
 		player.flicker(0.6)
 		Game.play_at(Sfx.sparks(), global_position, 4.0)
-		Game.say("Ударило током! Сначала заглушить генератор на станции.", Game.THOUGHT, 3.5)
+		Game.say("Ударило током — сначала заглушить генератор на станции.", Game.SYSTEM, 3.5)
 		return -1.0
 	_progress += delta / float(HOLD[kind])
 	if _progress < 1.0:
@@ -211,7 +211,7 @@ func hold_interact(player, delta: float) -> float:
 		"cable":
 			Game.play_at(Sfx.click(), global_position, -4.0)
 			Game.report("cable")
-			Game.say("Готово. Теперь — назад к генератору, запустить снова.", Game.THOUGHT, 3.5)
+			Game.say("Кабель исправлен. Генератор можно запускать снова.", Game.SYSTEM, 3.5)
 		"sensor":
 			_led.albedo_color = Color(0.2, 1.0, 0.3)
 			_led.emission = Color(0.2, 1.0, 0.3)
@@ -239,7 +239,7 @@ func hold_interact(player, delta: float) -> float:
 				for n in get_tree().get_nodes_in_group("valves"):
 					(n as TaskDevice).reopen()
 				Game.reset_task("valves")
-				Game.say("Не та! Пар засвистел на весь тоннель — и все задвижки сорвало. Заново, по порядку из журнала.", Game.THOUGHT, 4.5)
+				Game.say("Не та задвижка — пар сорвал все. Заново, по порядку из списка.", Game.SYSTEM, 4.5)
 				return -1.0
 			_wheel.rotation.z += PI
 			Game.play_at(Sfx.creak(), global_position, -4.0)

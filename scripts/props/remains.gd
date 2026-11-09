@@ -43,6 +43,39 @@ func _ready() -> void:
 	Geo.box(self, Vector3(-0.45, 0.1, 0.1), Vector3(0.15, 0.2, 0.25), ProcTex.flat(Color(0.3, 0.32, 0.3), 0.5, 0.6), false)
 
 
+# --- Пока не смотришь -------------------------------------------------------
+## С третьей смены кости иногда поворачиваются — пока обходчик стоит к ним спиной. Медленно, без звука.
+## Когда он обернётся — череп смотрит на него.
+var _player: Player
+var _turned := false
+var _noticed := false
+
+
+func _process(delta: float) -> void:
+	if Game.day < 3 or _noticed:
+		return
+	if _player == null:
+		_player = get_tree().get_first_node_in_group("player") as Player
+		if _player == null:
+			return
+	var to := _player.global_position - global_position
+	to.y = 0.0
+	if to.length() > 9.0:
+		return
+	var head := global_position + Vector3(0, 0.4, 0)
+	var seen := _player.is_looking_at(head, 0.35)
+	if not _turned:
+		if not seen and to.length() < 6.0 and randf() < delta * 0.25:
+			_turned = true
+			# Голова — к обходчику (скелет лежит головой к -Z).
+			rotation.y = atan2(-to.x, -to.z) + randf_range(-0.15, 0.15)
+	elif seen:
+		_noticed = true
+		Game.add_fear(10.0)
+		Game.play_at(Sfx.creak(), head, -12.0)
+		Game.say_once("remains_turned", "Кости лежали иначе. Я помню. Теперь череп смотрит на меня.")
+
+
 ## Часть скелета (.obj из набора): масштаб K, mirror — зеркально по X (левая рука из правой).
 static func _part(parent: Node3D, name: String, mat: Material, pos: Vector3, rot: Vector3, mirror := false) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
