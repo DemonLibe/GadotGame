@@ -5,7 +5,7 @@ signal tasks_changed
 signal message(text: String, color: Color, duration: float)
 signal end_day_requested
 ## Герой сделал запись в дневнике.
-signal diary_written(text: String)
+signal diary_written(text: String, foreign: bool)
 ## Шум: существа слышат его в радиусе radius.
 signal noise_made(pos: Vector3, radius: float)
 ## Собраны все записки и выбрана тайная концовка (запереть решётку изнутри).
@@ -245,12 +245,18 @@ func say(text: String, color := THOUGHT, duration := 4.0) -> void:
 	message.emit(text, color, duration)
 
 
-## Запись в дневнике: [смена, время смены «ЧЧ:ММ», текст].
+## Запись в дневнике: [смена, время смены «ЧЧ:ММ», текст, чужая ли рука].
 func write_diary(text: String) -> void:
 	if not diary.is_empty() and str(diary[-1][2]) == text:
 		return
-	diary.append([day, shift_clock(), text])
-	diary_written.emit(text)
+	diary.append([day, shift_clock(), text, false])
+	diary_written.emit(text, false)
+
+
+## Запись не его рукой: появляется в дневнике сама.
+func write_foreign(text: String) -> void:
+	diary.append([day, shift_clock(), text, true])
+	diary_written.emit(text, true)
 
 
 ## Часы смены: заступил в 23:00, одна секунда игры — десять секунд ночи.

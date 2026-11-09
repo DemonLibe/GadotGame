@@ -210,6 +210,7 @@ var hud: Hud
 var menu: Menu
 var stalker: Stalker
 var director: Director
+var horror: Horror
 var journal: Journal
 var hatch: Hatch
 var radio: RadioSet
@@ -293,6 +294,11 @@ func _ready() -> void:
 	director.stalker = stalker
 	director.level = level
 	add_child(director)
+	horror = Horror.new()
+	horror.main = self
+	horror.player = player
+	horror.level = level
+	add_child(horror)
 
 	ambience = Ambience.new()
 	ambience.player = player
@@ -620,6 +626,31 @@ func _spawn_ext_props() -> void:
 	ExtModels.metro_prop(level, "Poster_05", Vector3(-2.97, fy + 1.2, -39.6), PI / 2, 0.9)
 
 
+## Фото Маши на шкафчике меняется от смены к смене: лицо зацарапано, подпись не её рукой, потом фото нет.
+const PHOTO := Vector3(Level.SHAFT_X - 3.5 + 0.575, Level.ROOM_Y + 1.49, Level.SHAFT_Z + 1.6)
+
+
+func _photo_changes(d: int) -> void:
+	if d < 4:
+		return
+	var holder := Node3D.new()
+	holder.add_to_group("day_objects")
+	add_child(holder)
+	if d >= 6:
+		# Фотографии нет — только светлый след на краске и мел.
+		Geo.box(holder, PHOTO + Vector3(-0.004, -0.04, 0), Vector3(0.006, 0.19, 0.15), ProcTex.flat(Color(0.42, 0.44, 0.42), 0.8), false)
+		var chalk := Geo.label(holder, PHOTO + Vector3(0.012, -0.25, 0), "ОНА ЖДЁТ\nТЕБЯ ВНИЗУ", 90, 22, Color(0.85, 0.83, 0.78), true, 0.0022)
+		chalk.font = HudWidgets.hand()
+		return
+	# Лицо зацарапано — тёмные штрихи поверх.
+	for i in 5:
+		var scratch := Geo.box(holder, PHOTO + Vector3(0.008, randf_range(-0.012, 0.012), randf_range(-0.02, 0.02)), Vector3(0.002, 0.007, 0.07), ProcTex.flat(Color(0.05, 0.04, 0.04), 1.0), false)
+		scratch.rotation.x = randf_range(-0.9, 0.9)
+	if d >= 5:
+		var note := Geo.label(holder, PHOTO + Vector3(0.012, -0.13, 0), "папа не придёт", 90, 18, Color(0.55, 0.08, 0.06), true, 0.0018)
+		note.font = HudWidgets.hand()
+
+
 ## Пауки-охотники на стенах (с третьей смены): сидят, пока на них не посветишь.
 const LURKERS := {2: 1, 3: 2, 4: 3, 5: 3, 6: 2, 7: 3}
 const LURKERS_OLD := {3: 1, 4: 2, 5: 2, 6: 2}
@@ -768,6 +799,7 @@ func start_day(d: int, retry := false) -> void:
 	_spawn_threats(d, retry)
 	_setup_lower(d, retry)
 	_spawn_lurkers(d)
+	_photo_changes(d)
 	_setup_power(d)
 	_spawn_task_devices(d)
 	_reported = false
@@ -818,6 +850,7 @@ func start_day(d: int, retry := false) -> void:
 
 	if not debug_flag("s_dir"):
 		director.start_day(d)
+		horror.start_day(d)
 	if not debug_flag("s_fade"):
 		hud.set_black()
 		hud.show_title("День %d" % d, DAY_SUBTITLES[d], 2.5)
@@ -2094,6 +2127,16 @@ func _smoke_test() -> void:
 	air_ok = air_ok and player.air > 50.0
 	if not air_ok:
 		print("SMOKE FAIL: воздух от генератора")
+	# Хоррор: чужая запись в дневнике и волна темноты.
+	horror._foreign_left = 1
+	horror._foreign_t = 0.0
+	horror._update_foreign(0.1)
+	var h_ok: bool = not Game.diary.is_empty() and Game.diary[-1].size() > 3 and bool(Game.diary[-1][3])
+	player.global_position = Vector3(Level.TUN_CX, Level.FLOOR_Y + 0.1, -70.0)
+	h_ok = h_ok and level.dark_wave(player.global_position, -1.0) != Vector3.INF
+	if not h_ok:
+		print("SMOKE FAIL: чужая запись или волна темноты")
+	air_ok = air_ok and h_ok
 	shop_ok = shop_ok and air_ok
 	# Старая линия в третью смену: спуск, находка, платформа; провал — линия та же и вещмешок на месте;
 	# вынес находки наверх — заплатили.

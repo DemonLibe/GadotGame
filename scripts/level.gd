@@ -131,7 +131,8 @@ func _process(delta: float) -> void:
 		var light: OmniLight3D = l["light"]
 		var mat: StandardMaterial3D = l["mat"]
 		var mode: String = l["mode"]
-		var on: bool = mode != "broken" and not blackout and not (l["tunnel"] and (tunnel_lights_off or not power_on))
+		var on: bool = mode != "broken" and not blackout and not (l["tunnel"] and (tunnel_lights_off or not power_on)) \
+			and not l.get("off", false)
 		var f := 1.0 if on else 0.0
 		if on and mode == "flicker":
 			var phase: float = l["t"]
@@ -1036,6 +1037,32 @@ func _build_breach() -> void:
 	for side in [-1.0, 1.0]:
 		Geo.box(_breach, Vector3(TUN_CX + side * 1.25, FLOOR_Y + 1.0, z - 0.6), Vector3(0.6, 2.0, 0.5), brick, false)
 	_breach.visible = false
+
+
+## Волна темноты: лампы тоннеля впереди гаснут одна за другой — от дальней к ближней, с лязгом.
+## Возвращает точку у последней погасшей (там можно поставить фигуру) или Vector3.INF.
+func dark_wave(from: Vector3, dir_z: float) -> Vector3:
+	var picked: Array = []
+	for l in lamps:
+		if not l["tunnel"] or l["mode"] == "broken":
+			continue
+		var lz: float = (l["light"] as OmniLight3D).global_position.z
+		var ahead: float = (lz - from.z) * dir_z
+		if ahead > 6.0 and ahead < 70.0 and absf((l["light"] as OmniLight3D).global_position.x - TUN_CX) < 4.0:
+			picked.append(l)
+	if picked.size() < 3:
+		return Vector3.INF
+	picked.sort_custom(func(a, b): return absf((a["light"] as OmniLight3D).global_position.z - from.z) > absf((b["light"] as OmniLight3D).global_position.z - from.z))
+	for i in picked.size():
+		var l: Dictionary = picked[i]
+		get_tree().create_timer(0.45 * i).timeout.connect(func():
+			l["off"] = true
+			Game.play_at(Sfx.click(), (l["light"] as OmniLight3D).global_position, -2.0))
+	var last: Vector3 = (picked[-1]["light"] as OmniLight3D).global_position
+	get_tree().create_timer(0.45 * picked.size() + 9.0).timeout.connect(func():
+		for l in picked:
+			l["off"] = false)
+	return Vector3(TUN_CX, FLOOR_Y, last.z)
 
 
 ## Тоннельный светильник в сетке на стене. inward — куда смотрит (внутрь тоннеля).

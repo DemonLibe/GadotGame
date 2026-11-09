@@ -1047,9 +1047,12 @@ func _refresh_tasks() -> void:
 	_tasks.text = "\n".join(lines)
 
 
-func _on_diary(text: String) -> void:
-	_scribble.text = "— " + text
-	_scribble_t = clampf(2.5 + text.length() * 0.05, 3.5, 8.0)
+func _on_diary(text: String, foreign: bool) -> void:
+	_scribble.text = ("" if foreign else "— ") + text
+	# Чужая рука — бурыми чернилами, крупнее и дольше.
+	_scribble.add_theme_color_override("font_color", Color(0.7, 0.18, 0.12) if foreign else Color(0.88, 0.83, 0.7))
+	_scribble.add_theme_font_size_override("font_size", 25 if foreign else 21)
+	_scribble_t = clampf(2.5 + text.length() * 0.05, 3.5, 8.0) + (2.0 if foreign else 0.0)
 	if _book.visible:
 		_fill_book()
 
@@ -1103,7 +1106,10 @@ func _fill_book() -> void:
 		if int(e[0]) != last_day:
 			last_day = int(e[0])
 			lines.append("[b]СМЕНА № %d[/b]" % last_day)
-		lines.append("[color=#4a3a2a]%s[/color]  %s" % [e[1], e[2]])
+		if e.size() > 3 and bool(e[3]):
+			lines.append("[color=#6b1a10][font_size=26]%s[/font_size][/color]" % e[2])
+		else:
+			lines.append("[color=#4a3a2a]%s[/color]  %s" % [e[1], e[2]])
 	if lines.is_empty():
 		lines.append("Пусто. Пока.")
 	_book_text.text = "\n".join(lines)

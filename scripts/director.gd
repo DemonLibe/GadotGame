@@ -63,13 +63,13 @@ func start_day(d: int) -> void:
 		1: _budget = {}
 		2: _budget = {"footsteps": 1, "sighting": 1, "radio": 1}
 		3: _budget = {"footsteps": 1, "sighting": 2, "lamps": 1, "whisper": 1, "radio": 1, "crawler": 1, "interfere": 1,
-			"masha": 1, "silence": 1}
+			"masha": 1, "silence": 1, "darkwave": 1, "side": 1}
 		4: _budget = {"footsteps": 1, "sighting": 2, "behind": 2, "lamps": 1, "whisper": 2, "regrow": 1, "radio": 1, "crawler": 2, "interfere": 2,
-			"masha": 1, "double": 1, "silence": 1, "picket": 1, "name": 1}
+			"masha": 1, "double": 1, "silence": 1, "picket": 1, "name": 1, "darkwave": 1, "side": 2}
 		5: _budget = {"behind": 1, "whisper": 2, "lamps": 1, "footsteps": 1, "radio": 1, "crawler": 3, "interfere": 1,
-			"masha": 1, "double": 1, "silence": 1, "picket": 1, "name": 1}
+			"masha": 1, "double": 1, "silence": 1, "picket": 1, "name": 1, "darkwave": 2, "side": 2}
 		6: _budget = {}  # тихая смена: ничего
-		_: _budget = {"behind": 1, "whisper": 2, "crawler": 2, "swarm": 6, "double": 2, "silence": 2}
+		_: _budget = {"behind": 1, "whisper": 2, "crawler": 2, "swarm": 6, "double": 2, "silence": 2, "side": 2}
 
 
 func _next_hunt(d: int) -> float:
@@ -495,6 +495,10 @@ func _run(ev: String) -> bool:
 			return _sighting()
 		"behind":
 			return _behind()
+		"darkwave":
+			return _darkwave()
+		"side":
+			return _side()
 		"lamps":
 			_lamps_out()
 			return true
@@ -796,6 +800,36 @@ func _interfere() -> bool:
 
 
 ## Он стоит прямо за спиной. Сначала — дыхание.
+## Волна темноты навстречу: лампы гаснут от дальней к ближней, в темноте у последней — он.
+func _darkwave() -> bool:
+	if not level.power_on or level.tunnel_lights_off:
+		return false
+	var dir_z := -1.0 if player.forward_flat().z < 0.0 else 1.0
+	var at := level.dark_wave(player.global_position, dir_z)
+	if at == Vector3.INF:
+		return false
+	get_tree().create_timer(3.2).timeout.connect(func():
+		if not stalker.visible and level.is_walkable(at):
+			stalker.appear(at, "sighting", 5.0)
+			Game.add_fear(12.0))
+	Game.say_once("darkwave", "Лампы гасли одна за другой — по направлению ко мне. С щелчком. Как шаги.")
+	return true
+
+
+## Краем глаза: силуэт сбоку, в нескольких метрах. Повернёшься — пусто.
+func _side() -> bool:
+	var f := player.forward_flat()
+	var side := Vector3(-f.z, 0.0, f.x) * (1.0 if randf() < 0.5 else -1.0)
+	var pos := player.global_position + (side * 0.8 + f * 0.6).normalized() * randf_range(5.0, 8.0)
+	pos.y = Level.FLOOR_Y
+	if not level.is_walkable(pos) or pos.z > Level.TUN_Z0 - 2.0:
+		return false
+	stalker.appear(pos, "behind", 6.0)
+	Game.play_at(Sfx.sniff(), pos + Vector3(0, 1.6, 0), -6.0)
+	Game.say_once("side", "Краем глаза — фигура. Стоит сбоку и смотрит. Повернулся — никого.")
+	return true
+
+
 func _behind() -> bool:
 	var pos := player.global_position - player.forward_flat() * 3.2
 	pos.y = Level.FLOOR_Y
