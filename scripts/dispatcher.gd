@@ -77,7 +77,7 @@ func radio_pressed(day: int) -> void:
 		_static.play()
 		Game.say("Рация: только шипение — под кирпичным сводом не берёт.", Game.SYSTEM, 3.5)
 		return
-	if Game.has_open_task("relay") and player and player.global_position.z < RELAY_DEEP_Z and player.global_position.y < Level.FLOOR_Y + 5.0:
+	if Game.has_open_task("relay") and player and player.global_position.z < Level.map_z(RELAY_DEEP_Z) and player.global_position.y < Level.FLOOR_Y + 5.0:
 		_static.play()
 		Game.say("Рация: только шипение — глубже нужны ретрансляторы.", Game.SYSTEM, 3.5)
 		return

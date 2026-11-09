@@ -11,15 +11,29 @@ const W := 3.0                # ширина коридора
 const H := 3.0                # высота коридора
 const HALL_H := 3.8           # высота зала
 const WALL := 0.4
-const COLS := 12
-const ROWS := 12
+const COLS := 24
+const ROWS := 26
 ## Угол сетки: клетка (c, r) — от ORIGIN на c клеток по +X (прочь от тоннеля) и на r клеток по -Z (вглубь).
-## Сетка лежит справа от тоннеля между ПК 2 и ПК 3 — там, где нет ни комнат, ни штолен.
-const ORIGIN := Vector3(9.0, Y, -83.0)
-const ENTRY := Vector2i(0, 4)  # вход — клетка у тоннеля, с запада в неё ведёт ход от пролома
-const BREACH_Z := Level.OLD_BREACH_Z  # пролом в тоннеле — напротив входа (center(ENTRY).z)
+## Сетка лежит справа от тоннеля у пролома; генератор сети не пускает туда ни комнат, ни штолен.
+const ENTRY := Vector2i(0, 8)  # вход — клетка у тоннеля, с запада в неё ведёт ход от пролома
 const PASS_X0 := 2.85          # ход от пролома начинается у края пола тоннеля…
-const MOUTH := Vector3(Level.TUN_CX + 1.0, Y, BREACH_Z)  # …а это точка в тоннеле прямо перед проломом
+static var ORIGIN := Vector3(9.0, Y, -83.0)
+static var BREACH_Z := -110.0  # пролом в тоннеле — напротив входа (center(ENTRY).z)
+static var MOUTH := Vector3(Level.TUN_CX + 1.0, Y, BREACH_Z)  # …а это точка в тоннеле прямо перед проломом
+
+
+## Поставить сетку к пролому (сеть тоннелей пересобирается каждую смену).
+static func place(breach_z: float) -> void:
+	BREACH_Z = breach_z
+	ORIGIN = Vector3(9.0, Y, breach_z + (ENTRY.y + 0.5) * CELL)
+	MOUTH = Vector3(Level.TUN_CX + 1.0, Y, breach_z)
+
+
+## Прямоугольник сетки в плане (x, z).
+static func footprint() -> Rect2:
+	return Rect2(ORIGIN.x, ORIGIN.z - ROWS * CELL, COLS * CELL, ROWS * CELL)
+
+
 const DIRS := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 const HALL_KINDS := ["hall", "platform"]
 
@@ -178,7 +192,7 @@ func _mark_rooms() -> void:
 	var halls := 0
 	for c in cells:
 		var cell: Dictionary = cells[c]
-		if cell["kind"] == "corridor" and (cell["links"] as Array).size() == 1 and int(cell["dist"]) >= 3 and halls < 5 and rng.randf() < 0.5:
+		if cell["kind"] == "corridor" and (cell["links"] as Array).size() == 1 and int(cell["dist"]) >= 3 and halls < 20 and rng.randf() < 0.5:
 			cell["kind"] = "hall"
 			halls += 1
 

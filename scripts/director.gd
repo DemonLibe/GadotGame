@@ -544,10 +544,8 @@ func _hunt() -> bool:
 		var sgn := -1.0 if player.forward_flat().z < 0.0 else 1.0
 		pos = Vector3(Level.TUN_CX, Level.FLOOR_Y, p.z + sgn * randf_range(30.0, 40.0))
 	else:
-		var jz := 0.0
-		for i in Level.BRANCHES.size():
-			if absf(Level.branch_dir(i).dot(axis)) > 0.99:
-				jz = float(Level.BRANCHES[i]["z"])
+		var seg := level._segment_index(p)
+		var jz := Level.branch_root_z(seg - 1) if seg > 0 else p.z
 		pos = Vector3(Level.TUN_CX, Level.FLOOR_Y, jz - randf_range(12.0, 20.0))
 	pos.z = clampf(pos.z, maxf(main.day_limit() + 2.0, Level.GRATE_Z + 2.0), Level.TUN_Z0 - 6.0)
 	if pos.distance_to(p) < 18.0:

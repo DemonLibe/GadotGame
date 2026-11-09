@@ -11,53 +11,29 @@ const START_BATTERY := 50.0
 const MENU_SCENE := "res://scenes/main_menu.tscn"
 
 # Места в тоннелях. tunnel: -2 — станция (стена x = -3), -1 — основной тоннель (along = z),
-# 0..2 — штольни (along = метры от развилки). side: -1 / +1 — стена.
+# 0.. — штольни (along = метры от развилки). side: -1 / +1 — стена.
+# Сеть тоннелей каждую смену своя — места раскладываются по ней заново (_make_spots); первые — на станции.
 # Вентблоки: [tunnel, side, along, имя]
-const VENT_SPOTS := [
-	[-2, 0, -43.0, "В-1"],
-	[-1, -1, -92.0, "В-2"],
-	[0, 1, 42.0, "В-3"],
-	[-1, 1, -177.5, "В-4"],
-	[1, -1, 53.0, "В-5"],
-	[2, 1, 45.0, "В-6"],
-]
+var VENT_SPOTS: Array = []
 # Ящики: [tunnel, along, смещение поперёк]
-const CRATE_SPOTS := [
-	[-2, -46.5, 0.0],
-	[-1, -113.0, -1.3],
-	[0, 59.0, 1.0],
-	[-1, -167.0, 1.3],
-	[1, 33.5, -1.0],
-	[2, 52.0, -1.0],
-]
-# Места для большой паутины поперёк прохода: [tunnel, along]. Берутся по порядку.
-const WEB_SPOTS := [
-	[-1, -74.0], [-1, -107.0], [0, 22.5], [-1, -162.5], [1, 19.5],
-	[-1, -192.5], [2, 21.0], [-1, -245.0], [-1, -297.5],
-]
+var CRATE_SPOTS: Array = []
+# Места для большой паутины поперёк прохода: [tunnel, along], от станции вглубь.
+var WEB_SPOTS: Array = []
 const WEBS_PER_DAY := [0, 2, 4, 5, 7, 9, 3, 6]
 # Шкафы-укрытия: [tunnel, side, along]. tunnel -2 — станция.
-const HIDEOUT_SPOTS := [
-	[-2, 1, -34.0], [-1, 1, -71.0], [-1, -1, -110.0], [-1, -1, -188.0], [-1, -1, -236.0],
-	[-1, 1, -305.0], [0, -1, 31.0], [1, 1, 45.0], [2, -1, 31.0],
-]
-## Генератор: сколько топлива в баке в начале смены и сколько канистр спрятано в тоннелях.
+var HIDEOUT_SPOTS: Array = []
+## Генератор: сколько топлива в баке в начале смены (канистры раскладываются по бюджету смены).
 const GEN_FUEL := [0.0, 100.0, 70.0, 60.0, 50.0, 50.0, 100.0, 0.0]
-const CANISTERS_PER_DAY := [0, 0, 1, 2, 2, 2, 1, 0]
 ## Затопленная штольня (четвёртая смена): номер штольни и участок воды.
 const FLOOD_BRANCH := 2
 const FLOOD_FROM := 18.0
 # Места на стенах для поручений из пула (щиток, задвижки, ретрансляторы, точки осмотра): [tunnel, side, along].
-const WALL_TASK_SPOTS := [
-	[-1, 1, -62.0], [-1, -1, -88.0], [-1, 1, -104.0], [-1, 1, -146.0], [-1, -1, -158.0],
-	[-1, 1, -190.0], [-1, -1, -205.0], [-1, 1, -228.0], [-1, -1, -262.0], [-1, 1, -288.0], [-1, -1, -300.0],
-	[0, 1, 25.0], [0, -1, 48.0], [1, -1, 28.0], [1, 1, 60.0], [2, 1, 25.0], [2, -1, 40.0],
-]
+var WALL_TASK_SPOTS: Array = []
 ## Щиток четвёртой смены — во второй штольне (о нём говорит диспетчер).
-const FUSE_DAY4 := [1, 1, 73.0]
+var FUSE_DAY4: Array = [1, 1, 40.0]
 const RELAY_BOX := Vector3(-2.2, Level.FLOOR_Y, -38.5)
 # Где искрит кабель на третьей смене: [side, z].
-const CABLE_SPOTS := [[-1, -101.0], [1, -152.0], [1, -185.0]]
+var CABLE_SPOTS: Array = []
 const LETTER := ["Письмо от Маши",
 	"Папа! Мама говорит, ты теперь работаешь под землёй, как гном из сказки.\n\nВрач сказал, после операции я смогу бегать. Я нарисовала тебе фонарик, чтобы тебе там не было темно.\n\nВозвращайся скорее. Маша, 7 лет."]
 
@@ -76,10 +52,11 @@ const NOTES := {
 	7: [[-1, 1, -368.0, 1.7, "ПОЕЗД ЖДЁТ"], [-1, -1, -330.0, 1.5, "→ → →"]],
 }
 
-## Карта растёт: докуда по основному тоннелю открыто в каждую смену (z ограждения)
-## и с какой смены открыта каждая штольня.
-const DAY_LIMIT_Z := [0.0, -117.5, -197.0, -239.0, -321.5, -1000.0, -321.5, -1000.0]
-const BRANCH_OPEN_DAY := [2, 3, 4]
+## Карта растёт: докуда по основному тоннелю открыто в каждую смену (z ограждения по старой схеме —
+## переводится в нынешнюю сеть). Штольни открыты со второй смены, если их развилка не за ограждением.
+const OLD_DAY_LIMIT_Z := [0.0, -117.5, -197.0, -239.0, -321.5, -1000.0, -321.5, -1000.0]
+const BRANCH_OPEN_FROM := 2
+var DAY_LIMIT_Z: Array = OLD_DAY_LIMIT_Z.duplicate()
 ## Сложность растёт: существа, коробки патронов, патроны в оружейном ящике.
 const CREATURES_PER_DAY := [0, 0, 0, 2, 4, 6, 0, 4]
 const AMMO_BOXES_PER_DAY := [0, 0, 0, 3, 3, 4, Game.GEAR_AMMO_BOXES - 2, 4]  # в шестую — ещё две в старой линии
@@ -87,14 +64,14 @@ const PISTOL_ROUNDS := [0, 0, 0, 6, 4, 6, 6, 0]
 ## Седьмая смена: кусачие пауки на полу с самого начала; вагон метро за проломом (центр головного вагона).
 const BITERS_AT_START := 8
 ## Старая линия по сменам: сколько клеток прорастёт, сколько в ней существ и находок.
-const LOWER_CELLS := {3: 30, 4: 40, 5: 48, 6: 54}
-const LOWER_CRAWLERS := {3: 1, 4: 2, 5: 3, 6: 1}
-const LOWER_RELICS := {3: 4, 4: 5, 5: 6, 6: 5}
+const LOWER_CELLS := {3: 240, 4: 320, 5: 384, 6: 430}
+const LOWER_CRAWLERS := {3: 3, 4: 5, 5: 7, 6: 3}
+const LOWER_RELICS := {3: 8, 4: 10, 5: 12, 6: 10}
 ## Служебки за решёткой: [наверняка, ещё одна с вероятностью]. Ключ от каждой — у останков где-то в линии.
-const STOREROOMS := {3: [0, 0.5], 4: [1, 0.0], 5: [1, 0.5], 6: [2, 0.0]}
-const LOWER_LISTENERS := {3: 1, 4: 1, 5: 2, 6: 2}
+const STOREROOMS := {3: [1, 0.5], 4: [2, 0.5], 5: [3, 0.0], 6: [4, 0.0]}
+const LOWER_LISTENERS := {3: 3, 4: 3, 5: 5, 6: 5}
 ## Старые шкафы внизу — с пятой смены, когда туда спускается «Другой».
-const LOWER_HIDEOUTS := {5: 4, 6: 4}
+const LOWER_HIDEOUTS := {3: 4, 4: 6, 5: 12, 6: 12}
 ## Находки: [название, цена]; чем дальше от лестницы, тем дороже.
 const RELICS := [["серебряные монеты", 60], ["подстаканник", 50], ["карманные часы", 90], ["путейский фонарь", 70], ["эмалированная табличка", 80]]
 ## Мелом на кирпиче — по смене. Старая линия помнит тех, кто был здесь раньше.
@@ -104,11 +81,11 @@ const LOWER_CHALK := {
 	5: ["ВОСЬМОЙ, ТЫ ОПОЗДАЛ", "ПОЕЗД ХОДИТ ПО ЧЕТВЕРГАМ"],
 	6: ["ТЫ УЖЕ ВЫБРАЛСЯ?", "ОН ЖДЁТ НАВЕРХУ"],
 }
-## Коробки с болтами по тоннелю — каждую смену.
+## Коробки с болтами по тоннелю — каждую смену (столько на старую схему; в нынешней — по размеру сети).
 const BOLT_BOXES := 4
-const METRO_CAR_Z := -390.0
+var METRO_CAR_Z := -390.0
 
-## Комнаты, открытые в каждую смену: [индекс комнаты (0–2 — у тоннеля, 3–5 — в конце штолен), записка].
+## Комнаты, открытые в каждую смену: [сюжетная комната (0–2 — у тоннеля, 3–5 — в конце первых штолен), записка].
 const ROOM_SCHEDULE := {
 	1: [[0, "n1"]],
 	2: [[3, "n2"], [1, "n3"]],
@@ -220,7 +197,12 @@ var cart: Cart
 var vents: Array[Vent] = []
 var crates: Array[FilterCrate] = []
 var doors: Array[RoomDoor] = []
-var generator: Generator
+var _door_of := {}            # индекс комнаты → её дверь (у генераторных дверей нет)
+var generator: Generator      # главный — на станции
+var reserves: Array[Generator] = []  # резервные — в генераторных по тоннелю
+var _net_seed := 0            # сеть тоннелей в эту смену (после провала — та же)
+var _net_fresh := false       # сеть только что собрана при загрузке — первой смене пересобирать не нужно
+var _budget := {}             # расходники и существа на смену (по размеру открытой сети)
 var ambience: Ambience
 var phone: WallPhone
 var pump: TaskDevice
@@ -254,6 +236,9 @@ func _ready() -> void:
 	add_child(level)
 	level.build()
 	_spawn_props()
+	_net_seed = randi()
+	_build_network(_net_seed)
+	_net_fresh = true
 
 	player = Player.new()
 	add_child(player)
@@ -330,8 +315,25 @@ static func is_web_renderer() -> bool:
 	return str(ProjectSettings.get_setting_with_override("rendering/renderer/rendering_method")) == "gl_compatibility"
 
 
+var _fps_t := 0.0
+var _tick_t := 0
+
+
+func _tick(label: String) -> void:
+	if _smoke:
+		var now := Time.get_ticks_msec()
+		if now - _tick_t > 300:
+			print("TICK %s %dms" % [label, now - _tick_t])
+		_tick_t = Time.get_ticks_msec()
+
+
 func _process(delta: float) -> void:
 	_grace -= delta
+	if _smoke:
+		_fps_t += delta
+		if _fps_t > 10.0:
+			_fps_t = 0.0
+			print("FPS %d day %d nodes %d" % [Engine.get_frames_per_second(), Game.day, get_tree().get_node_count()])
 	if _debug_log:
 		_debug_t -= delta
 		if _debug_t <= 0.0:
@@ -502,10 +504,19 @@ func _spawn_kit_props() -> void:
 	k.call(level, "03_platform/tool_board", Vector3(-2.97, fy + 0.9, -36.6), PI / 2)
 	k.call(level, "common/wall_poster_safety", Vector3(2.98, fy + 1.5, -44.0), -PI / 2)
 	_kit_light_prop("04_cast_iron_tunnel/tunnel_signal", Vector3(2.6, fy + 2.3, -49.4), 0.0)
-	# Тоннель: лужи на лотке, светофор у решётки.
-	for z in [-61.0, -96.0, -143.0, -181.0, -228.0, -268.0, -301.0]:
-		k.call(level, "common/puddle_decal", Vector3(Level.TUN_CX - 0.9, fy + 0.012, z), randf() * TAU)
-	_kit_light_prop("04_cast_iron_tunnel/tunnel_signal", Vector3(Level.TUN_CX + 1.75, fy + 2.0, Level.GRATE_Z + 6.0), -PI / 2)
+
+
+## Обстановка сети тоннелей (пересобирается вместе с сетью): лужи, светофор у решётки, комнаты.
+func _spawn_net_kit_props() -> void:
+	if not ResourceLoader.exists(ProcTex.KIT + "models/common/fuel_barrel.glb"):
+		return
+	var fy := Level.FLOOR_Y
+	var k := ProcTex.kit_model
+	var z := Level.TUN_Z0 - 11.0
+	while z > Level.GRATE_Z + 4.0:
+		k.call(level.net, "common/puddle_decal", Vector3(Level.TUN_CX - 0.9, fy + 0.012, z), randf() * TAU)
+		z -= randf_range(30.0, 60.0)
+	_kit_light_prop("04_cast_iron_tunnel/tunnel_signal", Vector3(Level.TUN_CX + 1.75, fy + 2.0, Level.GRATE_Z + 6.0), -PI / 2, level.net)
 	# Служебные комнаты: у каждой своё назначение — обстановка вдоль стен, середина свободна
 	# (там лежат кости, записка и находки). Подстилка под кости — везде.
 	for room in level.rooms:
@@ -521,15 +532,22 @@ func _furnish_room(room: Dictionary) -> void:
 	var hw := float(kind["w"]) / 2.0
 	var hd := float(kind["d"]) / 2.0
 	var put := func(path: String, local: Vector3, yaw: float) -> void:
-		var m: Node3D = ProcTex.kit_model(level, path)
+		var m: Node3D = ProcTex.kit_model(level.net, path)
 		m.transform = Transform3D(b * Basis(Vector3.UP, yaw), c + b * local)
 	var junk := func(name: String, local: Vector3, scale := 1.0) -> void:
-		ExtModels.trash(level, name, c + b * local, randf() * TAU, scale)
+		ExtModels.trash(level.net, name, c + b * local, randf() * TAU, scale)
 	var back := -hd + 0.3     # у задней стены
 	var left := -hw + 0.45    # у левой
 	var right := hw - 0.45    # у правой
-	put.call("05_service_room/remains_bedding", Vector3(0.6, 0.0, -1.1), 0.0)
+	if kind["theme"] != "genroom":
+		put.call("05_service_room/remains_bedding", Vector3(0.6, 0.0, -1.1), 0.0)
 	match str(kind["theme"]):
+		"genroom":  # генераторная: дизель посередине (его ставит main), бочки, канистра, кабель, табличка
+			put.call("common/fuel_barrel", Vector3(left, 0.0, back + 0.2), 0.3)
+			put.call("common/fuel_barrel", Vector3(left + 0.65, 0.0, back + 0.1), 1.1)
+			put.call("common/cable_drum", Vector3(right - 0.1, 0.0, back + 0.4), 0.0)
+			put.call("common/danger_sign", Vector3(0.0, 1.7, -hd + 0.02), 0.0)
+			put.call("common/fire_extinguisher", Vector3(right, 0.0, hd - 0.6), -PI / 2)
 		"bytovka":  # бытовка: кровати, стол с плиткой, полка
 			put.call("05_service_room/iron_bed", Vector3(left, 0.0, -0.4), 0.0)
 			if hw > 2.2:
@@ -584,38 +602,17 @@ func _furnish_room(room: Dictionary) -> void:
 			junk.call("News_Stack", Vector3(-1.6, 0.72, back + 0.3), 0.6)
 
 
-## Мусор (Trash and Debris) и станционное (Metro PSX): стоит всё время, как стены.
+## Мусор (Trash and Debris) и станционное (Metro PSX) на станции: стоит всё время, как стены.
 func _spawn_ext_props() -> void:
 	if not ExtModels.ok(ExtModels.TRASH):
 		return
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1913
 	var fy := Level.FLOOR_Y
-	# Тоннель: у стен, не на рельсах, через каждые несколько метров.
-	var z := Level.TUN_Z0 - 4.0
-	while z > Level.GRATE_Z + 3.0:
-		if rng.randf() < 0.55:
-			var side := -1.0 if rng.randf() < 0.5 else 1.0
-			var pos := Vector3(Level.TUN_CX + side * rng.randf_range(1.15, 1.45), fy, z + rng.randf_range(-1.5, 1.5))
-			ExtModels.trash(level, ExtModels.TUNNEL_TRASH[rng.randi_range(0, ExtModels.TUNNEL_TRASH.size() - 1)], pos, rng.randf() * TAU)
-		z -= rng.randf_range(4.0, 8.0)
-	# Штольни.
-	for i in Level.BRANCHES.size():
-		var along := Level.JUNCTION_BRANCH + 2.0
-		while along < float(Level.BRANCHES[i]["length"]) - 3.0:
-			if rng.randf() < 0.5:
-				var pos := level.floor_point(i, along, (-1.0 if rng.randf() < 0.5 else 1.0) * rng.randf_range(1.0, 1.3))
-				ExtModels.trash(level, ExtModels.TUNNEL_TRASH[rng.randi_range(0, ExtModels.TUNNEL_TRASH.size() - 1)], pos, rng.randf() * TAU)
-			along += rng.randf_range(5.0, 9.0)
 	# Станция: мусор по платформе.
 	for i in 7:
 		var pos := Vector3(rng.randf_range(-2.6, -0.8), fy, rng.randf_range(-48.5, -31.5))
 		ExtModels.trash(level, ExtModels.STATION_TRASH[rng.randi_range(0, ExtModels.STATION_TRASH.size() - 1)], pos, rng.randf() * TAU)
-	# Служебные комнаты: газета или банка у двери.
-	for room in level.rooms:
-		var c: Vector3 = room["center"]
-		var b: Basis = room["basis"]
-		ExtModels.trash(level, ["News_1", "Paper_2", "Can_4_Crushed", "Tin_2"][rng.randi_range(0, 3)], c + b * Vector3(rng.randf_range(-0.4, 0.4), 0, 1.2), rng.randf() * TAU)
 	if not ExtModels.ok(ExtModels.METRO):
 		return
 	# Станция: скамья и урна у западной стены, схема линий и плакаты — на восточной.
@@ -624,6 +621,34 @@ func _spawn_ext_props() -> void:
 	ExtModels.metro_prop(level, "metro_map", Vector3(2.97, fy + 1.0, -38.2), -PI / 2, 1.2)
 	ExtModels.metro_prop(level, "Poster_02", Vector3(2.97, fy + 1.2, -46.6), -PI / 2, 0.9)
 	ExtModels.metro_prop(level, "Poster_05", Vector3(-2.97, fy + 1.2, -39.6), PI / 2, 0.9)
+
+
+## Мусор по сети тоннелей: у стен, не на рельсах; в комнатах — газета или банка у двери.
+func _spawn_net_ext_props() -> void:
+	if not ExtModels.ok(ExtModels.TRASH):
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = level.net_seed + 1913
+	var fy := Level.FLOOR_Y
+	var parent := level.net
+	var z := Level.TUN_Z0 - 4.0
+	while z > Level.GRATE_Z + 3.0:
+		if rng.randf() < 0.6:
+			var side := -1.0 if rng.randf() < 0.5 else 1.0
+			var pos := Vector3(Level.TUN_CX + side * rng.randf_range(1.15, 1.45), fy, z + rng.randf_range(-1.5, 1.5))
+			ExtModels.trash(parent, ExtModels.TUNNEL_TRASH[rng.randi_range(0, ExtModels.TUNNEL_TRASH.size() - 1)], pos, rng.randf() * TAU)
+		z -= rng.randf_range(7.0, 14.0)
+	for i in Level.BRANCHES.size():
+		var along := Level.JUNCTION_BRANCH + 2.0
+		while along < float(Level.BRANCHES[i]["length"]) - 3.0:
+			if rng.randf() < 0.5:
+				var pos := level.floor_point(i, along, (-1.0 if rng.randf() < 0.5 else 1.0) * rng.randf_range(1.0, 1.3))
+				ExtModels.trash(parent, ExtModels.TUNNEL_TRASH[rng.randi_range(0, ExtModels.TUNNEL_TRASH.size() - 1)], pos, rng.randf() * TAU)
+			along += rng.randf_range(7.0, 12.0)
+	for room in level.rooms:
+		var c: Vector3 = room["center"]
+		var b: Basis = room["basis"]
+		ExtModels.trash(parent, ["News_1", "Paper_2", "Can_4_Crushed", "Tin_2"][rng.randi_range(0, 3)], c + b * Vector3(rng.randf_range(-0.4, 0.4), 0, 1.2), rng.randf() * TAU)
 
 
 ## Фото Маши на шкафчике меняется от смены к смене: лицо зацарапано, подпись не её рукой, потом фото нет.
@@ -659,7 +684,7 @@ const LURKERS_OLD := {3: 1, 4: 2, 5: 2, 6: 2}
 func _spawn_lurkers(d: int) -> void:
 	if not ExtModels.ok(ExtModels.HUNTSMAN):
 		return
-	for i in int(LURKERS.get(d, 0)):
+	for i in int(LURKERS.get(d, 0) * float(_budget.get("f", 1.0))):
 		var along := randf_range(maxf(day_limit() + 4.0, Level.GRATE_Z + 4.0), Level.TUN_Z0 - 10.0)
 		var tr := _mount(-1, -1 if randf() < 0.5 else 1, along, Level.FLOOR_Y + randf_range(1.6, 2.4))
 		var l := Lurker.new()
@@ -680,11 +705,11 @@ func _spawn_lurkers(d: int) -> void:
 
 
 ## Модель-префаб набора со своим светом (светофор): свет гасится вдали, как лампы.
-func _kit_light_prop(path: String, pos: Vector3, yaw: float) -> void:
+func _kit_light_prop(path: String, pos: Vector3, yaw: float, parent: Node = null) -> void:
 	var scene := load(ProcTex.KIT + "prefabs/%s.tscn" % path) as PackedScene
 	var n := scene.instantiate() as Node3D
 	n.transform = Transform3D(Basis(Vector3.UP, yaw), pos)
-	level.add_child(n)
+	(parent if parent else level).add_child(n)
 	for l in n.find_children("*", "Light3D", true, false):
 		(l as Light3D).add_to_group("cull_light")
 		(l as Light3D).shadow_enabled = false
@@ -723,19 +748,6 @@ func _spawn_props() -> void:
 	add_child(radio)
 	Geo.label(level, Vector3(Level.SHAFT_X + 3.48, Level.ROOM_Y + 1.9, Level.SHAFT_Z - 1.6), "ЖУРНАЛ СМЕН", -90.0, 36, Color(0.15, 0.15, 0.15), true)
 
-	var fy := Level.FLOOR_Y
-	for s in VENT_SPOTS:
-		var v := Vent.new()
-		v.vent_name = s[3]
-		v.transform = _mount(s[0], s[1], s[2], fy + 1.4)
-		add_child(v)
-		vents.append(v)
-	for s in CRATE_SPOTS:
-		var crate := FilterCrate.new()
-		crate.position = _floor(s[0], s[1], s[2])
-		crate.rotation.y = randf_range(-0.3, 0.3)
-		add_child(crate)
-		crates.append(crate)
 	cart = Cart.new()
 	add_child(cart)
 	generator = Generator.new()
@@ -743,6 +755,111 @@ func _spawn_props() -> void:
 	generator.position = Vector3(-2.4, Level.FLOOR_Y, -44.6)
 	generator.rotation.y = deg_to_rad(90.0)
 	add_child(generator)
+
+
+## Новая сеть тоннелей (каждую смену; после провала — та же): геометрия, места, обстановка, резервные дизели.
+func _build_network(seed_value: int) -> void:
+	var t0 := Time.get_ticks_msec()
+	level.generate_network(seed_value)
+	var t1 := Time.get_ticks_msec()
+	METRO_CAR_Z = Level.map_z(-390.0)
+	for i in OLD_DAY_LIMIT_Z.size():
+		var z: float = OLD_DAY_LIMIT_Z[i]
+		if z <= -1000.0:
+			DAY_LIMIT_Z[i] = -100000.0
+		elif z <= -321.0:
+			DAY_LIMIT_Z[i] = Level.GRATE_Z + 1.5
+		elif z >= 0.0:
+			DAY_LIMIT_Z[i] = z
+		else:
+			DAY_LIMIT_Z[i] = level.plain_along(-1, Level.map_z(z), 0, 3.0)
+	_make_spots()
+	_spawn_net_props()
+	if _smoke:
+		print("NET seed=%d trunk=%d branches=%d rooms=%d lamps=%d geo=%dms props=%dms" % [seed_value, int(Level.TUN_Z0 - Level.GRATE_Z),
+			Level.BRANCHES.size(), level.rooms.size(), level.lamps.size(), t1 - t0, Time.get_ticks_msec() - t1])
+
+
+## Места для объектов по нынешней сети: через каждые ~9 м стены — вентблок, шкаф, ящик, место под поручение
+## или ничего. Зерно — от сети, так что после провала всё на тех же местах.
+func _make_spots() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = level.net_seed + 77
+	VENT_SPOTS = [[-2, 0, -43.0, "В-1"]]
+	CRATE_SPOTS = [[-2, -46.5, 0.0]]
+	HIDEOUT_SPOTS = [[-2, 1, -34.0]]
+	WALL_TASK_SPOTS = []
+	WEB_SPOTS = []
+	CABLE_SPOTS = []
+	var tunnels: Array = [-1]
+	for i in Level.BRANCHES.size():
+		tunnels.append(i)
+	var vent_n := 2
+	for t in tunnels:
+		var length := level.tunnel_length(t)
+		var along := 6.0
+		var last_web := -100.0
+		while along < length - 2.0:
+			var a: float = Level.TUN_Z0 - along if t < 0 else along
+			var side := 1 if rng.randf() < 0.5 else -1
+			if level.is_plain(t, a, side, 2.5):
+				var roll := rng.randf()
+				if roll < 0.085:
+					VENT_SPOTS.append([t, side, a, "В-%d" % vent_n])
+					vent_n += 1
+				elif roll < 0.17:
+					CRATE_SPOTS.append([t, a, side * 1.25])
+				elif roll < 0.26:
+					HIDEOUT_SPOTS.append([t, side, a])
+				elif roll < 0.62:
+					WALL_TASK_SPOTS.append([t, side, a])
+					if t < 0 and rng.randf() < 0.25:
+						CABLE_SPOTS.append([side, a])
+			if along - last_web > 45.0 and level.is_plain(t, a, 0, 3.0) and along > 15.0:
+				WEB_SPOTS.append([t, a])
+				last_web = along + rng.randf_range(0.0, 25.0)
+			along += rng.randf_range(7.0, 11.0)
+	# Паутина — от станции вглубь (по глубине корня), чтобы раскладка шла по порядку.
+	WEB_SPOTS.sort_custom(func(x, y): return _depth_of(x[0], x[1]) < _depth_of(y[0], y[1]))
+	# Кабель третьей смены искрит там, куда в третью смену можно дойти.
+	var lim3: float = DAY_LIMIT_Z[3]
+	CABLE_SPOTS = CABLE_SPOTS.filter(func(c): return float(c[1]) > lim3 + 3.0)
+	if CABLE_SPOTS.is_empty():
+		CABLE_SPOTS = [[-1, level.plain_along(-1, Level.map_z(-152.0), -1, 2.5)]]
+	if Level.BRANCHES.size() > 1:
+		FUSE_DAY4 = [1, 1, level.plain_along(1, float(Level.BRANCHES[1]["length"]) - 8.0, 1, 2.0)]
+
+
+## Глубина точки по сети: z развилки на основном тоннеле плюс путь по штольне.
+func _depth_of(tunnel: int, along: float) -> float:
+	if tunnel == -2:
+		return 0.0
+	if tunnel == -1:
+		return Level.TUN_Z0 - along
+	return Level.TUN_Z0 - Level.branch_root_z(tunnel) + along
+
+
+## Объекты сети: вентблоки, ящики, шкафы, двери комнат, резервные дизели, обстановка и мусор.
+func _spawn_net_props() -> void:
+	vents.clear()
+	crates.clear()
+	doors.clear()
+	_door_of.clear()
+	reserves.clear()
+	var fy := Level.FLOOR_Y
+	var net := level.net
+	for s in VENT_SPOTS:
+		var v := Vent.new()
+		v.vent_name = s[3]
+		v.transform = _mount(s[0], s[1], s[2], fy + 1.4)
+		net.add_child(v)
+		vents.append(v)
+	for s in CRATE_SPOTS:
+		var crate := FilterCrate.new()
+		crate.position = _floor(s[0], s[1], s[2])
+		crate.rotation.y = randf_range(-0.3, 0.3)
+		net.add_child(crate)
+		crates.append(crate)
 	for h in HIDEOUT_SPOTS:
 		var cab := Hideout.new()
 		var t: int = h[0]
@@ -755,12 +872,26 @@ func _spawn_props() -> void:
 			cab.position = level.floor_point(t, float(h[2]), float(h[1]) * 1.05)
 			var front := -right * float(h[1])
 			cab.rotation.y = atan2(front.x, front.z)
-		add_child(cab)
-	for room in level.rooms:
+		net.add_child(cab)
+	for ri in level.rooms.size():
+		var room: Dictionary = level.rooms[ri]
+		if room.get("gen", false):
+			# Резервный дизель посреди генераторной, панелью к проёму.
+			var g := Generator.new()
+			g.reserve = true
+			g.level = level
+			var b: Basis = room["basis"]
+			g.transform = Transform3D(b, (room["center"] as Vector3) + b * Vector3(0.4, 0.0, -0.3))
+			net.add_child(g)
+			reserves.append(g)
+			continue
 		var door := RoomDoor.new()
 		door.transform = room["door"]
-		add_child(door)
+		net.add_child(door)
 		doors.append(door)
+		_door_of[ri] = door
+	_spawn_net_kit_props()
+	_spawn_net_ext_props()
 
 
 # --- Смена дня ---------------------------------------------------------------
@@ -778,6 +909,14 @@ func start_day(d: int, retry := false) -> void:
 	Game.ended = false
 	if not debug_flag("s_save"):
 		Game.save_day(d)
+	# Каждая смена — своя сеть тоннелей (после провала — та же).
+	if not retry:
+		if _net_fresh:
+			_net_fresh = false
+		else:
+			_net_seed = randi()
+			_build_network(_net_seed)
+	_budget = _make_budget(d)
 	if not debug_flag("s_tasks"):
 		Game.build_tasks(d)
 	for n in get_tree().get_nodes_in_group("day_objects"):
@@ -796,12 +935,19 @@ func start_day(d: int, retry := false) -> void:
 	if not debug_flag("norooms"):
 		_setup_rooms(d)
 	_spawn_finds(d)
+	_tick("_spawn_finds")
 	_spawn_threats(d, retry)
+	_tick("_spawn_threats")
 	_setup_lower(d, retry)
+	_tick("_setup_lower")
 	_spawn_lurkers(d)
+	_tick("_spawn_lurkers")
 	_photo_changes(d)
+	_tick("_photo_changes")
 	_setup_power(d)
+	_tick("_setup_power")
 	_spawn_task_devices(d)
+	_tick("_spawn_task_devices")
 	_reported = false
 	_station_t = 0.0
 	dispatcher.collapse_mode = false
@@ -1353,13 +1499,15 @@ func _setup_vents_and_crates(d: int) -> void:
 		if _reachable(CRATE_SPOTS[i][0], CRATE_SPOTS[i][1]):
 			pool.append(crates[i])
 	var spare_f := need + 1 if need > 0 else 0
-	var spare_b := Player.MAX_BATTERIES if d == Game.LAST_DAY - 1 else 1
+	var spare_b: int = _budget.get("batteries", 1)
 	if d == 1:
 		crates[0].set_contents(1, 1)
 		spare_f -= 1
-		spare_b = 0
+		spare_b -= 1
+	# Ящики — по всей открытой сети, а не только у станции: сначала по очереди от ближних к дальним.
+	pool.shuffle()
 	var guard := 0
-	while (spare_f > 0 or spare_b > 0) and guard < 100:
+	while (spare_f > 0 or spare_b > 0) and guard < 400 and not pool.is_empty():
 		guard += 1
 		var c: FilterCrate = pool.pick_random()
 		if spare_f > 0 and c.filters < 3:
@@ -1371,22 +1519,25 @@ func _setup_vents_and_crates(d: int) -> void:
 
 
 func _spawn_webs(d: int) -> void:
-	var left_to_place: int = WEBS_PER_DAY[mini(d, WEBS_PER_DAY.size() - 1)]
-	for spot in WEB_SPOTS:
-		if left_to_place > 0 and _reachable(spot[0], spot[1]):
-			spawn_block_web(spot[0], spot[1])
-			left_to_place -= 1
-	for i in 3 + d * 2:
+	# Большая паутина — по открытым местам равномерно от станции вглубь.
+	var open: Array = WEB_SPOTS.filter(func(sp): return _reachable(sp[0], sp[1]))
+	var count: int = mini(int(_budget.get("webs", WEBS_PER_DAY[mini(d, WEBS_PER_DAY.size() - 1)])), open.size())
+	for k in count:
+		var spot: Array = open[int(float(k) * open.size() / count)]
+		spawn_block_web(spot[0], spot[1])
+	for i in int((3 + d * 2) * float(_budget.get("f", 1.0))):
 		var left := randf() < 0.5
 		var y := Level.FLOOR_Y + randf_range(2.0, 2.6)
 		var x := Level.wall_x(-1 if left else 1, y, 0.5)
-		spawn_small_web(Vector3(x, y, randf_range(-56.0, maxf(day_limit() + 3.0, Level.GRATE_Z + 3.0))), randf_range(0.9, 1.4))
+		var z := randf_range(-56.0, maxf(day_limit() + 3.0, Level.GRATE_Z + 3.0))
+		if level.is_plain(-1, z, -1 if left else 1, 1.0):
+			spawn_small_web(Vector3(x, y, z), randf_range(0.9, 1.4))
 	spawn_small_web(Vector3(-2.6, Level.FLOOR_Y + 3.4, -36.0), 1.2)
 	if d == Game.FINAL_DAY:
 		# Гнездо за решёткой.
 		for i in 12:
 			var x := randf_range(Level.LEFT_X + 0.5, Level.RIGHT_X - 0.5)
-			spawn_small_web(Vector3(x, Level.FLOOR_Y + randf_range(0.8, 2.8), randf_range(-368.0, -329.0)), randf_range(1.2, 2.0))
+			spawn_small_web(Vector3(x, Level.FLOOR_Y + randf_range(0.8, 2.8), Level.map_z(randf_range(-368.0, -329.0))), randf_range(1.2, 2.0))
 
 
 func spawn_block_web(tunnel: int, along: float, regrown := false) -> Web:
@@ -1434,13 +1585,11 @@ func _spawn_spiders(d: int) -> void:
 	if d == 1:
 		# Первый паук — на станции, чтобы познакомиться.
 		_add_spider(-3.0, Vector3.RIGHT, -40.0, 3.0)
-	for i in d + 1:
+	for i in int((d + 1) * float(_budget.get("f", 1.0))):
 		var left := randf() < 0.5
 		var z := randf_range(maxf(day_limit() + 6.0, Level.GRATE_Z + 12.0), -60.0)
-		# Не в камерах развилок — там стены другие.
-		for b in Level.BRANCHES:
-			if absf(z - float(b["z"])) < Level.JUNCTION_MAIN + 4.0:
-				z += 12.0
+		# Не в камерах развилок и не у дверей — там стены другие.
+		z = level.plain_along(-1, z, -1 if left else 1, 5.0)
 		_add_spider(Level.wall_x(-1 if left else 1, Level.FLOOR_Y + 1.5, 0.02), Vector3.RIGHT if left else Vector3.LEFT, z, 5.0)
 
 
@@ -1467,7 +1616,14 @@ func _spawn_notes(d: int) -> void:
 		if day > d:
 			continue
 		for n in NOTES[day]:
-			write_chalk(n[0], n[1], n[2], float(n[3]), n[4])
+			var t: int = n[0]
+			var along: float = n[2]
+			# Отметки старой схемы — в нынешнюю сеть, на ближайшую свободную стену.
+			if t == -1:
+				along = level.plain_along(-1, Level.map_z(along), n[1], 1.5)
+			elif t >= 0:
+				along = level.plain_along(t, float(Level.BRANCHES[t]["length"]) * 0.8, n[1], 1.5)
+			write_chalk(t, n[1], along, float(n[3]), n[4])
 
 
 ## Надпись мелом на стене (пропадает со сменой).
@@ -1492,7 +1648,7 @@ func _reachable(tunnel: int, along: float) -> bool:
 		return true
 	if tunnel == -1:
 		return along > day_limit() + 1.0
-	return Game.day >= BRANCH_OPEN_DAY[tunnel] and float(Level.BRANCHES[tunnel]["z"]) > day_limit()
+	return Game.day >= BRANCH_OPEN_FROM and Level.branch_root_z(tunnel) > day_limit()
 
 
 ## Ограждения на закрытых участках и схема на карте.
@@ -1506,14 +1662,14 @@ func _setup_access(d: int) -> void:
 	for i in Level.BRANCHES.size():
 		if _reachable(i, 0.0):
 			open.append(i)
-		elif float(Level.BRANCHES[i]["z"]) > limit:
+		elif Level.branch_root_z(i) > limit and int(Level.BRANCHES[i]["parent"]) < 0:
 			var f := Fence.new()
 			f.position = level.floor_point(i, Level.JUNCTION_BRANCH + 1.0)
 			f.rotation.y = level.cross_yaw(i)
 			add_child(f)
 	var rooms_open: Array = []
 	for r in ROOM_SCHEDULE.get(d, []):
-		rooms_open.append(r[0])
+		rooms_open.append(level.story_rooms[r[0]])
 	hud.update_map(limit, open, rooms_open)
 
 
@@ -1523,8 +1679,9 @@ func _setup_rooms(d: int) -> void:
 		door.set_open(false)
 	var k := 0
 	for entry in ROOM_SCHEDULE.get(d, []):
-		var ri: int = entry[0]
-		doors[ri].set_open(true)
+		var ri: int = level.story_rooms[entry[0]]
+		if _door_of.has(ri):
+			_door_of[ri].set_open(true)
 		var room: Dictionary = level.rooms[ri]
 		var c: Vector3 = room["center"]
 		var b: Basis = room["basis"]
@@ -1547,10 +1704,10 @@ func _setup_rooms(d: int) -> void:
 		k += 1
 	if d == Game.FINAL_DAY:
 		var nest := Remains.new()
-		nest.position = Vector3(Level.TUN_CX - 0.6, Level.FLOOR_Y, -341.0)
+		nest.position = Vector3(Level.TUN_CX - 0.6, Level.FLOOR_Y, Level.map_z(-341.0))
 		nest.rotation.y = 0.7
 		add_child(nest)
-		_spawn_note("n9", Vector3(Level.TUN_CX + 0.4, Level.FLOOR_Y, -339.0))
+		_spawn_note("n9", Vector3(Level.TUN_CX + 0.4, Level.FLOOR_Y, Level.map_z(-339.0)))
 
 
 ## Находки: лежат с определённой смены и пропадают навсегда, когда их подобрали.
@@ -1559,7 +1716,7 @@ func _spawn_finds(d: int) -> void:
 		"pills1": _room_spot(0, Vector3(1.2, 0, -1.2)),
 		"pills2": level.floor_point(0, float(Level.BRANCHES[0]["length"]) - 8.0, 1.3),
 		"pills3": level.floor_point(2, float(Level.BRANCHES[2]["length"]) - 8.0, -1.3),
-		"lens": level.floor_point(-1, -229.0, -1.35),
+		"lens": level.floor_point(-1, Level.map_z(-229.0), -1.35),
 		"cell": level.floor_point(1, float(Level.BRANCHES[1]["length"]) - 7.0, -1.3),
 		"duck": _room_spot(5, Vector3(1.1, 0, 0.9)),
 	}
@@ -1577,8 +1734,9 @@ func _spawn_finds(d: int) -> void:
 		add_child(f)
 
 
+## Точка в сюжетной комнате index (0–5) — в её осях.
 func _room_spot(index: int, local: Vector3) -> Vector3:
-	var room: Dictionary = level.rooms[index]
+	var room: Dictionary = level.rooms[level.story_rooms[index]]
 	return room["center"] + (room["basis"] as Basis) * local
 
 
@@ -1602,25 +1760,20 @@ func _spawn_threats(d: int, retry := false) -> void:
 		gun.position = Vector3(Level.SHAFT_X + 2.75, Level.ROOM_Y + 0.81, Level.SHAFT_Z - 1.8)
 		gun.rotation.y = deg_to_rad(80.0)
 		add_child(gun)
-	for i in AMMO_BOXES_PER_DAY[d]:
-		var box := Pickup.new()
-		box.kind = "ammo"
-		box.amount = 3
-		box.position = _random_floor_spot(30.0)
-		box.rotation.y = randf() * TAU
-		add_child(box)
-	for i in BOLT_BOXES:
-		var bolts := Pickup.new()
-		bolts.kind = "bolts"
-		bolts.amount = 3
-		bolts.position = _random_floor_spot(15.0)
-		bolts.rotation.y = randf() * TAU
-		add_child(bolts)
-	for i in CREATURES_PER_DAY[d]:
-		spawn_crawler(_random_floor_spot(60.0))
-	if d == Game.LAST_DAY:
-		for i in BITERS_AT_START:
-			spawn_biter(_random_floor_spot(50.0))
+	# Расходники — равномерно по открытой сети (бюджет смены, с небольшим запасом).
+	for kind in ["ammo", "bolts", "medkit"]:
+		var amount := {"ammo": 3, "bolts": 3, "medkit": 1}[kind] as int
+		for pos in _spread_spots(int(_budget.get(kind + ("s" if kind == "medkit" else ""), 0)), 20.0):
+			var box := Pickup.new()
+			box.kind = kind
+			box.amount = amount
+			box.position = pos
+			box.rotation.y = randf() * TAU
+			add_child(box)
+	for pos in _spread_spots(int(_budget.get("creatures", CREATURES_PER_DAY[d])), 60.0):
+		spawn_crawler(pos)
+	for pos in _spread_spots(int(_budget.get("biters", 0)), 50.0):
+		spawn_biter(pos)
 
 
 func spawn_crawler(pos: Vector3) -> Crawler:
@@ -1656,12 +1809,23 @@ func spawn_biter(pos: Vector3) -> Biter:
 ## Генератор: заглушен, в баке — сколько осталось. Канистры спрятаны в тоннелях.
 func _setup_power(d: int) -> void:
 	generator.reset(GEN_FUEL[d])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = level.net_seed + d * 31
+	for g in reserves:
+		g.reset(0.0 if d == Game.LAST_DAY else rng.randf_range(30.0, 50.0))
 	if d == Game.LAST_DAY - 1:
 		generator.run()  # шестая смена — тихая: свет горит с самого начала
-	for i in CANISTERS_PER_DAY[d]:
+	# Канистры: часть — в открытых сегодня генераторных (у резервных дизелей), остальное — по сети.
+	var cans: int = _budget.get("canisters", 0)
+	var spots: Array[Vector3] = []
+	for g in reserves:
+		if spots.size() < cans / 2 and g.global_position.z > day_limit() + 2.0:
+			spots.append(g.global_position + g.global_transform.basis * Vector3(-1.1, 0.05, 0.6))
+	spots.append_array(_spread_spots(cans - spots.size(), 25.0))
+	for pos in spots:
 		var can := Pickup.new()
 		can.kind = "fuel"
-		can.position = _random_floor_spot(25.0)
+		can.position = pos
 		can.rotation.y = randf() * TAU
 		add_child(can)
 
@@ -1850,7 +2014,7 @@ var _lamps_power := true
 func _update_air(delta: float) -> void:
 	var p := player.global_position
 	var lower := level.lower
-	var on := generator.running
+	var on := level.power_on
 	if on != _lamps_power:
 		_lamps_power = on
 		for l in get_tree().get_nodes_in_group("lower_lamp"):
@@ -1882,7 +2046,8 @@ func _update_air(delta: float) -> void:
 
 
 func _update_water() -> void:
-	var slow := 1.0
+	# Бегство из рушащегося тоннеля: до станции далеко — адреналин гонит вдвое быстрее.
+	var slow := 1.8 if collapsing else 1.0
 	if pump != null and is_instance_valid(pump) and pump.water_level > 0.05:
 		var o := Level.branch_origin(FLOOD_BRANCH)
 		var axis := Level.branch_dir(FLOOD_BRANCH)
@@ -1895,23 +2060,93 @@ func _update_water() -> void:
 	player.speed_mult = slow
 
 
+## Открытые сегодня участки сети: [tunnel, от, до] (у основного тоннеля along = z, идёт вглубь — убывает).
+func _open_runs(min_depth: float) -> Array:
+	var runs: Array = []
+	var deep := maxf(day_limit() + 3.0, Level.GRATE_Z + 3.0)
+	var near := Level.TUN_Z0 - min_depth
+	if deep < near:
+		runs.append([-1, near, deep])
+	for i in Level.BRANCHES.size():
+		var length := float(Level.BRANCHES[i]["length"])
+		if _reachable(i, length):
+			runs.append([i, Level.JUNCTION_BRANCH + 2.0, length - 2.0])
+	return runs
+
+
+func _run_point(run: Array, u: float, lateral: float) -> Vector3:
+	var t: int = run[0]
+	var along: float = float(run[1]) - u if t < 0 else float(run[1]) + u
+	return level.floor_point(t, along, lateral)
+
+
 ## Случайная точка в открытом сегодня проходе, не ближе min_depth метров от станции.
 func _random_floor_spot(min_depth: float) -> Vector3:
-	for attempt in 20:
-		var t := randi_range(-1, Level.BRANCHES.size() - 1)
-		var along: float
-		if t == -1:
-			var deep := maxf(day_limit() + 3.0, Level.GRATE_Z + 3.0)
-			var near := Level.TUN_Z0 - min_depth
-			if deep >= near:
-				continue
-			along = randf_range(deep, near)
-		else:
-			along = randf_range(Level.JUNCTION_BRANCH + 2.0, float(Level.BRANCHES[t]["length"]) - 1.0)
-		if not _reachable(t, along):
-			continue
-		return level.floor_point(t, along, randf_range(-1.2, 1.2))
-	return Vector3(Level.TUN_CX + 1.0, Level.FLOOR_Y, -95.0)
+	var spots := _spread_spots(1, min_depth, true)
+	return spots[0] if not spots.is_empty() else Vector3(Level.TUN_CX + 1.0, Level.FLOOR_Y, -95.0)
+
+
+## n точек, разложенных по всей открытой сети равномерно (по одной на каждый n-й отрезок пути) —
+## так расходники есть и у станции, и в самой глубине.
+func _spread_spots(n: int, min_depth: float, random := false) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	var runs := _open_runs(min_depth)
+	var total := 0.0
+	for r in runs:
+		total += absf(float(r[2]) - float(r[1]))
+	if total <= 0.0 or n <= 0:
+		return out
+	for k in n:
+		var u := randf() * total if random else (k + randf_range(0.15, 0.85)) / float(n) * total
+		for r in runs:
+			var len_r := absf(float(r[2]) - float(r[1]))
+			if u <= len_r:
+				out.append(_run_point(r, u, randf_range(-1.1, 1.1)))
+				break
+			u -= len_r
+	return out
+
+
+## Бюджет смены — по длине открытой сегодня сети: сколько идти (а значит, сколько гореть дизелю и фонарю),
+## сколько существ и сколько всего разложить, чтобы хватало чуть с запасом.
+const OLD_BRANCHES := [[-132.5, 64.5, 2], [-215.0, 78.5, 3], [-275.0, 56.0, 4]]  # z, длина, с какой смены
+
+
+func _make_budget(d: int) -> Dictionary:
+	var lim := day_limit()
+	var trunk := Level.TUN_Z0 - maxf(lim, Level.GRATE_Z - 45.0)
+	var branches := 0.0
+	for i in Level.BRANCHES.size():
+		if _reachable(i, 0.0):
+			branches += float(Level.BRANCHES[i]["length"])
+	var reach := trunk + branches
+	var old_lim: float = OLD_DAY_LIMIT_Z[clampi(d, 0, OLD_DAY_LIMIT_Z.size() - 1)]
+	var old_reach := Level.TUN_Z0 - maxf(old_lim, -368.0)
+	for ob in OLD_BRANCHES:
+		if d >= int(ob[2]) and float(ob[0]) > old_lim:
+			old_reach += float(ob[1])
+	var f := clampf(sqrt(reach / maxf(old_reach, 60.0)), 1.0, 3.5)
+	# Ожидаемая длина смены: дважды пройти основной тоннель и обойти штольни — часть пути бегом.
+	var shift := 240.0 + (trunk * 2.0 + branches * 1.2) / Player.WALK_SPEED * 0.7
+	var b := {"reach": reach, "f": f, "shift": shift}
+	# Дизель: главный горит всю смену; резервные — подмога на половину их бака. Канистра — 55 %.
+	var need := shift / Generator.BURN_TIME * 100.0 * 1.2
+	var reserve := 0.0
+	for g in reserves:
+		reserve += 20.0
+	b["canisters"] = 0 if d == Game.LAST_DAY or d < 1 else maxi(0, ceili((need - float(GEN_FUEL[d]) - reserve) / 55.0))
+	if d >= 2:
+		b["canisters"] = maxi(int(b["canisters"]), 1)  # хоть одна — на случай, если дизелю «помогут»
+	# Батарейки: фонарь садится за 5 минут; почти половину смены выручает ручка динамо и лампы.
+	var drain := 1.0 + (mini(d, Game.FINAL_DAY) - 1) * 0.15
+	b["batteries"] = Player.MAX_BATTERIES if d == Game.LAST_DAY - 1 else maxi(1, ceili(shift * drain / 300.0 * 0.45))
+	b["ammo"] = ceili(AMMO_BOXES_PER_DAY[d] * f) + (1 if AMMO_BOXES_PER_DAY[d] > 0 else 0)
+	b["bolts"] = ceili(BOLT_BOXES * f) + 1
+	b["creatures"] = int(round(CREATURES_PER_DAY[d] * f))
+	b["biters"] = int(round(BITERS_AT_START * f)) if d == Game.LAST_DAY else 0
+	b["medkits"] = int(reach / 800.0) if d >= 3 else 0
+	b["webs"] = int(round(WEBS_PER_DAY[mini(d, WEBS_PER_DAY.size() - 1)] * minf(f, 2.5)))
+	return b
 
 
 ## Визуальный стиль: чуть пониженное разрешение, жёсткий контраст, плёночное зерно (под интерфейсом).
@@ -1984,7 +2219,9 @@ func _smoke_test() -> void:
 	state = "playing"
 	hud.set_ingame(true)
 	for d in range(1, Game.LAST_DAY + 1):
+		_tick("smoke-prev")
 		start_day(d)
+		_tick("start_day")
 		await get_tree().create_timer(5.5).timeout
 		hatch.hold_interact(player, 2.0)
 		radio.interact(player)
@@ -1997,6 +2234,7 @@ func _smoke_test() -> void:
 		for ev in ["footsteps", "sighting", "behind", "lamps", "whisper", "regrow", "interfere", "crawler", "hunt", "swarm",
 				"masha", "double", "silence", "picket", "name"]:
 			director._run(ev)
+			_tick("ev " + ev)
 		if PHONE_CALLS.has(d):
 			phone.ring(PHONE_CALLS[d])
 			phone.interact(player)
@@ -2035,9 +2273,10 @@ func _smoke_test() -> void:
 		await get_tree().create_timer(1.0).timeout
 		Input.action_release("crank")
 		await get_tree().process_frame
-		doors[0].set_open(true)
-		doors[0].slam()
-		doors[0].interact(player)
+		var door0: RoomDoor = _door_of.get(level.story_rooms[0], doors[0])
+		door0.set_open(true)
+		door0.slam()
+		door0.interact(player)
 		player.hold("radio")
 		dispatcher.radio_pressed(d)
 		player.batteries = 1
@@ -2087,8 +2326,8 @@ func _smoke_test() -> void:
 		for n in get_tree().get_nodes_in_group("biters"):
 			(n as Biter).hit()
 		player.take_damage(10.0)
-		doors[0].interact(player)
-		player.global_position = level.rooms[0]["center"] + Vector3(0, 0.1, 0)
+		(_door_of.get(level.story_rooms[0], doors[0]) as RoomDoor).interact(player)
+		player.global_position = level.rooms[level.story_rooms[0]]["center"] + Vector3(0, 0.1, 0)
 		await get_tree().physics_frame
 		cart.interact(player)
 		cart.hold_interact(player, 200.0)
@@ -2304,7 +2543,29 @@ func _smoke_test() -> void:
 	await get_tree().create_timer(6.0).timeout
 	hud.close_newspaper()
 	await get_tree().create_timer(7.0).timeout
-	var ok := Game.ended and retry_ok and hide_ok and shop_ok and low_ok and lis_ok
+	# Генерация сети: на разных зёрнах — длина, штольни, сюжетные комнаты на своих глубинах, генераторные.
+	var net_ok := true
+	for k in 12:
+		_build_network(1000 + k * 7919)
+		var prim := 0
+		for b in Level.BRANCHES:
+			if int(b["parent"]) < 0:
+				prim += 1
+			var e: Vector3 = (b["origin"] as Vector3) + (b["dir"] as Vector3) * float(b["length"])
+			if LowerLine.footprint().has_point(Vector2(e.x, e.z)):
+				net_ok = false
+		var trunk := Level.TUN_Z0 - Level.GRATE_Z
+		var stories := {}
+		for r in level.story_rooms:
+			stories[r] = true
+		var z0: float = (level.rooms[level.story_rooms[0]]["center"] as Vector3).z
+		var good := prim >= 8 and trunk > 2000.0 and stories.size() == 6 and level.gen_rooms.size() >= 3 \
+			and z0 > float(DAY_LIMIT_Z[1]) and reserves.size() == level.gen_rooms.size() and VENT_SPOTS.size() > 15
+		if not good:
+			print("SMOKE FAIL: сеть %d — штолен %d, длина %d, сюжетных комнат %d, генераторных %d, вентблоков %d" % [k, prim, trunk,
+				stories.size(), level.gen_rooms.size(), VENT_SPOTS.size()])
+		net_ok = net_ok and good
+	var ok := Game.ended and retry_ok and hide_ok and shop_ok and low_ok and lis_ok and net_ok
 	# Концовка 3: все записки, засов решётки изнутри.
 	start_day(5)
 	await get_tree().create_timer(5.5).timeout
