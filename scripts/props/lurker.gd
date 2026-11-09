@@ -40,7 +40,7 @@ func _flee(d: float) -> void:
 	_gone = true
 	Game.play_at(Sfx.scuttle(), global_position, 2.0)
 	Game.add_fear(lerpf(14.0, 5.0, d / RANGE))
-	Game.say_once("lurker", "...Паук. С ладонь? С тарелку! И он был тут всё это время.", Game.THOUGHT, 3.5)
+	Game.say_once("lurker", "Паук размером с тарелку. Сидел на стене — всё это время, пока я шёл мимо.", Game.THOUGHT, 3.5)
 	# Рывок вверх по стене и вбок, потом пропадает.
 	var up := global_transform.basis.z  # голова смотрит вверх по стене
 	var side := global_transform.basis.x * (1.0 if randf() < 0.5 else -1.0)

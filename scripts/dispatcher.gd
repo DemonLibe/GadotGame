@@ -75,11 +75,11 @@ func radio_pressed(day: int) -> void:
 		return
 	if player and lower and lower.contains(player.global_position):
 		_static.play()
-		Game.say("Только шипение. Под кирпичным сводом рация не берёт.", Game.THOUGHT, 3.5)
+		Game.say("Рация: только шипение — под кирпичным сводом не берёт.", Game.SYSTEM, 3.5)
 		return
 	if Game.has_open_task("relay") and player and player.global_position.z < RELAY_DEEP_Z and player.global_position.y < Level.FLOOR_Y + 5.0:
 		_static.play()
-		Game.say("Только шипение. Глубже рация без ретрансляторов не берёт.", Game.THOUGHT, 3.5)
+		Game.say("Рация: только шипение — глубже нужны ретрансляторы.", Game.SYSTEM, 3.5)
 		return
 	if Game.all_done() and Game.has_open_task("return"):
 		report_shift(day)
@@ -146,7 +146,7 @@ func report_shift(day: int) -> void:
 
 func repeat_last() -> void:
 	if _last.is_empty():
-		Game.say("Рация молчит. Только шипение.", Game.THOUGHT, 2.5)
+		Game.say("Рация молчит. Только шипение.", Game.SYSTEM, 2.5)
 		_static.play()
 		return
 	speak(_last)

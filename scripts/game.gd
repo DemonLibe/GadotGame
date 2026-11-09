@@ -4,6 +4,8 @@ extends Node
 signal tasks_changed
 signal message(text: String, color: Color, duration: float)
 signal end_day_requested
+## Герой сделал запись в дневнике.
+signal diary_written(text: String)
 ## Шум: существа слышат его в радиусе radius.
 signal noise_made(pos: Vector3, radius: float)
 ## Собраны все записки и выбрана тайная концовка (запереть решётку изнутри).
@@ -33,6 +35,8 @@ var valve_order: Array = [1, 2, 3]  # в каком порядке перекр�
 var gear := {}  # что собрано в шестую смену и взято в седьмую: pistol, ammo, batteries
 const NOTES_TOTAL := 9
 var _said := {}
+var diary: Array = []          # записи героя за прохождение
+var shift_started_msec := 0
 var paid := {}  # какие поручения уже оплачены в эту смену (не сбрасывается при повторе после провала)
 
 
@@ -232,8 +236,27 @@ func load_day() -> int:
 
 # --- Реплики и страх -------------------------------------------------------
 
+## Реплика. Мысли героя (THOUGHT) не звучат субтитрами — он записывает их в дневник (J).
+## Диспетчер, шёпот, голоса и подсказки — субтитрами, как раньше.
 func say(text: String, color := THOUGHT, duration := 4.0) -> void:
+	if color == THOUGHT:
+		write_diary(text)
+		return
 	message.emit(text, color, duration)
+
+
+## Запись в дневнике: [смена, время смены «ЧЧ:ММ», текст].
+func write_diary(text: String) -> void:
+	if not diary.is_empty() and str(diary[-1][2]) == text:
+		return
+	diary.append([day, shift_clock(), text])
+	diary_written.emit(text)
+
+
+## Часы смены: заступил в 23:00, одна секунда игры — десять секунд ночи.
+func shift_clock() -> String:
+	var mins := 23 * 60 + int((Time.get_ticks_msec() - shift_started_msec) / 6000.0)
+	return "%02d:%02d" % [(mins / 60) % 24, mins % 60]
 
 
 ## Реплика, которая звучит не больше одного раза за день.
@@ -302,6 +325,7 @@ func _setup_input() -> void:
 	_bind("crouch", [KEY_C, KEY_CTRL])
 	_bind("slot_8", [KEY_8])
 	_bind("tasks", [KEY_TAB])
+	_bind("diary", [KEY_J])
 	if not InputMap.has_action("burn"):
 		InputMap.add_action("burn")
 	var mb := InputEventMouseButton.new()

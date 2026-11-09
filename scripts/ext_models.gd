@@ -114,7 +114,7 @@ static func huntsman(parent: Node, size: float) -> Node3D:
 		return holder
 	var m := (load(HUNTSMAN) as PackedScene).instantiate() as Node3D
 	holder.add_child(m)
-	var skin := ProcTex.model_skin("res://models/huntsman/huntsman_albedo.png", Color(0.8, 0.74, 0.68), 0.6)
+	var skin := ProcTex.model_skin("res://models/huntsman/huntsman_albedo.png", Color(0.55, 0.5, 0.45), 0.7)
 	for mi in m.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).material_override = skin
 	var box := Geo.mesh_bounds(m)

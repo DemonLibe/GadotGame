@@ -382,6 +382,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_pause()
 	elif Game.ended and event.is_action_pressed("restart"):
 		Meta.new_run()
+		Game.diary.clear()
 		Game.save_day(1)
 		Game.pending_day = 1
 		get_tree().reload_current_scene()
@@ -499,21 +500,82 @@ func _spawn_kit_props() -> void:
 	for z in [-61.0, -96.0, -143.0, -181.0, -228.0, -268.0, -301.0]:
 		k.call(level, "common/puddle_decal", Vector3(Level.TUN_CX - 0.9, fy + 0.012, z), randf() * TAU)
 	_kit_light_prop("04_cast_iron_tunnel/tunnel_signal", Vector3(Level.TUN_CX + 1.75, fy + 2.0, Level.GRATE_Z + 6.0), -PI / 2)
-	# Служебные комнаты: подстилка (на ней потом лежат кости), кровать или табурет с ведром, полка.
-	for i in level.rooms.size():
-		var room: Dictionary = level.rooms[i]
-		var c: Vector3 = room["center"]
-		var b: Basis = room["basis"]
-		var put := func(path: String, local: Vector3, yaw: float) -> void:
-			var m: Node3D = ProcTex.kit_model(level, path)
-			m.transform = Transform3D(b * Basis(Vector3.UP, yaw), c + b * local)
-		put.call("05_service_room/remains_bedding", Vector3(0.6, 0.0, -1.1), 0.0)
-		put.call("05_service_room/wall_shelf", Vector3(1.58, 1.3, 0.1), -PI / 2)
-		if i % 2 == 0:
-			put.call("05_service_room/iron_bed", Vector3(-1.25, 0.0, -0.55), 0.0)
-		else:
-			put.call("05_service_room/stool", Vector3(-1.2, 0.0, 1.15), 0.3)
-			put.call("05_service_room/bucket", Vector3(1.35, 0.0, -0.35), 0.0)
+	# Служебные комнаты: у каждой своё назначение — обстановка вдоль стен, середина свободна
+	# (там лежат кости, записка и находки). Подстилка под кости — везде.
+	for room in level.rooms:
+		_furnish_room(room)
+
+
+## Обстановка служебной комнаты по её назначению. Координаты — в осях комнаты: +Z смотрит на дверь,
+## x — от -w/2 до w/2, z — от -d/2 до d/2. Модели набора смотрят в +Z.
+func _furnish_room(room: Dictionary) -> void:
+	var c: Vector3 = room["center"]
+	var b: Basis = room["basis"]
+	var kind: Dictionary = room.get("kind", {"theme": "bytovka", "w": 3.4, "d": 3.4})
+	var hw := float(kind["w"]) / 2.0
+	var hd := float(kind["d"]) / 2.0
+	var put := func(path: String, local: Vector3, yaw: float) -> void:
+		var m: Node3D = ProcTex.kit_model(level, path)
+		m.transform = Transform3D(b * Basis(Vector3.UP, yaw), c + b * local)
+	var junk := func(name: String, local: Vector3, scale := 1.0) -> void:
+		ExtModels.trash(level, name, c + b * local, randf() * TAU, scale)
+	var back := -hd + 0.3     # у задней стены
+	var left := -hw + 0.45    # у левой
+	var right := hw - 0.45    # у правой
+	put.call("05_service_room/remains_bedding", Vector3(0.6, 0.0, -1.1), 0.0)
+	match str(kind["theme"]):
+		"bytovka":  # бытовка: кровати, стол с плиткой, полка
+			put.call("05_service_room/iron_bed", Vector3(left, 0.0, -0.4), 0.0)
+			if hw > 2.2:
+				put.call("05_service_room/iron_bed", Vector3(left + 1.05, 0.0, back + 1.0), 0.0)
+			put.call("05_service_room/small_table", Vector3(right, 0.0, back + 0.3), -PI / 2)
+			put.call("01_duty_room/stove_kettle", Vector3(right, 0.72, back + 0.3), -PI / 2)
+			put.call("05_service_room/stool", Vector3(right - 0.6, 0.0, back + 0.5), 0.4)
+			put.call("05_service_room/wall_shelf", Vector3(hw - 0.12, 1.4, 0.6), -PI / 2)
+			put.call("01_duty_room/wall_clock", Vector3(0.0, 1.9, -hd + 0.04), 0.0)
+		"sklad":  # склад: стеллажи, бочки, поддоны, коробки
+			put.call("01_duty_room/shelf_rack", Vector3(-1.4, 0.0, back), 0.0)
+			put.call("01_duty_room/shelf_rack", Vector3(right - 0.1, 0.0, -0.6), -PI / 2)
+			put.call("common/fuel_barrel", Vector3(right - 0.1, 0.0, hd - 0.7), 0.0)
+			put.call("common/fuel_barrel", Vector3(right - 0.75, 0.0, hd - 0.6), 1.0)
+			put.call("common/wooden_pallet", Vector3(left + 0.2, 0.0, 0.6), PI / 2)
+			junk.call("CardboardBox_1", Vector3(left + 0.2, 0.14, 0.4))
+			junk.call("CardboardBox_3", Vector3(left + 0.3, 0.14, 1.0))
+			put.call("06_old_line/wooden_barrel", Vector3(left, 0.0, back + 0.4), 0.0)
+		"workshop":  # мастерская: верстак, щит с инструментом, кабельный барабан
+			put.call("03_platform/tool_board", Vector3(-1.2, 0.9, -hd + 0.15), 0.0)
+			put.call("05_service_room/small_table", Vector3(left, 0.0, -0.2), PI / 2)
+			put.call("05_service_room/small_table", Vector3(left, 0.0, 0.55), PI / 2)
+			put.call("common/cable_drum", Vector3(right - 0.2, 0.0, back + 0.5), 0.3)
+			put.call("05_service_room/bucket", Vector3(right, 0.0, 0.8), 0.0)
+			put.call("common/fuel_canister", Vector3(left + 0.1, 0.0, 1.3), 0.5)
+			put.call("common/danger_sign", Vector3(hw - 0.02, 1.5, -0.6), -PI / 2)
+			junk.call("Wooden_Plank_2", Vector3(right - 0.2, 0.0, -0.3))
+		"medpunkt":  # медпункт: койка, аптечка, столик, плакат
+			put.call("01_duty_room/cot", Vector3(left + 0.1, 0.0, -0.3), 0.0)
+			put.call("01_duty_room/first_aid_box", Vector3(hw - 0.08, 1.45, -0.5), -PI / 2)
+			put.call("05_service_room/small_table", Vector3(right, 0.0, back + 0.3), -PI / 2)
+			put.call("05_service_room/stool", Vector3(right - 0.55, 0.0, back + 0.55), 0.2)
+			put.call("05_service_room/bucket", Vector3(left + 0.2, 0.0, hd - 0.5), 0.0)
+			put.call("common/wall_poster_safety", Vector3(-0.8, 1.5, -hd + 0.02), 0.0)
+			junk.call("Pills_1", Vector3(right, 0.72, back + 0.2), 0.8)
+		"shield":  # щитовая: трубы, таблички «Опасно», огнетушитель, стеллаж
+			put.call("common/pipe_run_4m", Vector3(-hw + 0.02, 1.4, 1.6), 0.0)
+			put.call("common/danger_sign", Vector3(-0.6, 1.6, -hd + 0.02), 0.0)
+			put.call("common/danger_sign", Vector3(0.6, 1.6, -hd + 0.02), 0.0)
+			put.call("common/fire_extinguisher", Vector3(right, 0.0, hd - 0.5), -PI / 2)
+			put.call("01_duty_room/shelf_rack", Vector3(right - 0.1, 0.0, -0.8), -PI / 2)
+			put.call("common/cable_drum", Vector3(left + 0.3, 0.0, back + 0.6), 0.0)
+			put.call("04_cast_iron_tunnel/tunnel_signal", Vector3(1.6, 1.8, -hd + 0.1), 0.0)
+		"office":  # кабинет: стол, схема линии, часы, полка, график обхода
+			put.call("05_service_room/small_table", Vector3(-1.3, 0.0, back + 0.35), 0.0)
+			put.call("05_service_room/stool", Vector3(-1.3, 0.0, back + 0.9), PI)
+			put.call("common/line_scheme_board", Vector3(hw - 0.04, 1.45, -0.4), -PI / 2)
+			put.call("01_duty_room/wall_clock", Vector3(-1.3, 1.9, -hd + 0.04), 0.0)
+			put.call("05_service_room/wall_shelf", Vector3(-hw + 0.12, 1.4, 0.2), PI / 2)
+			put.call("common/wall_poster_schedule", Vector3(1.2, 1.5, -hd + 0.02), 0.0)
+			put.call("01_duty_room/field_telephone", Vector3(-1.0, 0.72, back + 0.3), 0.0)
+			junk.call("News_Stack", Vector3(-1.6, 0.72, back + 0.3), 0.6)
 
 
 ## Мусор (Trash and Debris) и станционное (Metro PSX): стоит всё время, как стены.
@@ -676,6 +738,7 @@ func _spawn_props() -> void:
 func start_day(d: int, retry := false) -> void:
 	busy = true
 	collapsing = false
+	Game.shift_started_msec = Time.get_ticks_msec()
 	if not retry:
 		Game.paid.clear()
 		Meta.new_shift()
@@ -782,7 +845,7 @@ func start_day(d: int, retry := false) -> void:
 	elif not debug_flag("s_say"):
 		Game.say(DAY_THOUGHTS[d], Game.THOUGHT, 6.0)
 		if d <= Game.FINAL_DAY:
-			Game.say("На столе шипит рация. Диспетчер ждёт.", Game.THOUGHT, 3.5)
+			Game.say("На столе шипит рация — диспетчер ждёт.", Game.SYSTEM, 3.5)
 		if d == 1:
 			Game.say("Рация в руке (4) и ЛКМ — спросить диспетчера, куда идти. Шуметь внизу не стоит: приседай (C).", Game.SYSTEM, 6.0)
 			Game.say("За поручения платят. Шкафчик снабжения — у стены, рядом с фото Маши.", Game.SYSTEM, 5.0)
@@ -1012,7 +1075,7 @@ func ending() -> void:
 	stalker.hide_now()
 	Game.play_ui(Sfx.rumble(), 0.0)
 	player.flicker(0.8)
-	Game.say("Тоннель рушится! Бежать! К станции, к лестнице — быстрее!", Game.THOUGHT, 5.0)
+	Game.say("Тоннель рушится! Бежать к станции, к лестнице!", Game.SYSTEM, 5.0)
 	_rumble_t = 0.0
 	_rock_t = 0.0
 	_call_t = 5.0
@@ -1056,7 +1119,7 @@ func _update_collapse(delta: float) -> void:
 		return
 	if _station_t == 0.0:
 		player.climb_mult = 5.0
-		Game.say("Здесь никого... Наверх! По лестнице — пока оно не пришло!", Game.THOUGHT, 4.0)
+		Game.say("Наверх по лестнице — пока оно не пришло!", Game.SYSTEM, 4.0)
 	_station_t += delta
 	if _station_t > 20.0 and not player.climbing:
 		_final_scene()
@@ -1442,7 +1505,7 @@ func _setup_rooms(d: int) -> void:
 		var lamp := OmniLight3D.new()
 		lamp.position = c + b * Vector3(-1.2, 0.3, -1.2)
 		lamp.light_color = Color(1.0, 0.6, 0.3)
-		lamp.omni_range = 3.5
+		lamp.omni_range = 5.5
 		lamp.light_energy = 0.5
 		lamp.add_to_group("fear_light")
 		lamp.add_to_group("cull_light")

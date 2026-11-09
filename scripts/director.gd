@@ -196,7 +196,7 @@ func start_collapse() -> bool:
 	Game.play_at(Sfx.rumble(), at + Vector3(0, LowerLine.H, 0), -2.0)
 	player.flicker(0.3)
 	_dust(at)
-	Game.say_once("collapse_warn", "Свод трещит! Сыплется... Прочь оттуда!", Game.THOUGHT, 3.0)
+	Game.say_once("collapse_warn", "Свод трещит — прочь из-под него!", Game.SYSTEM, 3.0)
 	get_tree().create_timer(COLLAPSE_WARN).timeout.connect(func(): _collapse_now(pick[0], pick[1]))
 	return true
 

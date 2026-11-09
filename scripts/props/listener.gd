@@ -58,7 +58,7 @@ const YAW := 0.0  # поворот модели, чтобы пасть смот�
 
 
 func _build() -> void:
-	var skin := ProcTex.model_skin(SKIN, Color(0.95, 0.85, 0.8), 0.6)
+	var skin := ProcTex.model_skin(SKIN, Color(0.6, 0.52, 0.48), 0.75)
 	skin.rim_enabled = true
 	skin.rim = 0.35
 	_body = Node3D.new()
@@ -94,7 +94,7 @@ func _heard(pos: Vector3, radius: float) -> void:
 			_click.play()
 			_face(pos)
 			if global_position.distance_to(player.global_position) < 14.0:
-				Game.say_once("listener_alert", "Щёлкает... Повернул голову. Он меня слышит. Не шуметь.", Game.THOUGHT, 3.5)
+				Game.say_once("listener_alert", "Слепой в зале щёлкает и поворачивает голову на звук. Не шуметь.", Game.THOUGHT, 3.5)
 		"alert", "charge":
 			_charge(pos)
 

@@ -32,7 +32,7 @@ func get_prompt(_player) -> String:
 func interact(_player) -> void:
 	# После пятой смены докладывать некому: смену закрывает запись в журнале.
 	if Game.day == Game.LAST_DAY:
-		Game.say("Не до журнала. Надо выбираться — через тоннель, до конца.", Game.THOUGHT, 4.0)
+		Game.say("Не до журнала — выбираться через тоннель, до конца.", Game.SYSTEM, 4.0)
 		return
 	if Game.day == Game.LAST_DAY - 1:
 		if Game.all_done():

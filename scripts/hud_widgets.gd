@@ -26,6 +26,19 @@ static func oswald(weight := 500) -> Font:
 	return _fonts[key]
 
 
+## Почерк героя (Caveat) — для дневника.
+static func hand() -> Font:
+	if not _fonts.has("hand"):
+		var base := load("res://assets/fonts/Caveat.ttf") as Font
+		if base == null:
+			return ThemeDB.fallback_font
+		var v := FontVariation.new()
+		v.base_font = base
+		v.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): 500}
+		_fonts["hand"] = v
+	return _fonts["hand"]
+
+
 static func mono() -> Font:
 	if not _fonts.has("mono"):
 		var f := load("res://assets/fonts/PTMono.ttf") as Font

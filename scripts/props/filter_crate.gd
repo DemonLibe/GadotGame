@@ -57,7 +57,7 @@ func interact(player) -> void:
 	var took_b := mini(batteries, player.max_batteries() - player.batteries)
 	if took_f + took_b <= 0:
 		if filters + batteries > 0:
-			Game.say("Больше не унесу.")
+			Game.say("Больше не унести.", Game.SYSTEM)
 		return
 	filters -= took_f
 	batteries -= took_b
