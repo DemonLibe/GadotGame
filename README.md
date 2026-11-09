@@ -97,7 +97,8 @@ voice/          озвучка диспетчера и Маши
 | Вагонетка, путь | [Mine Object collection](https://opengameart.org/content/mine-object-collection) | loafbrr_1 | CC0 |
 | Ползуны | [Alien Bug Animated](https://opengameart.org/content/alien-bug-animated) | CDmir | CC0 |
 | Пауки | [Low Poly Spider (Glest)](https://opengameart.org/content/low-poly-spider-glest) | Wciow, John.d.h | [CC-BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/), изменённая `spider.glb` — на тех же условиях |
-| «Другой» | [Angler Man 3D](https://opengameart.org/content/angler-man-3d) | piacenti | [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/), анимации добавлены |
+| «Другой» | [3D Horror Game Monster](https://opengameart.org/content/3d-horror-game-monster) | HorrorGameMaker.com | CC0 — анимации собраны в один файл |
+| «Другой» (запасная модель) | [Angler Man 3D](https://opengameart.org/content/angler-man-3d) | piacenti | [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/), анимации добавлены |
 | Слушатель | [Blind Hunter Creature](https://opengameart.org/content/blind-hunter-creature) | Mophs | [CC-BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) / [4.0](https://creativecommons.org/licenses/by-sa/4.0/), изменённая `listener.obj` — на тех же условиях |
 | Декорации | [Train Kit](https://opengameart.org/content/train-kit) | Kenney | CC0 |
 | Останки | [3D Dungeon Debris — Skull and Bones](https://opengameart.org/content/3d-dungeon-debris-skull-and-bones) | Paul Wortmann | CC0 |

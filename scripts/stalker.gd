@@ -45,9 +45,12 @@ var _voice: AudioStreamPlayer3D
 const IDLE := "Idle"
 const RUN := "Run"
 const ATTACK := "Attack"
+const WALK := "Walk"
+const MODEL_YAW := PI  # в файле лицом к +Z — разворачиваем к -Z узла (так смотрит look_at)
+var _attack := ATTACK
 const SCALE := 0.6
 ## Скример: середина морды над полом и с какого расстояния он влезает в кадр целиком.
-const EYE_HEIGHT := 1.65
+const EYE_HEIGHT := 1.95
 const SCREAM_DIST := 1.3
 const LURE := Vector3(0, 2.1, -0.4)  # огонёк приманки (модель повёрнута лицом в -Z узла)
 const FEET := 1.37  # начало модели — в тазу, ступни на 2.29 ниже (×SCALE): поднимаем на пол
@@ -56,6 +59,44 @@ const FEET := 1.37  # начало модели — в тазу, ступни н
 func _ready() -> void:
 	visible = false
 	Game.noise_made.connect(_on_noise)
+	var model: Node3D
+	if ResourceLoader.exists(MODEL):
+		model = _build_creature()
+	else:
+		model = _build_angler()
+	# Голос: слышно издалека — по нему понятно, откуда он идёт.
+	_voice = AudioStreamPlayer3D.new()
+	_voice.position = Vector3(0, 1.8, 0)
+	_voice.unit_size = 9.0
+	_voice.volume_db = 2.0
+	add_child(_voice)
+	_anim = Geo.model_anim(model, [IDLE, RUN, WALK])
+	_anim.play(IDLE)
+	_anim.seek(randf() * 2.0)
+
+
+## Модель: Horror Game Monster (HorrorGameMaker.com, CC0) — ободранный кровавый гуманоид без лица,
+## с пастью вместо головы. Выше человека. Анимации: покой, шаг, бег, прыжок (он же бросок).
+const MODEL := "res://models/other/other.glb"
+const HEIGHT := 2.15
+
+
+func _build_creature() -> Node3D:
+	var model := (load(MODEL) as PackedScene).instantiate() as Node3D
+	model.rotation.y = MODEL_YAW
+	add_child(model)
+	var skin := ProcTex.model_skin("res://models/other/other_albedo.png", Color(0.72, 0.66, 0.64), 0.65)
+	skin.rim_enabled = true
+	skin.rim = 0.3
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).material_override = skin
+	# Рост по скелету — 1,87 м (габариты сетки у скиннинговой модели в сантиметрах врут).
+	model.scale = Vector3.ONE * (HEIGHT / 1.87)
+	_attack = "Jump"
+	return model
+
+
+func _build_angler() -> Node3D:
 	# Модель: Angler Man (piacenti, CC-BY 3.0) — человек с головой рыбы-удильщика.
 	# Анимации (ожидание, бег, удар) сделаны для игры. Смотрит в +Z — разворачиваем.
 	var model := Geo.model(self, "res://models/angler/angler.glb", null, Vector3(0, FEET, 0), Basis(Vector3.UP, PI).scaled(Vector3.ONE * SCALE))
@@ -86,15 +127,7 @@ func _ready() -> void:
 	glow.shadow_enabled = false
 	glow.position = LURE
 	add_child(glow)
-	# Голос: слышно издалека — по нему понятно, откуда он идёт.
-	_voice = AudioStreamPlayer3D.new()
-	_voice.position = Vector3(0, 1.8, 0)
-	_voice.unit_size = 9.0
-	_voice.volume_db = 2.0
-	add_child(_voice)
-	_anim = Geo.model_anim(model, [IDLE, RUN])
-	_anim.play(IDLE)
-	_anim.seek(randf() * 2.0)
+	return model
 
 
 ## Светится сам, без освещения; grow — чтобы не мерцал поверх той же поверхности тела.
@@ -299,7 +332,7 @@ func _hunt_update(delta: float) -> void:
 			var axis := level.axis_at(global_position)
 			global_position += axis * signf(step.dot(axis)) * step.length()
 		look_at(global_position + go.normalized(), Vector3.UP)
-		_anim.play(RUN, 0.2)
+		_anim.play(RUN if _chasing or not _anim.has_animation(WALK) else WALK, 0.2)
 		_anim.speed_scale = clampf(speed / 3.0, 0.6, 1.5)
 	else:
 		# Пришёл туда, где слышал или видел, — стоит, принюхивается, бродит рядом.
@@ -320,7 +353,7 @@ func _hunt_update(delta: float) -> void:
 
 func _catch() -> void:
 	_anim.speed_scale = 1.0
-	_anim.play(ATTACK, 0.05)
+	_anim.play(_attack, 0.05)
 	look_at(Vector3(player.global_position.x, global_position.y, player.global_position.z), Vector3.UP)
 	mode = "caught"
 	Game.play_ui(Sfx.sting(), 4.0)
