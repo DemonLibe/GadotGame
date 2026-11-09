@@ -99,6 +99,7 @@ voice/          озвучка диспетчера и Маши
 | Пистолет | [Pistol](https://opengameart.org/content/pistol-5) | loafbrr_1 | CC0 |
 | Батарейка | [Lowpoly Survival Item Pack](https://opengameart.org/content/lowpoly-survival-item-pack) | artie31 | CC0 |
 | Рация | [Radio](https://opengameart.org/content/radio-0) | laleksic | CC0 |
+| Двойник | [Universal Base Characters](https://quaternius.com) (Standard) | Quaternius | CC0 |
 | Таблетки | [Pills 3D models](https://opengameart.org/content/pills-3d-models) | mxc2 | CC0 |
 
 **Присланные автором проекта** (лицензия — та, под которой их скачали; в архивах её не было):
@@ -119,6 +120,7 @@ voice/          озвучка диспетчера и Маши
 | Шаги, скрип | [50 RPG sound effects](https://opengameart.org/content/50-rpg-sound-effects) | Kenney |
 | Тревога | [Panic mode](https://opengameart.org/content/panic-mode) | Breadman |
 | Музыка меню | [At the End of Hope](https://opengameart.org/content/at-the-end-of-hope) | Emma_MA |
+| Лязг, перекладины, щелчки, выстрел, подбор, сердце, дыхание, дождь, ветер, гул, капель, замок, бумага | [500 game sound effects](sounds/LICENSES-500-game-sfx.txt) — подборка CC0 (Kenney, qubodup, Iwan Gabovitch и др.) | см. LICENSES |
 
 Голоса диспетчера и Маши — нейросетевой синтез [Piper](https://github.com/rhasspy/piper).
 

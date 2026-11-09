@@ -1,0 +1,182 @@
+CC0 1.0 UNIVERSAL
+https://creativecommons.org/publicdomain/zero/1.0/
+Legal terms: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+All included WAV files are CC0. Commercial use, modification, redistribution and sale are permitted; attribution is not required.
+Collection-specific edits are also dedicated under CC0.
+Filename suffixes (s01, s02, etc.) identify the original sources below.
+
+s01: Circlerun — Hi-Tech Button Sound Pack I (Non Themed)
+https://opengameart.org/content/hi-tech-button-sound-pack-i-non-themed
+
+s02: Corsica_S (Submitted by qubodup ) — 42 Snow and Gravel Footsteps
+https://opengameart.org/content/42-snow-and-gravel-footsteps
+
+s03: Fantozzi (Submitted by qubodup ) — Fantozzi's Footsteps (Grass/Sand & Stone)
+https://opengameart.org/content/fantozzis-footsteps-grasssand-stone
+
+s04: Independent.nu (Submitted by qubodup ) — 35 wooden cracks/hits/destructions
+https://opengameart.org/content/35-wooden-crackshitsdestructions
+
+s05: Independent.nu (Submitted by qubodup ) — 4 Atmospheric ghostly loops
+https://opengameart.org/content/4-atmospheric-ghostly-loops
+
+s06: Independent.nu (Submitted by qubodup ) — 8 wet squish, slurp impacts
+https://opengameart.org/content/8-wet-squish-slurp-impacts
+
+s07: Iwan Gabovitch (Submitted by qubodup ) — Door open, door close
+https://opengameart.org/content/door-open-door-close
+
+s08: JaggedStone — Loopable Dungeon Ambience
+https://opengameart.org/content/loopable-dungeon-ambience
+
+s09: JaggedStone — Magic Spell SFX
+https://opengameart.org/content/magic-spell-sfx
+
+s10: Julien Matthey (Submitted by diligentcircle ) — Fireball
+https://opengameart.org/content/fireball-1
+
+s11: Kenney — 63 Digital sound effects (lasers, phasers, space etc.)
+https://opengameart.org/content/63-digital-sound-effects-lasers-phasers-space-etc
+https://kenney.nl/assets/digital-audio
+
+s12: Kenney — Impact Sounds
+https://kenney.nl/assets/impact-sounds
+
+s13: Kenney — Interface Sounds
+https://kenney.nl/assets/interface-sounds
+
+s14: Kenney — RPG Audio
+https://kenney.nl/assets/rpg-audio
+
+s15: Kenney — Sci-fi Sounds
+https://kenney.nl/assets/sci-fi-sounds
+
+s16: Kenney — UI Audio
+https://kenney.nl/assets/ui-audio
+
+s17: LokiF — Swamp Environment Audio
+https://opengameart.org/content/swamp-environment-audio
+
+s18: Lokif (Submitted by LokiF ) — GUI Sound Effects
+https://opengameart.org/content/gui-sound-effects
+
+s19: Luke.RUSTLTD — bomb_explosion_8bit
+https://opengameart.org/content/bombexplosion8bit
+
+s20: Luke.RUSTLTD — wind1
+https://opengameart.org/content/wind1
+
+s21: MentalSanityOff (Submitted by qubodup ) — Jump Landing Sound
+https://opengameart.org/content/jump-landing-sound
+
+s22: NenadSimic — Muffled Distant Explosion
+https://opengameart.org/content/muffled-distant-explosion
+
+s23: Ogrebane — Dark Ambiences
+https://opengameart.org/content/dark-ambiences
+
+s24: Ogrebane — Monster Sound Effects 2
+https://opengameart.org/content/monster-sound-effects-2
+
+s25: Ogrebane — Teleport Spell
+https://opengameart.org/content/teleport-spell
+
+s26: OwlishMedia — 202 More Sound Effects
+https://opengameart.org/content/202-more-sound-effects
+
+s27: OwlishMedia — Sound Effects Pack
+https://opengameart.org/content/sound-effects-pack
+
+s28: PagDev — Fireplace Sound loop
+https://opengameart.org/content/fireplace-sound-loop
+
+s29: Pixel-boy (Sparklin Labs) — Superpowers assets sound effects
+https://opengameart.org/content/superpowers-assets-sound-effects
+https://github.com/sparklinlabs/superpowers-asset-packs
+
+s30: SubspaceAudio — 512 Sound Effects (8-bit style)
+https://opengameart.org/content/512-sound-effects-8-bit-style
+
+s31: TinyWorlds — Different steps on wood, stone, leaves, gravel and mud
+https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud
+
+s32: Vehicle — Fantasy Sound Effects (Tinysized SFX)
+https://opengameart.org/content/fantasy-sound-effects-tinysized-sfx
+
+s33: artisticdude — Freeze Spell
+https://opengameart.org/content/freeze-spell-0
+
+s34: artisticdude — Goblins Sound Pack
+https://opengameart.org/content/goblins-sound-pack
+
+s35: artisticdude — RPG Sound Pack
+https://opengameart.org/content/rpg-sound-pack
+
+s36: artisticdude — Zombies Sound Pack
+https://opengameart.org/content/zombies-sound-pack
+
+s37: artisticdude (Submitted by Ogrebane ) — Battle Sound Effects
+https://opengameart.org/content/battle-sound-effects
+
+s38: bart — Heartbeat sounds
+https://opengameart.org/content/heartbeat-sounds
+
+s39: isaiah658 — Ambient Bird Sounds
+https://opengameart.org/content/ambient-bird-sounds
+
+s40: qubodup — 20 Rustles of dry leaves
+https://opengameart.org/content/20-rustles-dry-leaves
+
+s41: qubodup — Door Open, Door Close Set
+https://opengameart.org/content/door-open-door-close-set
+
+s42: qubodup — Energy Drain
+https://opengameart.org/content/energy-drain
+
+s43: qubodup — Ghost Monster Voice Moaning & Growling
+https://opengameart.org/content/ghost-monster-voice-moaning-growling
+
+s44: qubodup — Impact
+https://opengameart.org/content/impact
+
+s45: qubodup — Swish - bamboo stick weapon swhoshes
+https://opengameart.org/content/swish-bamboo-stick-weapon-swhoshes
+
+s46: qubodup — Synthesized explosion
+https://opengameart.org/content/synthesized-explosion
+
+s47: remaxim — 3 Melee sounds
+https://opengameart.org/content/3-melee-sounds
+
+s48: rubberduck — 100 CC0 SFX
+https://opengameart.org/content/100-cc0-sfx
+
+s49: rubberduck — 100 CC0 SFX #2
+https://opengameart.org/content/100-cc0-sfx-2
+
+s50: rubberduck — 100 CC0 metal and wood SFX
+https://opengameart.org/content/100-cc0-metal-and-wood-sfx
+
+s51: rubberduck — 25 CC0 mud sfx
+https://opengameart.org/content/25-cc0-mud-sfx
+
+s52: rubberduck — 30 CC0 SFX loops
+https://opengameart.org/content/30-cc0-sfx-loops
+
+s53: rubberduck — 40 CC0 water / splash / slime SFX
+https://opengameart.org/content/40-cc0-water-splash-slime-sfx
+
+s54: rubberduck — 50 CC0 Sci-Fi SFX
+https://opengameart.org/content/50-cc0-sci-fi-sfx
+
+s55: rubberduck — 50 CC0 retro / synth SFX
+https://opengameart.org/content/50-cc0-retro-synth-sfx
+
+s56: rubberduck — 80 CC0 RPG SFX
+https://opengameart.org/content/80-cc0-rpg-sfx
+
+s57: rubberduck — 80 CC0 creature SFX
+https://opengameart.org/content/80-cc0-creature-sfx
+
+s58: syncopika — Bird chirping sounds
+https://opengameart.org/content/bird-chirping-sounds

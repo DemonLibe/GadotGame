@@ -845,6 +845,7 @@ var _newspapers := {
 
 
 func show_newspaper(variant := "A") -> void:
+	Game.play_ui(Sfx.paper(), -4.0)
 	var paper: Array = _newspapers.get(variant, _newspapers["A"])
 	_paper_head.text = paper[0]
 	_paper_cap.text = paper[1]
@@ -875,6 +876,7 @@ func is_reading() -> bool:
 
 
 func show_note(title: String, text: String) -> void:
+	Game.play_ui(Sfx.paper(), -6.0)
 	_note_title.text = title
 	_note_text.text = text
 	_note_scroll.scroll_vertical = 0

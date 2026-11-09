@@ -48,6 +48,7 @@ func interact(player) -> void:
 		Game.play_at(Sfx.clank(), global_position + Vector3(0, 1.0, 0), -8.0)
 		Game.say_once("store_locked_%d" % number, "Заперто. На решётке бирка «С-%d». Ключ должен быть где-то здесь — у таких же, как я." % number, Game.THOUGHT, 4.0)
 		return
+	Game.play_at(Sfx.unlock(), global_position + Vector3(0, 1.0, 0), 0.0)
 	open()
 	Game.play_at(Sfx.creak(), global_position + Vector3(0, 1.2, 0), -2.0)
 	Game.make_noise(global_position, 9.0)

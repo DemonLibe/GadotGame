@@ -1193,7 +1193,6 @@ func ending_metro() -> void:
 
 
 func _newspaper(variant: String) -> void:
-	Game.play_ui(Sfx.pickup(), -6.0)
 	hud.show_newspaper(variant)
 	await hud.newspaper_closed
 	await get_tree().create_timer(1.0).timeout
