@@ -516,6 +516,76 @@ func _spawn_kit_props() -> void:
 			put.call("05_service_room/bucket", Vector3(1.35, 0.0, -0.35), 0.0)
 
 
+## Мусор (Trash and Debris) и станционное (Metro PSX): стоит всё время, как стены.
+func _spawn_ext_props() -> void:
+	if not ExtModels.ok(ExtModels.TRASH):
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1913
+	var fy := Level.FLOOR_Y
+	# Тоннель: у стен, не на рельсах, через каждые несколько метров.
+	var z := Level.TUN_Z0 - 4.0
+	while z > Level.GRATE_Z + 3.0:
+		if rng.randf() < 0.55:
+			var side := -1.0 if rng.randf() < 0.5 else 1.0
+			var pos := Vector3(Level.TUN_CX + side * rng.randf_range(1.15, 1.45), fy, z + rng.randf_range(-1.5, 1.5))
+			ExtModels.trash(level, ExtModels.TUNNEL_TRASH[rng.randi_range(0, ExtModels.TUNNEL_TRASH.size() - 1)], pos, rng.randf() * TAU)
+		z -= rng.randf_range(4.0, 8.0)
+	# Штольни.
+	for i in Level.BRANCHES.size():
+		var along := Level.JUNCTION_BRANCH + 2.0
+		while along < float(Level.BRANCHES[i]["length"]) - 3.0:
+			if rng.randf() < 0.5:
+				var pos := level.floor_point(i, along, (-1.0 if rng.randf() < 0.5 else 1.0) * rng.randf_range(1.0, 1.3))
+				ExtModels.trash(level, ExtModels.TUNNEL_TRASH[rng.randi_range(0, ExtModels.TUNNEL_TRASH.size() - 1)], pos, rng.randf() * TAU)
+			along += rng.randf_range(5.0, 9.0)
+	# Станция: мусор по платформе.
+	for i in 7:
+		var pos := Vector3(rng.randf_range(-2.6, -0.8), fy, rng.randf_range(-48.5, -31.5))
+		ExtModels.trash(level, ExtModels.STATION_TRASH[rng.randi_range(0, ExtModels.STATION_TRASH.size() - 1)], pos, rng.randf() * TAU)
+	# Служебные комнаты: газета или банка у двери.
+	for room in level.rooms:
+		var c: Vector3 = room["center"]
+		var b: Basis = room["basis"]
+		ExtModels.trash(level, ["News_1", "Paper_2", "Can_4_Crushed", "Tin_2"][rng.randi_range(0, 3)], c + b * Vector3(rng.randf_range(-0.4, 0.4), 0, 1.2), rng.randf() * TAU)
+	if not ExtModels.ok(ExtModels.METRO):
+		return
+	# Станция: скамья и урна у западной стены, схема линий и плакаты — на восточной.
+	ExtModels.metro_prop(level, "Chair", Vector3(-2.65, fy, -33.6), PI / 2, 1.9)
+	ExtModels.metro_prop(level, "trash_can", Vector3(-2.65, fy, -35.4), 0.0, 0.75)
+	ExtModels.metro_prop(level, "metro_map", Vector3(2.97, fy + 1.0, -38.2), -PI / 2, 1.2)
+	ExtModels.metro_prop(level, "Poster_02", Vector3(2.97, fy + 1.2, -46.6), -PI / 2, 0.9)
+	ExtModels.metro_prop(level, "Poster_05", Vector3(-2.97, fy + 1.2, -39.6), PI / 2, 0.9)
+
+
+## Пауки-охотники на стенах (с третьей смены): сидят, пока на них не посветишь.
+const LURKERS := {2: 1, 3: 2, 4: 3, 5: 3, 6: 2, 7: 3}
+const LURKERS_OLD := {3: 1, 4: 2, 5: 2, 6: 2}
+
+
+func _spawn_lurkers(d: int) -> void:
+	if not ExtModels.ok(ExtModels.HUNTSMAN):
+		return
+	for i in int(LURKERS.get(d, 0)):
+		var along := randf_range(maxf(day_limit() + 4.0, Level.GRATE_Z + 4.0), Level.TUN_Z0 - 10.0)
+		var tr := _mount(-1, -1 if randf() < 0.5 else 1, along, Level.FLOOR_Y + randf_range(1.6, 2.4))
+		var l := Lurker.new()
+		l.player = player
+		add_child(l)
+		l.place_on_wall(tr.origin, tr.basis.z)
+	var lower := level.lower
+	if lower.cells.is_empty():
+		return
+	for i in int(LURKERS_OLD.get(d, 0)):
+		var tr := lower.wall_mount(lower.random_cell(2), randf_range(1.7, 2.4))
+		if tr.origin == Vector3.ZERO:
+			continue
+		var l := Lurker.new()
+		l.player = player
+		add_child(l)
+		l.place_on_wall(tr.origin, tr.basis.z)
+
+
 ## Модель-префаб набора со своим светом (светофор): свет гасится вдали, как лампы.
 func _kit_light_prop(path: String, pos: Vector3, yaw: float) -> void:
 	var scene := load(ProcTex.KIT + "prefabs/%s.tscn" % path) as PackedScene
@@ -529,6 +599,7 @@ func _kit_light_prop(path: String, pos: Vector3, yaw: float) -> void:
 
 func _spawn_props() -> void:
 	_spawn_kit_props()
+	_spawn_ext_props()
 	ladder = Ladder.new()
 	# Лестница — у стены напротив петель люка (петли на северной кромке).
 	ladder.setup(Level.SHAFT_X, Level.SHAFT_Z + Level.SHAFT_HALF, -1.0, Level.FLOOR_Y, Level.ROOM_Y,
@@ -633,6 +704,7 @@ func start_day(d: int, retry := false) -> void:
 	_spawn_finds(d)
 	_spawn_threats(d, retry)
 	_setup_lower(d, retry)
+	_spawn_lurkers(d)
 	_setup_power(d)
 	_spawn_task_devices(d)
 	_reported = false

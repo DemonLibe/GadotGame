@@ -101,6 +101,10 @@ voice/          озвучка диспетчера и Маши
 | Рация | [Radio](https://opengameart.org/content/radio-0) | laleksic | CC0 |
 | Таблетки | [Pills 3D models](https://opengameart.org/content/pills-3d-models) | mxc2 | CC0 |
 
+**Присланные автором проекта** (лицензия — та, под которой их скачали; в архивах её не было):
+мусор — Trash and Debris (`models/trash/`), скамья, урна, схема, плакаты и вагон метро — Metro PSX
+(`models/metro_psx/`), паук-охотник — Huntsman Spider (`models/huntsman/`).
+
 **Звуки и музыка с [OpenGameArt](https://opengameart.org)**, все CC0 (остальное синтезируется кодом):
 
 | Где | Источник | Автор |

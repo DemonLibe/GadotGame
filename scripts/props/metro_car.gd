@@ -1,7 +1,7 @@
 class_name MetroCar
 extends StaticBody3D
 ## Вагон метро за проломом (седьмая смена): головной и прицепной, у кабины горят фары.
-## Сесть в вагон — и уехать. Модели: Train Kit (Kenney, CC0).
+## Сесть в вагон — и уехать. Модель: вагон из Metro PSX (запасной вариант — Train Kit, Kenney, CC0).
 
 const SCALE := 1.75
 const STRETCH := 2.2  # вагоны в наборе короткие — вытягиваем вдоль пути
@@ -12,12 +12,20 @@ var main  # Main
 
 func _ready() -> void:
 	add_to_group("day_objects")
-	var skin := ProcTex.model_skin("res://models/subway/Textures/colormap.png", Color(0.55, 0.55, 0.58), 0.7, 0.3)
-	var basis := Basis.from_scale(Vector3(SCALE, SCALE, SCALE * STRETCH))
-	# Кабина смотрит в +Z — навстречу тому, кто пришёл через пролом. Прицепной — за ним.
-	Geo.model(self, "res://models/subway/subway_head.glb", skin, Vector3(0.09 * SCALE, 0, 0), basis)
-	Geo.model(self, "res://models/subway/subway_car.glb", skin, Vector3(0, 0, -CAR_LEN - 0.3), basis)
-	Geo.collider_box(self, Vector3(2.2, 2.8, CAR_LEN * 2.0 + 0.3), Vector3(0, 1.4, -CAR_LEN / 2.0 - 0.15))
+	if ExtModels.ok(ExtModels.METRO):
+		# Вагон из Metro PSX: двери, стёкла, сиденья внутри. Торец смотрит в +Z — навстречу из пролома.
+		var built: Array = ExtModels.metro_car(self, 2.9)
+		var length: float = built[1]
+		var width: float = built[2]
+		(built[0] as Node3D).position.z = -length / 2.0 + CAR_LEN / 2.0
+		Geo.collider_box(self, Vector3(width, 2.9, length), Vector3(0, 1.45, -length / 2.0 + CAR_LEN / 2.0))
+	else:
+		var skin := ProcTex.model_skin("res://models/subway/Textures/colormap.png", Color(0.55, 0.55, 0.58), 0.7, 0.3)
+		var basis := Basis.from_scale(Vector3(SCALE, SCALE, SCALE * STRETCH))
+		# Кабина смотрит в +Z — навстречу тому, кто пришёл через пролом. Прицепной — за ним.
+		Geo.model(self, "res://models/subway/subway_head.glb", skin, Vector3(0.09 * SCALE, 0, 0), basis)
+		Geo.model(self, "res://models/subway/subway_car.glb", skin, Vector3(0, 0, -CAR_LEN - 0.3), basis)
+		Geo.collider_box(self, Vector3(2.2, 2.8, CAR_LEN * 2.0 + 0.3), Vector3(0, 1.4, -CAR_LEN / 2.0 - 0.15))
 	# Фары и слабый свет из кабины: его видно от самого пролома.
 	var glow := ProcTex.emissive(Color(1.0, 0.85, 0.55), 3.0)
 	for x in [-0.55, 0.55]:
