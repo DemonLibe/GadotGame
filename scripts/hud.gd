@@ -33,6 +33,7 @@ var _prompt_key_label: Label
 var _hold: ProgressBar
 var _tasks: RichTextLabel
 var _slip: HudWidgets.Slip
+var _chrome: Array[Control] = []   # таблички, которые прячет «Погружение»: место, деньги, пульс
 var _location: Label
 var _scribble: Label
 var _scribble_t := 0.0
@@ -184,6 +185,7 @@ func _ready() -> void:
 	where.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	_place(where, 1, 0, 1, 0, -18, 16, -18, 16)
 	_ingame.add_child(where)
+	_chrome.append(where)
 	_location = HudWidgets.label("", 15, AMBER, HudWidgets.oswald(500))
 	where.add_child(_location)
 	# Свежая запись в дневнике — почерком, под табличкой; весь дневник — по J.
@@ -226,6 +228,7 @@ func _ready() -> void:
 	purse.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_place(purse, 1, 1, 1, 1, -16, -16, -16, -16)
 	_ingame.add_child(purse)
+	_chrome.append(purse)
 	_money = HudWidgets.label("", 18, TEXT, HudWidgets.oswald(500))
 	purse.add_child(_money)
 	_coin = _make_label(_ingame, 15, HORIZONTAL_ALIGNMENT_RIGHT)
@@ -243,6 +246,7 @@ func _ready() -> void:
 	var monitor := HudWidgets.Plate.new(5)
 	_place(monitor, 0.5, 0, 0.5, 0, -110, 12, 110, 12)
 	_ingame.add_child(monitor)
+	_chrome.append(monitor)
 	var mrow := HBoxContainer.new()
 	mrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mrow.add_theme_constant_override("separation", 8)
@@ -377,6 +381,17 @@ func setup_hotbar(player: Player, with_icons := true) -> void:
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_theme_stylebox_override("panel", style)
 		bar.add_child(panel)
+		# Ячейка — потёртый металл ящика с инструментом, а не чёрный квадрат.
+		var tex_path := ProcTex.KIT + "textures/metal_dark.png"
+		if ResourceLoader.exists(tex_path):
+			var plate := TextureRect.new()
+			plate.texture = load(tex_path)
+			plate.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			plate.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+			plate.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			plate.modulate = Color(0.5, 0.47, 0.44, 0.92)
+			plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			panel.add_child(plate)
 		if not with_icons:
 			_slot_icons.append(Node3D.new())
 			var plain := Label.new()
@@ -459,6 +474,11 @@ func _process(delta: float) -> void:
 		_sub_left = m[2]
 	_subtitle_box.modulate.a = clampf(_sub_left * 2.0, 0.0, 1.0)
 	_tasks_full = Input.is_action_pressed("tasks")
+	# «Погружение»: таблички скрыты, путевой лист — только пока держишь Tab.
+	var immersive: bool = Settings.get_value("immersive")
+	for c in _chrome:
+		c.visible = not immersive
+	_slip.visible = not immersive or _tasks_full
 	if _tasks_full != _tasks_shown_full:
 		_refresh_tasks()
 	_toast_t -= delta

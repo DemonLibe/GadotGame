@@ -45,7 +45,7 @@ const NOTES := {
 		[-1, -1, -65.0, 1.4, "|||| |||| |||| ||"]],
 	4: [[-1, -1, -101.0, 1.7, "ОН СЧИТАЕТ\nТВОИ ШАГИ"],
 		[0, 1, 56.0, 1.7, "СМЕНА №7.\nНЕ ХОДИ\nЗА РЕШЁТКУ"],
-		[-3, 0, 40.0, 0.0, "НЕ СМОТРИ ВНИЗ"]],
+		[-3, 0, 4.0, 0.0, "НЕ СМОТРИ ВНИЗ"]],
 	5: [[-1, -1, -318.5, 1.8, "ТВОЯ СМЕНА"],
 		[-1, 1, -117.5, 1.7, "ОН УЖЕ ЗДЕСЬ"]],
 	6: [[-1, -1, -58.0, 1.7, "ВОСЬМОЙ ВЕРНУЛСЯ"]],
@@ -153,8 +153,13 @@ const NOTE_TEXTS := {
 
 ## Звонки на мёртвый телефон наверху: [id озвучки (голос Маши) или "", субтитр] — по одному на снятие трубки.
 const PHONE_CALLS := {
+	3: [["m_call", "…Папа?.. Папа, я здесь…"],
+		["", "…Гудки. Этого номера нет ни в одном справочнике. Откуда она его знает?"]],
 	5: [["m_phone_0", "Папа? Папа, ты где? Ты же дома... Я тебя вижу в окне. Ты стоишь во дворе и смотришь на меня."],
 		["", "…В трубке кто-то дышит. Медленно. В такт моему дыханию."]],
+	# Та же запись, что вчера, — слово в слово, только медленнее и ниже.
+	6: [["m_phone_0", "Папа? Папа, ты где? Ты же дома... Я тебя вижу в окне. Ты стоишь во дворе и смотришь на меня.", 0.8],
+		["", "…Слово в слово, как вчера. Те же паузы. Тот же вдох посередине. Это не она. Это запись."]],
 	7: [["m_phone_7", "Папа... Ты уже три дня дома. Но это не ты. Он не разговаривает. Он только смотрит."]],
 }
 
@@ -195,12 +200,15 @@ var radio: RadioSet
 var dispatcher: Dispatcher
 var ladder: Ladder
 var cart: Cart
+var trolley: Trolley
+var _smoke_bad := false
 var vents: Array[Vent] = []
 var crates: Array[FilterCrate] = []
 var doors: Array[RoomDoor] = []
 var _door_of := {}            # индекс комнаты → её дверь (у генераторных дверей нет)
 var generator: Generator      # главный — на станции
 var reserves: Array[Generator] = []  # резервные — в генераторных по тоннелю
+var _retry_top := false       # после падения в шахту смена начинается заново наверху, а не внизу
 var _net_seed := 0            # сеть тоннелей в эту смену (после провала — та же)
 var _net_fresh := false       # сеть только что собрана при загрузке — первой смене пересобирать не нужно
 var _budget := {}             # расходники и существа на смену (по размеру открытой сети)
@@ -364,7 +372,8 @@ func _process(delta: float) -> void:
 		return
 	# Сорвался в шахту.
 	if not player.climbing and player.velocity.y < -16.0:
-		fail_day("Ты сорвался в шахту.")
+		# Прыжок в шахту — не короткая дорога вниз: очнёшься наверху, и лезть придётся заново.
+		fail_day("Ты сорвался в шахту.", true)
 		return
 	# В браузере Esc снимает захват мыши сам — тогда ставим игру на паузу.
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not hud.is_shop_open():
@@ -740,6 +749,9 @@ func _spawn_props() -> void:
 
 	cart = Cart.new()
 	add_child(cart)
+	trolley = Trolley.new()
+	trolley.main = self
+	add_child(trolley)
 	generator = Generator.new()
 	generator.level = level
 	generator.position = Vector3(-2.4, Level.FLOOR_Y, -44.6)
@@ -893,6 +905,8 @@ func start_day(d: int, retry := false) -> void:
 	busy = true
 	collapsing = false
 	Game.shift_started_msec = Time.get_ticks_msec()
+	if not retry and d == 1:
+		Game.habit = {"hide": 0, "light": 0}  # новая игра — он ещё ничего о тебе не знает
 	if not retry:
 		Game.paid.clear()
 		Meta.new_shift()
@@ -928,7 +942,10 @@ func start_day(d: int, retry := false) -> void:
 	if not debug_flag("norooms"):
 		_setup_rooms(d)
 	_spawn_finds(d)
-	_spawn_threats(d, retry)
+	# Сорвался в шахту — повтор смены с самого верха: рация на столе, пистолет в ящике, лестница впереди.
+	var below := retry and not _retry_top
+	_retry_top = false
+	_spawn_threats(d, below)
 	_setup_lower(d, retry)
 	_spawn_lurkers(d)
 	_photo_changes(d)
@@ -940,6 +957,7 @@ func start_day(d: int, retry := false) -> void:
 	# На третий день вагонетка уезжает в тоннель сама.
 	if not debug_flag("s_misc"):
 		cart.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, -155.0 if d == 3 else -40.0)
+		trolley.reset()
 		level.set_grate_open(d == Game.FINAL_DAY or d == Game.LAST_DAY)
 		level.set_breach(d == Game.LAST_DAY)
 		level.tunnel_lights_off = d == Game.LAST_DAY
@@ -963,7 +981,7 @@ func start_day(d: int, retry := false) -> void:
 		player.ammo = int(Game.gear.get("ammo", 6))
 		player.batteries = int(Game.gear.get("batteries", Player.MAX_BATTERIES))
 		player.battery = 100.0
-	if retry:
+	if below:
 		player.global_position = BOTTOM_SPAWN
 		player.rotation.y = 0.0
 		hatch.set_open(true)
@@ -1006,7 +1024,9 @@ func start_day(d: int, retry := false) -> void:
 		get_tree().create_timer(8.0).timeout.connect(func():
 			if Game.day == d and player.global_position.y > Level.ROOM_Y - 2.0:
 				phone.ring(PHONE_CALLS[d]))
-	if retry:
+	if retry and not below:
+		Game.say("Очнулся у люка. Как поднялся — не помню. Вниз — только по скобам.", Game.THOUGHT, 4.5)
+	elif retry:
 		Game.say("Снова внизу. Голова гудит. Ещё раз — и осторожнее.", Game.THOUGHT, 4.0)
 	elif not debug_flag("s_say"):
 		Game.say(DAY_THOUGHTS[d], Game.THOUGHT, 6.0)
@@ -1207,10 +1227,11 @@ func _update_lower() -> void:
 
 
 ## Смена провалена (сорвался, страх взял верх) — начинается заново. Игра всегда сложная.
-func fail_day(reason: String) -> void:
+func fail_day(reason: String, top := false) -> void:
 	if busy:
 		return
 	busy = true
+	_retry_top = top
 	player.input_locked = true
 	stalker.hide_now()
 	# Упал в старой линии с находками — вещмешок останется там же (линия после провала та же).
@@ -1218,7 +1239,8 @@ func fail_day(reason: String) -> void:
 		_lost = {"pos": Vector3(player.global_position.x, LowerLine.Y + 0.05, player.global_position.z), "amount": player.loot}
 	Game.play_ui(Sfx.sting(), 0.0)
 	await hud.fade_to(1.0, 0.5).finished
-	hud.show_title("СМЕНА ПРОВАЛЕНА", reason + "\n\nСмена начнётся заново — уже внизу.", 2.5)
+	hud.show_title("СМЕНА ПРОВАЛЕНА", reason + ("\n\nСмена начнётся заново — наверху, у люка." if _retry_top
+		else "\n\nСмена начнётся заново — уже внизу."), 2.5)
 	await get_tree().create_timer(4.0).timeout
 	start_day(Game.day, true)
 
@@ -2233,6 +2255,21 @@ func _smoke_test() -> void:
 		for ev in ["footsteps", "sighting", "behind", "lamps", "whisper", "regrow", "interfere", "crawler", "hunt", "swarm",
 				"masha", "double", "silence", "picket", "name"]:
 			director._run(ev)
+		# Дрезина: встать, качнуть рычаг, проехать, сойти.
+		var before_ride := player.global_position
+		trolley.interact(player)
+		trolley.pump(1.0, -1.0, 1.0, true)
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+		var rode: bool = player.riding == trolley and trolley.position.z < Trolley.HOME_Z
+		trolley.speed = 0.0
+		trolley.interact(player)
+		if not rode or player.riding != null:
+			print("SMOKE FAIL: дрезина — ехал %s, сошёл %s" % [rode, player.riding == null])
+			_smoke_bad = true
+		player.global_position = before_ride
+		dread._duty_prints()
+		dread._update_duty(20.0)
 		# Страх между событиями: признаки всех уровней, кривая с пиком, потайная штольня, ложь схемы.
 		if d >= 2:
 			for lv in 3:
@@ -2540,10 +2577,23 @@ func _smoke_test() -> void:
 	var hide_cab: Hideout = get_tree().get_nodes_in_group("hideouts")[1]
 	player.global_position = hide_cab.global_position + Vector3(0, 0.1, 0)
 	hide_cab.interact(player)
+	Game.habit = {"hide": 0, "light": 0}
 	stalker.hunt(player.global_position + Vector3(0, 0, -10.0), 3)
 	await get_tree().create_timer(Stalker.HIDE_VANISH + 1.5).timeout
 	var hide_ok := player.hiding and not stalker.visible
-	hide_cab.interact(player)
+	# Он учится: после двух отсидок подходит к дверце и слушает. Дышишь — вырвет дверцу.
+	Game.habit["hide"] = Stalker.LEARN_HIDE
+	stalker.hunt(player.global_position + hide_cab.global_transform.basis.z * 1.5, 3)
+	await get_tree().create_timer(Stalker.LISTEN_TOLERANCE + 1.0).timeout
+	var learn_ok := not player.hiding and player.health < 100.0
+	if not learn_ok:
+		print("SMOKE FAIL: «Другой» не нашёл в шкафу того, кто дышит")
+	hide_ok = hide_ok and learn_ok
+	stalker.hide_now()
+	player.health = 100.0
+	Game.habit = {"hide": 0, "light": 0}
+	if player.hiding:
+		hide_cab.interact(player)
 	if not (retry_ok and hide_ok):
 		print("SMOKE FAIL: провал смены внизу — %s, шкаф от «Другого» — %s" % [retry_ok, hide_ok])
 	start_day(Game.FINAL_DAY)
@@ -2581,7 +2631,7 @@ func _smoke_test() -> void:
 			print("SMOKE FAIL: сеть %d — штолен %d, длина %d, сюжетных комнат %d, генераторных %d, вентблоков %d" % [k, prim, trunk,
 				stories.size(), level.gen_rooms.size(), VENT_SPOTS.size()])
 		net_ok = net_ok and good
-	var ok := Game.ended and retry_ok and hide_ok and shop_ok and low_ok and lis_ok and net_ok
+	var ok := Game.ended and retry_ok and hide_ok and shop_ok and low_ok and lis_ok and net_ok and not _smoke_bad
 	# Концовка 3: все записки, засов решётки изнутри.
 	start_day(5)
 	await get_tree().create_timer(5.5).timeout

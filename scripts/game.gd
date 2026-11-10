@@ -32,6 +32,8 @@ var ended := false
 var notes_read := {}  # прочитанные записки (id → true), копятся за всю игру
 var pending_day := 1  # с какой смены начать, когда загрузится сцена игры
 var valve_order: Array = [1, 2, 3]  # в каком порядке перекрывать задвижки сегодня
+## Чему «Другой» научился у обходчика: сколько раз тот пересидел в шкафу и сколько раз прогнал светом.
+var habit := {"hide": 0, "light": 0}
 var gear := {}  # что собрано в шестую смену и взято в седьмую: pistol, ammo, batteries
 const NOTES_TOTAL := 9
 var _said := {}
@@ -240,6 +242,10 @@ func load_day() -> int:
 ## Диспетчер, шёпот, голоса и подсказки — субтитрами, как раньше.
 func say(text: String, color := THOUGHT, duration := 4.0) -> void:
 	if color == THOUGHT:
+		write_diary(text)
+		return
+	# «Погружение»: подсказок на экране нет — они уходят в дневник, как всё остальное.
+	if color == SYSTEM and Settings.get_value("immersive"):
 		write_diary(text)
 		return
 	message.emit(text, color, duration)

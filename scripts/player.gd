@@ -19,7 +19,7 @@ const NOISE_SHOT := 45.0
 const NOISE_RUNG := 6.0
 const BREATH_DRAIN := 18.0
 const RUN_SPEED := 4.2
-const CLIMB_SPEED := 0.85               # 100 м лестницы — около двух минут
+const CLIMB_SPEED := 0.85               # 40 м лестницы — меньше минуты
 const GRAVITY := 12.0
 const MOUSE_SENS := 0.0022
 const MAX_FILTERS := 3
@@ -83,6 +83,7 @@ var ran_today := false        # для достижения «Тихоня»
 var climbing := false
 var crouching := false
 var hiding := false          # сидит в шкафу
+var riding = null            # дрезина, на площадке которой стоит
 var holding_breath := false
 var canisters := 0
 var bolts := 0                # болты в кармане — бросить (G), чтобы отвлечь
@@ -117,6 +118,7 @@ var _exhausted := false
 var _stamina_wait := 0.0
 
 var head: Node3D
+var body: PlayerBody   # тело от первого лица (видно, если посмотреть вниз)
 var camera: Camera3D
 var flashlight: SpotLight3D
 
@@ -157,6 +159,8 @@ func _ready() -> void:
 	head = Node3D.new()
 	head.position.y = 1.62
 	add_child(head)
+	body = PlayerBody.new()
+	add_child(body)
 	camera = Camera3D.new()
 	_apply_settings()
 	Settings.changed.connect(_apply_settings)
@@ -258,15 +262,15 @@ func make_model(item: String) -> Node3D:
 			Geo.cylinder(root, Vector3(0, 0, -0.02), 0.014, 0.25, ProcTex.flat(Color(0.4, 0.4, 0.42), 0.4, 0.9), along)
 			Geo.box(root, Vector3(0, -0.02, 0.08), Vector3(0.02, 0.05, 0.03), steel, false)
 		"filter":
-			Geo.box(root, Vector3(-0.05, 0.02, 0.0), Vector3(0.28, 0.24, 0.03), steel, false)
-			Geo.box(root, Vector3(-0.05, 0.02, 0.0), Vector3(0.25, 0.21, 0.05), ProcTex.flat(Color(0.88, 0.88, 0.82), 0.95), false)
+			Geo.box(root, Vector3(-0.05, 0.02, 0.0), Vector3(0.28, 0.24, 0.03), ProcTex.textured("metal_dark", Color(0.9, 0.9, 0.95), 0.5, 0.7), false)
+			Geo.box(root, Vector3(-0.05, 0.02, 0.0), Vector3(0.25, 0.21, 0.05), ProcTex.textured("blanket_wool", Color(1.0, 0.98, 0.9), 0.95), false)
 			for k in 4:
 				Geo.box(root, Vector3(-0.05, -0.06 + k * 0.055, 0.027), Vector3(0.24, 0.01, 0.005), ProcTex.flat(Color(0.7, 0.7, 0.65), 0.95), false)
 		"battery":
 			# Survival Items (artie31, CC0).
 			Geo.model_fit(root, "res://models/items/battery.glb", ProcTex.model_skin("res://models/items/survival_palette.png", Color(0.85, 0.85, 0.85), 0.5, 0.2), 0.12, Vector3(0, -0.06, 0), Basis(Vector3.RIGHT, -PI / 2))
 		"map":
-			var paper := ProcTex.flat(Color(0.86, 0.82, 0.7), 1.0)
+			var paper := ProcTex.textured("line_scheme", Color(0.95, 0.9, 0.78), 1.0)
 			var left := Geo.box(root, Vector3(-0.07, 0, 0), Vector3(0.14, 0.2, 0.004), paper, false)
 			left.rotation.y = 0.25
 			var right := Geo.box(root, Vector3(0.07, 0, 0), Vector3(0.14, 0.2, 0.004), paper, false)
@@ -451,6 +455,7 @@ func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
 	health = HEALTH_MAX
 	crouching = false
 	hiding = false
+	riding = null
 	holding_breath = false
 	_hideout = null
 	canisters = 0
@@ -510,6 +515,9 @@ func _physics_process(delta: float) -> void:
 		return
 	if hiding:
 		_hide_update(delta)
+		return
+	if riding != null:
+		_ride_update(delta)
 		return
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
@@ -571,9 +579,39 @@ func _physics_process(delta: float) -> void:
 			Game.make_noise(global_position, noise)
 	else:
 		_bob_amp = move_toward(_bob_amp, 0.0, delta * 4.0)
+	body.animate(_bob, _bob_amp, clampf((HEAD_STAND - head.position.y) / (HEAD_STAND - HEAD_CROUCH), 0.0, 1.0))
 	var shake := pow(Game.fear / Achievements.fear_max(), 2.0) * 0.02 + extra_shake
 	camera.position = Vector3(cos(_bob) * 0.025, absf(sin(_bob)) * 0.04, 0) * _bob_amp \
 		+ Vector3(randf_range(-shake, shake), randf_range(-shake, shake), 0)
+
+
+# --- Дрезина ------------------------------------------------------------------
+
+## На площадке: стоишь на месте, W/S — качаешь рычаг (по взгляду / назад). Рычаг ест выносливость.
+func _ride_update(delta: float) -> void:
+	if not is_instance_valid(riding):
+		riding = null
+		return
+	velocity = Vector3.ZERO
+	crouching = false
+	global_position = riding.global_position + Vector3(0, 0.47, 0)
+	var push := 0.0
+	if not input_locked:
+		push = Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
+	var can := not _exhausted
+	if push != 0.0 and can:
+		stamina = maxf(0.0, stamina - riding.PUMP_STAMINA * delta)
+		_stamina_wait = STAMINA_DELAY
+		if stamina <= 0.0:
+			_exhausted = true
+			Game.say_once("pump_tired", "Руки не держат рычаг. Катится сама — пока катится.", Game.THOUGHT, 3.0)
+	else:
+		_stamina_wait -= delta
+		if _stamina_wait <= 0.0:
+			stamina = minf(STAMINA_MAX, stamina + STAMINA_REGEN * air_regen() * delta)
+			if stamina > STAMINA_MAX * 0.3:
+				_exhausted = false
+	riding.pump(push, forward_flat().z, delta, can)
 
 
 # --- Укрытие -----------------------------------------------------------------
@@ -810,6 +848,8 @@ func _update_interaction(delta: float) -> void:
 	var t = null
 	if hiding:
 		t = _hideout  # изнутри шкафа луч его не видит — выход по E всегда
+	elif riding != null:
+		t = riding
 	elif _ray.is_colliding():
 		t = _find_interactable(_ray.get_collider())
 	if _target != null and not is_instance_valid(_target):

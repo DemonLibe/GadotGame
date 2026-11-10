@@ -28,6 +28,7 @@ func _ready() -> void:
 	_slider("brightness", "Яркость", 0.6, 1.6, 0.05, _percent)
 	_slider("ui_scale", "Масштаб интерфейса", 0.8, 1.25, 0.05, _percent, true)
 	_check("grain", "Плёночное зерно")
+	_check("immersive", "Погружение: без листа дел и подсказок (Tab — лист, J — дневник)")
 	_check("fullscreen", "Во весь экран")
 
 	var bar := HBoxContainer.new()
