@@ -381,6 +381,17 @@ func setup_hotbar(player: Player, with_icons := true) -> void:
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_theme_stylebox_override("panel", style)
 		bar.add_child(panel)
+		# Ячейка — потёртый металл ящика с инструментом, а не чёрный квадрат.
+		var tex_path := ProcTex.KIT + "textures/metal_dark.png"
+		if ResourceLoader.exists(tex_path):
+			var plate := TextureRect.new()
+			plate.texture = load(tex_path)
+			plate.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			plate.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+			plate.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			plate.modulate = Color(0.5, 0.47, 0.44, 0.92)
+			plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			panel.add_child(plate)
 		if not with_icons:
 			_slot_icons.append(Node3D.new())
 			var plain := Label.new()

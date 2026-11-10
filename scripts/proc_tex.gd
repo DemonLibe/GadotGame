@@ -205,6 +205,22 @@ static func kit(name: String, tint := Color.WHITE) -> StandardMaterial3D:
 	return _cache[key]
 
 
+## Простой материал с текстурой набора (не трипланарный — для мелких предметов и значков инвентаря).
+static func textured(name: String, tint := Color.WHITE, rough := 0.8, metal := 0.0) -> StandardMaterial3D:
+	var key := "tex_%s_%s" % [name, tint.to_html()]
+	if not _cache.has(key):
+		var m := StandardMaterial3D.new()
+		m.albedo_color = tint
+		m.roughness = rough
+		m.metallic = metal
+		var path := KIT + "textures/%s.png" % name
+		if ResourceLoader.exists(path):
+			m.albedo_texture = load(path)
+			m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		_cache[key] = m
+	return _cache[key]
+
+
 static func _kit_ok(name: String) -> bool:
 	return ResourceLoader.exists(KIT + "materials/triplanar/M_%s_tri.tres" % name)
 

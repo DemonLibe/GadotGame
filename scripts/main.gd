@@ -45,7 +45,7 @@ const NOTES := {
 		[-1, -1, -65.0, 1.4, "|||| |||| |||| ||"]],
 	4: [[-1, -1, -101.0, 1.7, "ОН СЧИТАЕТ\nТВОИ ШАГИ"],
 		[0, 1, 56.0, 1.7, "СМЕНА №7.\nНЕ ХОДИ\nЗА РЕШЁТКУ"],
-		[-3, 0, 40.0, 0.0, "НЕ СМОТРИ ВНИЗ"]],
+		[-3, 0, 4.0, 0.0, "НЕ СМОТРИ ВНИЗ"]],
 	5: [[-1, -1, -318.5, 1.8, "ТВОЯ СМЕНА"],
 		[-1, 1, -117.5, 1.7, "ОН УЖЕ ЗДЕСЬ"]],
 	6: [[-1, -1, -58.0, 1.7, "ВОСЬМОЙ ВЕРНУЛСЯ"]],
@@ -208,6 +208,7 @@ var doors: Array[RoomDoor] = []
 var _door_of := {}            # индекс комнаты → её дверь (у генераторных дверей нет)
 var generator: Generator      # главный — на станции
 var reserves: Array[Generator] = []  # резервные — в генераторных по тоннелю
+var _retry_top := false       # после падения в шахту смена начинается заново наверху, а не внизу
 var _net_seed := 0            # сеть тоннелей в эту смену (после провала — та же)
 var _net_fresh := false       # сеть только что собрана при загрузке — первой смене пересобирать не нужно
 var _budget := {}             # расходники и существа на смену (по размеру открытой сети)
@@ -371,7 +372,8 @@ func _process(delta: float) -> void:
 		return
 	# Сорвался в шахту.
 	if not player.climbing and player.velocity.y < -16.0:
-		fail_day("Ты сорвался в шахту.")
+		# Прыжок в шахту — не короткая дорога вниз: очнёшься наверху, и лезть придётся заново.
+		fail_day("Ты сорвался в шахту.", true)
 		return
 	# В браузере Esc снимает захват мыши сам — тогда ставим игру на паузу.
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not hud.is_shop_open():
@@ -940,7 +942,10 @@ func start_day(d: int, retry := false) -> void:
 	if not debug_flag("norooms"):
 		_setup_rooms(d)
 	_spawn_finds(d)
-	_spawn_threats(d, retry)
+	# Сорвался в шахту — повтор смены с самого верха: рация на столе, пистолет в ящике, лестница впереди.
+	var below := retry and not _retry_top
+	_retry_top = false
+	_spawn_threats(d, below)
 	_setup_lower(d, retry)
 	_spawn_lurkers(d)
 	_photo_changes(d)
@@ -976,7 +981,7 @@ func start_day(d: int, retry := false) -> void:
 		player.ammo = int(Game.gear.get("ammo", 6))
 		player.batteries = int(Game.gear.get("batteries", Player.MAX_BATTERIES))
 		player.battery = 100.0
-	if retry:
+	if below:
 		player.global_position = BOTTOM_SPAWN
 		player.rotation.y = 0.0
 		hatch.set_open(true)
@@ -1019,7 +1024,9 @@ func start_day(d: int, retry := false) -> void:
 		get_tree().create_timer(8.0).timeout.connect(func():
 			if Game.day == d and player.global_position.y > Level.ROOM_Y - 2.0:
 				phone.ring(PHONE_CALLS[d]))
-	if retry:
+	if retry and not below:
+		Game.say("Очнулся у люка. Как поднялся — не помню. Вниз — только по скобам.", Game.THOUGHT, 4.5)
+	elif retry:
 		Game.say("Снова внизу. Голова гудит. Ещё раз — и осторожнее.", Game.THOUGHT, 4.0)
 	elif not debug_flag("s_say"):
 		Game.say(DAY_THOUGHTS[d], Game.THOUGHT, 6.0)
@@ -1220,10 +1227,11 @@ func _update_lower() -> void:
 
 
 ## Смена провалена (сорвался, страх взял верх) — начинается заново. Игра всегда сложная.
-func fail_day(reason: String) -> void:
+func fail_day(reason: String, top := false) -> void:
 	if busy:
 		return
 	busy = true
+	_retry_top = top
 	player.input_locked = true
 	stalker.hide_now()
 	# Упал в старой линии с находками — вещмешок останется там же (линия после провала та же).
@@ -1231,7 +1239,8 @@ func fail_day(reason: String) -> void:
 		_lost = {"pos": Vector3(player.global_position.x, LowerLine.Y + 0.05, player.global_position.z), "amount": player.loot}
 	Game.play_ui(Sfx.sting(), 0.0)
 	await hud.fade_to(1.0, 0.5).finished
-	hud.show_title("СМЕНА ПРОВАЛЕНА", reason + "\n\nСмена начнётся заново — уже внизу.", 2.5)
+	hud.show_title("СМЕНА ПРОВАЛЕНА", reason + ("\n\nСмена начнётся заново — наверху, у люка." if _retry_top
+		else "\n\nСмена начнётся заново — уже внизу."), 2.5)
 	await get_tree().create_timer(4.0).timeout
 	start_day(Game.day, true)
 
