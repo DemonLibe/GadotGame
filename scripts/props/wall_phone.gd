@@ -65,6 +65,7 @@ func interact(_player) -> void:
 	var path := "res://voice/%s.ogg" % call[0]
 	if str(call[0]) != "" and ResourceLoader.exists(path):
 		_voice.stream = load(path)
+		_voice.pitch_scale = float(call[2]) if call.size() > 2 else 1.0
 		_voice.play()
 	else:
 		Game.play_ui(Sfx.whisper(), -10.0)

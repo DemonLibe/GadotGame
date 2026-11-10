@@ -72,6 +72,73 @@ func start_day(d: int) -> void:
 	if main.hud:
 		main.hud.set_map_fake({})
 	_last_pos = player.global_position if player else Vector3.ZERO
+	_duty_day = d
+	_duty_t = 0.0
+	_duty_step = 0
+	_phone_rang = false
+	if d >= 4 and d != Game.LAST_DAY - 1:
+		_duty_prints.call_deferred()
+
+
+# --- Дежурка больше не убежище ------------------------------------------------------
+
+var _duty_day := 0
+var _duty_t := 0.0
+var _duty_step := 0
+var _phone_rang := false
+
+
+## Наверху, до спуска: с третьей смены снизу стучат в крышку люка, с четвёртой — мокрые следы от люка
+## к шкафчику, с пятой — он стоит за спиной. А когда уже на лестнице — наверху звонит телефон.
+func _update_duty(delta: float) -> void:
+	var d := Game.day
+	var p := player.global_position
+	if d < 3 or d == Game.LAST_DAY - 1:
+		return
+	if p.y < Level.ROOM_Y - 2.0:
+		if d >= 4 and not _phone_rang and player.climbing and p.y < Level.ROOM_Y - 22.0 and p.y > Level.ROOM_Y - 40.0:
+			_phone_rang = true
+			var at := Vector3(Level.SHAFT_X + 3.45, Level.ROOM_Y + 1.45, Level.SHAFT_Z + 0.9)
+			for i in 4:
+				get_tree().create_timer(2.2 * i).timeout.connect(func(): Game.play_at(Sfx.phone(), at, 8.0))
+			Game.say_once("phone_above_%d" % d, "Наверху звонит телефон. Я уже на лестнице. Линия мёртвая. Он звонит.", Game.THOUGHT, 4.5)
+		return
+	_duty_t += delta
+	var hatch := Vector3(Level.SHAFT_X, Level.ROOM_Y, Level.SHAFT_Z)
+	if _duty_step == 0 and _duty_t > 9.0:
+		_duty_step = 1
+		for i in 3:
+			get_tree().create_timer(0.7 * i).timeout.connect(func(): play_earth(Sfx.knock(), hatch + Vector3(0, -1.5, 0), 8.0))
+		Game.add_fear(4.0)
+		Game.say_once("hatch_knock_%d" % d, "В крышку люка постучали. Снизу. Три раза. Я ещё не спускался.", Game.THOUGHT, 4.5)
+	if _duty_step == 1 and _duty_t > 17.0:
+		_duty_step = 2
+		if d >= 5 and not main.stalker.visible:
+			# За спиной, в самой дежурке. Обернёшься — никого.
+			var back := p - player.forward_flat() * 1.7
+			back.x = clampf(back.x, Level.SHAFT_X - 3.0, Level.SHAFT_X + 3.0)
+			back.z = clampf(back.z, Level.SHAFT_Z - 3.0, Level.SHAFT_Z + 3.0)
+			back.y = Level.ROOM_Y
+			if back.distance_to(hatch) > 1.6:
+				main.stalker.appear(back, "behind", 9.0)
+				play_earth(Sfx.breath(), back + Vector3(0, 1.6, 0), 6.0)
+
+
+## Мокрые босые следы от люка к шкафчику с фотографией Маши — кто-то уже поднимался.
+func _duty_prints() -> void:
+	var wet := ProcTex.flat(Color(0.05, 0.055, 0.06), 0.08, 0.2)
+	var from := Vector3(Level.SHAFT_X - 1.1, Level.ROOM_Y + 0.006, Level.SHAFT_Z + 0.3)
+	var to := Vector3(Level.SHAFT_X - 2.8, Level.ROOM_Y + 0.006, Level.SHAFT_Z + 1.7)
+	var dir := (to - from).normalized()
+	var across := Vector3(-dir.z, 0.0, dir.x)
+	var n := 7
+	for i in n:
+		var foot := from.lerp(to, float(i) / (n - 1)) + across * (0.11 if i % 2 == 0 else -0.11)
+		var m := Geo.box(main, foot, Vector3(0.11, 0.004, 0.27), wet, false, Basis(Vector3.UP, atan2(dir.x, dir.z)))
+		m.add_to_group("day_objects")
+	get_tree().create_timer(12.0).timeout.connect(func():
+		if player.global_position.y > Level.ROOM_Y - 2.0:
+			Game.say_once("duty_prints", "На линолеуме мокрые следы. От люка — к шкафчику, где фото Маши. Люк был закрыт.", Game.THOUGHT, 5.0))
 
 
 func _set_phase(p: String, t: float) -> void:
@@ -88,6 +155,7 @@ func _process(delta: float) -> void:
 	var below := p.y < Level.FLOOR_Y + 5.0 and not player.climbing
 	if not below or p.z > Level.TUN_Z0 - 2.0:
 		_last_pos = p
+		_update_duty(delta)
 		return
 	var in_old: bool = level.lower.contains(p)
 	var moved := Vector2(p.x - _last_pos.x, p.z - _last_pos.z).length()

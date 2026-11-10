@@ -83,6 +83,7 @@ var ran_today := false        # для достижения «Тихоня»
 var climbing := false
 var crouching := false
 var hiding := false          # сидит в шкафу
+var riding = null            # дрезина, на площадке которой стоит
 var holding_breath := false
 var canisters := 0
 var bolts := 0                # болты в кармане — бросить (G), чтобы отвлечь
@@ -451,6 +452,7 @@ func reset_for_day(pos: Vector3, yaw: float, start_battery: float) -> void:
 	health = HEALTH_MAX
 	crouching = false
 	hiding = false
+	riding = null
 	holding_breath = false
 	_hideout = null
 	canisters = 0
@@ -510,6 +512,9 @@ func _physics_process(delta: float) -> void:
 		return
 	if hiding:
 		_hide_update(delta)
+		return
+	if riding != null:
+		_ride_update(delta)
 		return
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
@@ -574,6 +579,35 @@ func _physics_process(delta: float) -> void:
 	var shake := pow(Game.fear / Achievements.fear_max(), 2.0) * 0.02 + extra_shake
 	camera.position = Vector3(cos(_bob) * 0.025, absf(sin(_bob)) * 0.04, 0) * _bob_amp \
 		+ Vector3(randf_range(-shake, shake), randf_range(-shake, shake), 0)
+
+
+# --- Дрезина ------------------------------------------------------------------
+
+## На площадке: стоишь на месте, W/S — качаешь рычаг (по взгляду / назад). Рычаг ест выносливость.
+func _ride_update(delta: float) -> void:
+	if not is_instance_valid(riding):
+		riding = null
+		return
+	velocity = Vector3.ZERO
+	crouching = false
+	global_position = riding.global_position + Vector3(0, 0.47, 0)
+	var push := 0.0
+	if not input_locked:
+		push = Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
+	var can := not _exhausted
+	if push != 0.0 and can:
+		stamina = maxf(0.0, stamina - riding.PUMP_STAMINA * delta)
+		_stamina_wait = STAMINA_DELAY
+		if stamina <= 0.0:
+			_exhausted = true
+			Game.say_once("pump_tired", "Руки не держат рычаг. Катится сама — пока катится.", Game.THOUGHT, 3.0)
+	else:
+		_stamina_wait -= delta
+		if _stamina_wait <= 0.0:
+			stamina = minf(STAMINA_MAX, stamina + STAMINA_REGEN * air_regen() * delta)
+			if stamina > STAMINA_MAX * 0.3:
+				_exhausted = false
+	riding.pump(push, forward_flat().z, delta, can)
 
 
 # --- Укрытие -----------------------------------------------------------------
@@ -810,6 +844,8 @@ func _update_interaction(delta: float) -> void:
 	var t = null
 	if hiding:
 		t = _hideout  # изнутри шкафа луч его не видит — выход по E всегда
+	elif riding != null:
+		t = riding
 	elif _ray.is_colliding():
 		t = _find_interactable(_ray.get_collider())
 	if _target != null and not is_instance_valid(_target):

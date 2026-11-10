@@ -22,6 +22,12 @@ const HUNT := {
 const CATCH_RANGE := 1.2
 ## Сколько он ищет того, кто спрятался в шкаф, прежде чем уйти.
 const HIDE_VANISH := 3.0
+## Он учится. Дважды пересидел в шкафу — в третий раз он подойдёт к дверце и будет слушать:
+## дышишь — вырвет дверцу. Прогонял светом — с каждым разом уходит из луча всё неохотнее.
+const LEARN_HIDE := 2
+const LISTEN_TIME := 5.0        # сколько стоит у дверцы и слушает
+const LISTEN_TOLERANCE := 1.2   # сколько секунд дыхания он простит
+const LEARN_LIGHT := 3          # после стольких раз свет его только замедляет
 
 var player: Player
 var level: Level
@@ -39,6 +45,8 @@ var _search := 0.0
 var _lit_hunt := 0.0
 var _player_hid := false  # за эту охоту обходчик прятался в шкафу
 var _hidden_t := 0.0
+var _listen := 0.0     # сколько уже слушает у шкафа
+var _heard := 0.0      # сколько секунд слышал дыхание
 var _growl_t := 0.0
 var _voice: AudioStreamPlayer3D
 
@@ -182,6 +190,8 @@ func hunt(pos: Vector3, day: int) -> void:
 	_lit_hunt = 0.0
 	_player_hid = false
 	_hidden_t = 0.0
+	_listen = 0.0
+	_heard = 0.0
 	_growl_t = randf_range(1.0, 2.5)
 	_anim.play(RUN)
 	_say(Sfx.stalker_roar())
@@ -257,7 +267,39 @@ func _hunt_update(delta: float) -> void:
 	to_player.y = 0.0
 	var dist := to_player.length()
 	# Спрятался в шкаф — не найдёт: постоит, поищет и уйдёт.
-	if player.hiding:
+	if player.hiding and int(Game.habit["hide"]) >= LEARN_HIDE:
+		# Он запомнил шкафы: идёт к дверце, встаёт вплотную и слушает.
+		_player_hid = true
+		_chasing = false
+		_goal = player.global_position
+		if dist < 2.4:
+			_listen += delta
+			if not player.holding_breath:
+				_heard += delta
+			if _listen < 0.1:
+				_say(Sfx.sniff())
+				Game.say_once("he_listens", "Он у дверцы. Не уходит. Слушает. Не дышать.", Game.THOUGHT, 3.5)
+			if _heard > LISTEN_TOLERANCE:
+				# Услышал: дверца настежь.
+				Game.play_at(Sfx.clank(), player.global_position + Vector3(0, 1.0, 0), 4.0)
+				player.exit_hide()
+				player.take_damage(35.0)
+				Game.add_fear(30.0)
+				Game.play_ui(Sfx.sting(), 0.0)
+				_say(Sfx.stalker_roar())
+				Game.say_once("he_found", "Он вырвал дверцу. Он знал, что я там. Шкаф больше не спасает — только если не дышать.", Game.THOUGHT, 5.0)
+				_chasing = true
+				_unseen = 0.0
+				_listen = 0.0
+				_heard = 0.0
+				return
+			if _listen > LISTEN_TIME:
+				_vanish(false)
+				return
+			_anim.play(IDLE, 0.3)
+			look_at(Vector3(player.global_position.x, global_position.y, player.global_position.z), Vector3.UP)
+			return
+	elif player.hiding:
 		_player_hid = true
 		_chasing = false
 		_hidden_t += delta
@@ -266,6 +308,7 @@ func _hunt_update(delta: float) -> void:
 			return
 	else:
 		_hidden_t = 0.0
+		_listen = 0.0
 	_growl_t -= delta
 	if _growl_t <= 0.0:
 		_growl_t = randf_range(3.0, 6.0)
@@ -276,9 +319,16 @@ func _hunt_update(delta: float) -> void:
 	var speed_k := 1.0
 	if lit:
 		_lit_hunt += delta
-		match str(_cfg["light"]):
+		var lights := int(Game.habit["light"])
+		var react := str(_cfg["light"])
+		if react == "flee" and lights >= LEARN_LIGHT:
+			react = "slow"  # привык: свет его уже не гонит
+		match react:
 			"flee":
-				if _lit_hunt > 0.6:
+				if _lit_hunt > 0.6 + lights * 0.7:
+					Game.habit["light"] = lights + 1
+					if lights + 1 == LEARN_LIGHT:
+						Game.write_foreign("Свет. Сначала больно. Потом привыкаешь.")
 					_vanish(true)
 					return
 			"slow":
@@ -363,5 +413,9 @@ func _catch() -> void:
 
 func _vanish(seen: bool) -> void:
 	var old := mode
+	if old == "hunt" and _player_hid and not seen:
+		Game.habit["hide"] = int(Game.habit["hide"]) + 1
+		if int(Game.habit["hide"]) == LEARN_HIDE:
+			Game.write_foreign("Шкаф. Опять шкаф. Я запомнил.")
 	hide_now()
 	vanished.emit(old, seen)

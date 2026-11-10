@@ -153,8 +153,13 @@ const NOTE_TEXTS := {
 
 ## Звонки на мёртвый телефон наверху: [id озвучки (голос Маши) или "", субтитр] — по одному на снятие трубки.
 const PHONE_CALLS := {
+	3: [["m_call", "…Папа?.. Папа, я здесь…"],
+		["", "…Гудки. Этого номера нет ни в одном справочнике. Откуда она его знает?"]],
 	5: [["m_phone_0", "Папа? Папа, ты где? Ты же дома... Я тебя вижу в окне. Ты стоишь во дворе и смотришь на меня."],
 		["", "…В трубке кто-то дышит. Медленно. В такт моему дыханию."]],
+	# Та же запись, что вчера, — слово в слово, только медленнее и ниже.
+	6: [["m_phone_0", "Папа? Папа, ты где? Ты же дома... Я тебя вижу в окне. Ты стоишь во дворе и смотришь на меня.", 0.8],
+		["", "…Слово в слово, как вчера. Те же паузы. Тот же вдох посередине. Это не она. Это запись."]],
 	7: [["m_phone_7", "Папа... Ты уже три дня дома. Но это не ты. Он не разговаривает. Он только смотрит."]],
 }
 
@@ -195,6 +200,8 @@ var radio: RadioSet
 var dispatcher: Dispatcher
 var ladder: Ladder
 var cart: Cart
+var trolley: Trolley
+var _smoke_bad := false
 var vents: Array[Vent] = []
 var crates: Array[FilterCrate] = []
 var doors: Array[RoomDoor] = []
@@ -740,6 +747,9 @@ func _spawn_props() -> void:
 
 	cart = Cart.new()
 	add_child(cart)
+	trolley = Trolley.new()
+	trolley.main = self
+	add_child(trolley)
 	generator = Generator.new()
 	generator.level = level
 	generator.position = Vector3(-2.4, Level.FLOOR_Y, -44.6)
@@ -893,6 +903,8 @@ func start_day(d: int, retry := false) -> void:
 	busy = true
 	collapsing = false
 	Game.shift_started_msec = Time.get_ticks_msec()
+	if not retry and d == 1:
+		Game.habit = {"hide": 0, "light": 0}  # новая игра — он ещё ничего о тебе не знает
 	if not retry:
 		Game.paid.clear()
 		Meta.new_shift()
@@ -940,6 +952,7 @@ func start_day(d: int, retry := false) -> void:
 	# На третий день вагонетка уезжает в тоннель сама.
 	if not debug_flag("s_misc"):
 		cart.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, -155.0 if d == 3 else -40.0)
+		trolley.reset()
 		level.set_grate_open(d == Game.FINAL_DAY or d == Game.LAST_DAY)
 		level.set_breach(d == Game.LAST_DAY)
 		level.tunnel_lights_off = d == Game.LAST_DAY
@@ -2233,6 +2246,21 @@ func _smoke_test() -> void:
 		for ev in ["footsteps", "sighting", "behind", "lamps", "whisper", "regrow", "interfere", "crawler", "hunt", "swarm",
 				"masha", "double", "silence", "picket", "name"]:
 			director._run(ev)
+		# Дрезина: встать, качнуть рычаг, проехать, сойти.
+		var before_ride := player.global_position
+		trolley.interact(player)
+		trolley.pump(1.0, -1.0, 1.0, true)
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+		var rode: bool = player.riding == trolley and trolley.position.z < Trolley.HOME_Z
+		trolley.speed = 0.0
+		trolley.interact(player)
+		if not rode or player.riding != null:
+			print("SMOKE FAIL: дрезина — ехал %s, сошёл %s" % [rode, player.riding == null])
+			_smoke_bad = true
+		player.global_position = before_ride
+		dread._duty_prints()
+		dread._update_duty(20.0)
 		# Страх между событиями: признаки всех уровней, кривая с пиком, потайная штольня, ложь схемы.
 		if d >= 2:
 			for lv in 3:
@@ -2540,10 +2568,23 @@ func _smoke_test() -> void:
 	var hide_cab: Hideout = get_tree().get_nodes_in_group("hideouts")[1]
 	player.global_position = hide_cab.global_position + Vector3(0, 0.1, 0)
 	hide_cab.interact(player)
+	Game.habit = {"hide": 0, "light": 0}
 	stalker.hunt(player.global_position + Vector3(0, 0, -10.0), 3)
 	await get_tree().create_timer(Stalker.HIDE_VANISH + 1.5).timeout
 	var hide_ok := player.hiding and not stalker.visible
-	hide_cab.interact(player)
+	# Он учится: после двух отсидок подходит к дверце и слушает. Дышишь — вырвет дверцу.
+	Game.habit["hide"] = Stalker.LEARN_HIDE
+	stalker.hunt(player.global_position + hide_cab.global_transform.basis.z * 1.5, 3)
+	await get_tree().create_timer(Stalker.LISTEN_TOLERANCE + 1.0).timeout
+	var learn_ok := not player.hiding and player.health < 100.0
+	if not learn_ok:
+		print("SMOKE FAIL: «Другой» не нашёл в шкафу того, кто дышит")
+	hide_ok = hide_ok and learn_ok
+	stalker.hide_now()
+	player.health = 100.0
+	Game.habit = {"hide": 0, "light": 0}
+	if player.hiding:
+		hide_cab.interact(player)
 	if not (retry_ok and hide_ok):
 		print("SMOKE FAIL: провал смены внизу — %s, шкаф от «Другого» — %s" % [retry_ok, hide_ok])
 	start_day(Game.FINAL_DAY)
@@ -2581,7 +2622,7 @@ func _smoke_test() -> void:
 			print("SMOKE FAIL: сеть %d — штолен %d, длина %d, сюжетных комнат %d, генераторных %d, вентблоков %d" % [k, prim, trunk,
 				stories.size(), level.gen_rooms.size(), VENT_SPOTS.size()])
 		net_ok = net_ok and good
-	var ok := Game.ended and retry_ok and hide_ok and shop_ok and low_ok and lis_ok and net_ok
+	var ok := Game.ended and retry_ok and hide_ok and shop_ok and low_ok and lis_ok and net_ok and not _smoke_bad
 	# Концовка 3: все записки, засов решётки изнутри.
 	start_day(5)
 	await get_tree().create_timer(5.5).timeout
