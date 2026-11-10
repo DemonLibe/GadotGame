@@ -105,21 +105,35 @@ func _process(delta: float) -> void:
 		if _hunt_t <= 0.0:
 			_hunt_t = _next_hunt(Game.day) if _hunt() else 5.0
 			return
-	_cooldown -= delta
-	if _cooldown > 0.0 or stalker.visible:
-		return
+	# Остальные события — не по таймеру: их вызывает кривая напряжения (Dread.peak) на вершине нарастания.
+
+
+## Вершина нарастания: одно событие из бюджета смены. false — ничего не вышло (тогда нарастание было ложным).
+func peak() -> bool:
+	if stalker.visible or _hunt_pending:
+		return false
 	var options: Array = []
 	for k in _budget:
 		if _budget[k] > 0:
 			options.append(k)
-	if options.is_empty():
-		return
-	var ev: String = options.pick_random()
-	if _run(ev):
-		_budget[ev] -= 1
-		_cooldown = randf_range(35.0, 60.0) - Game.day * 4.0
-	else:
-		_cooldown = 4.0
+	options.shuffle()
+	for ev in options:
+		if _run(ev):
+			_budget[ev] -= 1
+			return true
+	return false
+
+
+func budget_left() -> int:
+	var n := 0
+	for k in _budget:
+		n += int(_budget[k])
+	return n
+
+
+## Скоро охота «Другого» — нарастание тогда не начинаем, охота сама себе пик.
+func hunt_soon() -> bool:
+	return HUNT_EVERY.has(Game.day) and (_hunt_t < 25.0 or _hunt_pending or stalker.visible)
 
 
 ## Старая линия: шаги за спиной, шёпот и далёкий поезд, которого здесь быть не может.

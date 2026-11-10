@@ -188,6 +188,7 @@ var menu: Menu
 var stalker: Stalker
 var director: Director
 var horror: Horror
+var dread: Dread
 var journal: Journal
 var hatch: Hatch
 var radio: RadioSet
@@ -284,6 +285,12 @@ func _ready() -> void:
 	horror.player = player
 	horror.level = level
 	add_child(horror)
+	dread = Dread.new()
+	dread.main = self
+	dread.player = player
+	dread.level = level
+	dread.director = director
+	add_child(dread)
 
 	ambience = Ambience.new()
 	ambience.player = player
@@ -779,6 +786,8 @@ func _make_spots() -> void:
 		tunnels.append(i)
 	var vent_n := 2
 	for t in tunnels:
+		if t == level.hidden_branch:
+			continue  # в потайной штольне ничего не лежит и не висит
 		var length := level.tunnel_length(t)
 		var along := 6.0
 		var last_web := -100.0
@@ -899,6 +908,7 @@ func start_day(d: int, retry := false) -> void:
 		else:
 			_net_seed = randi()
 			_build_network(_net_seed)
+	level.set_hidden_open(false)
 	_budget = _make_budget(d)
 	if not debug_flag("s_tasks"):
 		Game.build_tasks(d)
@@ -973,6 +983,7 @@ func start_day(d: int, retry := false) -> void:
 	if not debug_flag("s_dir"):
 		director.start_day(d)
 		horror.start_day(d)
+		dread.start_day(d)
 	if not debug_flag("s_fade"):
 		hud.set_black()
 		hud.show_title("День %d" % d, DAY_SUBTITLES[d], 2.5)
@@ -1055,7 +1066,7 @@ func _setup_lower(d: int, retry: bool) -> void:
 		var r: Array = RELICS.pick_random()
 		var deep := float(lower.cells[c]["dist"]) / maxf(1.0, float(lower.cells[lower.goal]["dist"]))
 		_lower_pickup("relic", int(round(float(r[1]) * (0.7 + 0.8 * deep) / 5.0)) * 5, lower.floor_spot(c), r[0], "relic%d" % i)
-	for kind in ["bolts", "ammo"]:
+	for kind in ["bolts"]:
 		_lower_pickup(kind, 3, lower.floor_spot(lower.random_cell(2)), "", "free_" + kind)
 	if not _lost.is_empty():
 		_lower_pickup("bag", int(_lost["amount"]), _lost["pos"])
@@ -1128,7 +1139,7 @@ func _spawn_storerooms(d: int) -> void:
 		# Добыча — в глубине тупика.
 		var base := lower.center(c) + into * 0.6
 		var side := Vector3(into.z, 0.0, -into.x)
-		var loot := [["medkit", 1, ""], ["battery", 1, ""], ["ammo", 6, ""] if lower.rng.randf() < 0.5 else ["bolts", 4, ""],
+		var loot := [["medkit", 1, ""], ["battery", 1, ""], ["bolts", 4, ""],
 			["relic", 120 + 10 * lower.rng.randi_range(0, 4), "ящик с инструментом"]]
 		for k in loot.size():
 			var at := base + side * (-0.9 + 0.6 * k) + Vector3(0, 0.05, 0)
@@ -1474,7 +1485,7 @@ func _setup_vents_and_crates(d: int) -> void:
 	for i in range(1, crates.size()):
 		if _reachable(CRATE_SPOTS[i][0], CRATE_SPOTS[i][1]):
 			pool.append(crates[i])
-	var spare_f := need + 1 if need > 0 else 0
+	var spare_f := need  # запасных фильтров — ровно столько, сколько забито
 	var spare_b: int = _budget.get("batteries", 1)
 	if d == 1:
 		crates[0].set_contents(1, 1)
@@ -1624,6 +1635,13 @@ func _reachable(tunnel: int, along: float) -> bool:
 		return true
 	if tunnel == -1:
 		return along > day_limit() + 1.0
+	if tunnel == level.hidden_branch and not level.hidden_open:
+		return false
+	return Game.day >= BRANCH_OPEN_FROM and Level.branch_root_z(tunnel) > day_limit()
+
+
+## Развилка штольни открыта сегодня (без учёта того, есть ли сейчас потайная штольня).
+func _reachable_root(tunnel: int) -> bool:
 	return Game.day >= BRANCH_OPEN_FROM and Level.branch_root_z(tunnel) > day_limit()
 
 
@@ -1634,19 +1652,26 @@ func _setup_access(d: int) -> void:
 		var f := Fence.new()
 		f.position = Vector3(Level.TUN_CX, Level.FLOOR_Y, limit)
 		add_child(f)
-	var open: Array = []
 	for i in Level.BRANCHES.size():
-		if _reachable(i, 0.0):
-			open.append(i)
-		elif Level.branch_root_z(i) > limit and int(Level.BRANCHES[i]["parent"]) < 0:
+		if not _reachable(i, 0.0) and Level.branch_root_z(i) > limit and int(Level.BRANCHES[i]["parent"]) < 0 \
+				and i != level.hidden_branch:
 			var f := Fence.new()
 			f.position = level.floor_point(i, Level.JUNCTION_BRANCH + 1.0)
 			f.rotation.y = level.cross_yaw(i)
 			add_child(f)
+	refresh_map()
+
+
+## Схема: открытые штольни и комнаты (потайная штольня появляется на схеме, только когда она есть).
+func refresh_map() -> void:
+	var open: Array = []
+	for i in Level.BRANCHES.size():
+		if _reachable(i, 0.0):
+			open.append(i)
 	var rooms_open: Array = []
-	for r in ROOM_SCHEDULE.get(d, []):
+	for r in ROOM_SCHEDULE.get(Game.day, []):
 		rooms_open.append(level.story_rooms[r[0]])
-	hud.update_map(limit, open, rooms_open)
+	hud.update_map(day_limit(), open, rooms_open)
 
 
 ## Каждую смену открыты другие комнаты: в них останки и записки прежних обходчиков.
@@ -2106,21 +2131,21 @@ func _make_budget(d: int) -> Dictionary:
 	var shift := 240.0 + (trunk * 2.0 + branches * 1.2) / Player.WALK_SPEED * 0.7
 	var b := {"reach": reach, "f": f, "shift": shift}
 	# Дизель: главный горит всю смену; резервные — подмога на половину их бака. Канистра — 55 %.
-	var need := shift / Generator.BURN_TIME * 100.0 * 1.2
+	# Всё — впритык: без запаса. Кто тратит лишнее (гоняет дизель вхолостую, жжёт фонарь), тому не хватит.
+	var need := shift / Generator.BURN_TIME * 100.0
 	var reserve := 0.0
 	for g in reserves:
 		reserve += 20.0
 	b["canisters"] = 0 if d == Game.LAST_DAY or d < 1 else maxi(0, ceili((need - float(GEN_FUEL[d]) - reserve) / 55.0))
-	if d >= 2:
-		b["canisters"] = maxi(int(b["canisters"]), 1)  # хоть одна — на случай, если дизелю «помогут»
 	# Батарейки: фонарь садится за 5 минут; почти половину смены выручает ручка динамо и лампы.
 	var drain := 1.0 + (mini(d, Game.FINAL_DAY) - 1) * 0.15
-	b["batteries"] = Player.MAX_BATTERIES if d == Game.LAST_DAY - 1 else maxi(1, ceili(shift * drain / 300.0 * 0.45))
-	b["ammo"] = ceili(AMMO_BOXES_PER_DAY[d] * f) + (1 if AMMO_BOXES_PER_DAY[d] > 0 else 0)
-	b["bolts"] = ceili(BOLT_BOXES * f) + 1
+	b["batteries"] = Player.MAX_BATTERIES if d == Game.LAST_DAY - 1 else maxi(1, int(shift * drain / 300.0 * 0.35))
+	# Патроны — только по сюжету: в оружейном ящике и то, что собираешь в шестую смену на седьмую.
+	b["ammo"] = AMMO_BOXES_PER_DAY[d] if d == Game.LAST_DAY - 1 else 0
+	b["bolts"] = int(BOLT_BOXES * f)
 	b["creatures"] = int(round(CREATURES_PER_DAY[d] * f))
 	b["biters"] = int(round(BITERS_AT_START * f)) if d == Game.LAST_DAY else 0
-	b["medkits"] = int(reach / 800.0) if d >= 3 else 0
+	b["medkits"] = int(reach / 1400.0) if d >= 3 else 0
 	b["webs"] = int(round(WEBS_PER_DAY[mini(d, WEBS_PER_DAY.size() - 1)] * minf(f, 2.5)))
 	return b
 
@@ -2208,6 +2233,24 @@ func _smoke_test() -> void:
 		for ev in ["footsteps", "sighting", "behind", "lamps", "whisper", "regrow", "interfere", "crawler", "hunt", "swarm",
 				"masha", "double", "silence", "picket", "name"]:
 			director._run(ev)
+		# Страх между событиями: признаки всех уровней, кривая с пиком, потайная штольня, ложь схемы.
+		if d >= 2:
+			for lv in 3:
+				for k in 10:
+					dread._sign(lv, false)
+			dread._on_step()
+			dread._extra_step = true
+			dread._step_wait = 0.01
+			dread._update_steps(0.1)
+			dread._set_phase("build", 0.5)
+			dread._false = false
+			dread._update_curve(1.0, false)
+			level.set_hidden_open(true)
+			refresh_map()
+			level.set_hidden_open(false)
+			refresh_map()
+			hud.set_map_fake({"z": -200.0, "side": 1, "name": "ШТОЛЬНЯ 9"})
+			hud.set_map_fake({})
 		if PHONE_CALLS.has(d):
 			phone.ring(PHONE_CALLS[d])
 			phone.interact(player)

@@ -567,6 +567,11 @@ func set_map_visible(value: bool) -> void:
 
 
 ## Карта читает уровень и открытые сегодня участки.
+## Схема врёт: штольня, которой нет (пустой словарь — убрать).
+func set_map_fake(f: Dictionary) -> void:
+	_map.fake = f
+
+
 func setup_map(level: Level, who: Node3D) -> void:
 	_map.level = level
 	_map.player = who
