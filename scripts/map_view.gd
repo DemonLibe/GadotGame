@@ -14,6 +14,7 @@ var limit_z := -1000.0          # дальше по основному тонн�
 var open_branches: Array = []   # индексы открытых штолен
 var marks: Array = []           # места поручений: [позиция, подпись]
 var open_rooms: Array = []      # индексы открытых комнат
+var fake := {}                  # штольня, которая есть только на схеме: {z, side, name}
 var _view := Rect2()            # видимый кусок мира: x, z (верх листа — z_max)
 var _k := 1.0
 
@@ -98,6 +99,13 @@ func _draw() -> void:
 		var p := _to_map(Vector2(c.x, c.z))
 		draw_rect(Rect2(p - Vector2(5, 5), Vector2(10, 10)), INK, false, 1.5)
 		draw_string(font, p + Vector2(-3, 4), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK)
+	if not fake.is_empty():
+		var fo := Vector2(Level.TUN_CX, float(fake["z"]))
+		var fd := Vector2(sin(deg_to_rad(38.0)) * float(fake["side"]), -cos(deg_to_rad(38.0)))
+		var fa := _to_map(fo)
+		var fb := _to_map(fo + fd * 70.0)
+		draw_line(fa, fb, Color(INK, 0.75), w * 0.8)
+		draw_string(font, fb + Vector2(-20, 16), str(fake["name"]).to_lower(), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK)
 	for ri in level.gen_rooms:
 		var gc: Vector3 = level.rooms[ri]["center"]
 		var gp := _to_map(Vector2(gc.x, gc.z))

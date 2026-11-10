@@ -87,6 +87,9 @@ var _segments: Array[Dictionary] = []  # оси проходов {a, b, dir} в 
 var _holes := {}                # участки проходов, построенные через CSG: tunnel → [[от, до, сторона]]
 var net: Node3D                 # вся сеть тоннелей (пересобирается каждую смену)
 var net_seed := 0
+var hidden_branch := -1         # потайная штольня (индекс в BRANCHES) или -1
+var hidden_open := false
+var _plug: Node3D               # тюбинг, которым она «заложена», пока её нет
 var _into: Node3D               # куда сейчас строим: self (постоянное) или net
 var _static_lamps := 0
 var rng := RandomNumberGenerator.new()
@@ -147,6 +150,8 @@ func generate_network(seed_value: int) -> void:
 	gen_rooms.clear()
 	_segments.clear()
 	_holes.clear()
+	_plug = null
+	hidden_open = false
 	_plan()
 	_into = net
 	_build_main_tunnel()
@@ -241,9 +246,22 @@ func _plan() -> void:
 		prim.append(b)
 		segs.append([Vector2(o.x, o.z), Vector2(o.x, o.z) + Vector2(d.x, d.z) * (blen + 9.0), -1])
 	prim.sort_custom(func(a, b): return float(a["z"]) > float(b["z"]))
+	# Одна штольня — «потайная»: её то нет (сплошной тюбинг), то она есть. Не из первых трёх, без комнаты.
+	hidden_branch = -1
+	var cand: Array = []
+	for i in range(3, prim.size()):
+		cand.append(i)
+	if not cand.is_empty():
+		hidden_branch = cand[rng.randi_range(0, cand.size() - 1)]
+	var number := 1
 	for i in prim.size():
-		prim[i]["name"] = "ШТОЛЬНЯ %d" % (i + 1)
-		prim[i]["room"] = i < 3 or rng.randf() < 0.45
+		prim[i]["hidden"] = i == hidden_branch
+		if i == hidden_branch:
+			prim[i]["name"] = "ШТОЛЬНЯ"
+		else:
+			prim[i]["name"] = "ШТОЛЬНЯ %d" % number
+			number += 1
+		prim[i]["room"] = (i < 3 or rng.randf() < 0.45) and i != hidden_branch
 		prim[i]["kind"] = ROOM_KINDS[3 + i] if i < 3 else ROOM_KINDS[rng.randi_range(0, ROOM_KINDS.size() - 1)]
 		BRANCHES.append(prim[i])
 	segs = [segs[0]]
@@ -255,6 +273,8 @@ func _plan() -> void:
 	var letters := ["А", "Б", "В"]
 	for pi in prim.size():
 		var parent: Dictionary = BRANCHES[pi]
+		if parent.get("hidden", false):
+			continue
 		var used: Array = []
 		var count := 0
 		var tries := rng.randi_range(0, 2)
@@ -1033,6 +1053,13 @@ func _build_junction(index: int) -> void:
 		Vector3(chord, 0.3, JUNCTION_BRANCH), m_floor, true, Basis(Vector3.UP, _yaw_to(d)))
 	floor_b.name = "JunctionFloor%d" % index
 	var side: int = b["side"]
+	if b.get("hidden", false):
+		_build_plug(o, pd, side)
+		# В самом конце — мелом. Если дошёл.
+		var tr_end := wall_mount(index, -1, float(b["length"]) - 3.0, FLOOR_Y + 1.7)
+		var chalk := Geo.label(_into, tr_end.origin, "ТЫ ЕЁ\nВИДИШЬ?", 0.0, 72, Color(0.85, 0.83, 0.78, 0.85), true, 0.0035)
+		chalk.basis = tr_end.basis
+		return
 
 	# Указатель на противоположной стене перед развилкой и свет.
 	var word := "НАЛЕВО" if side < 0 else "НАПРАВО"
@@ -1045,6 +1072,71 @@ func _build_junction(index: int) -> void:
 	var l := Geo.label(_into, tr.origin + tr.basis.z * 0.02, "%s\n%s" % [b["name"], word], 0.0, 30 if parent < 0 else 26, Color(0.95, 0.95, 0.95), true)
 	l.basis = tr.basis
 	_add_lamp(o + pd * 2.0 + Vector3(0, TUBE_CY - FLOOR_Y + TUBE_R - 0.25, 0), Color(1.0, 0.72, 0.42), 1.1, 9.0, "ok" if parent < 0 else "flicker", true)
+
+
+## Заглушка потайной штольни: кусок стены трубы (тюбинг) поверх проёма и невидимая стена.
+func _build_plug(o: Vector3, pd: Vector3, side: int) -> void:
+	_plug = Node3D.new()
+	_plug.transform = Transform3D(Basis(Vector3.UP, _yaw_to(pd)), o + Vector3(0, TUBE_CY - FLOOR_Y, 0))
+	_into.add_child(_plug)
+	var a0 := -0.62 if side > 0 else PI - 1.35
+	var a1 := 1.35 if side > 0 else PI + 0.62
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var r := TUBE_R - 0.02
+	var steps := 14
+	for i in steps:
+		var b0 := lerpf(a0, a1, float(i) / steps)
+		var b1 := lerpf(a0, a1, float(i + 1) / steps)
+		var zf := JUNCTION_MAIN
+		var zt := -JUNCTION_MAIN
+		for q in [[b0, zf], [b1, zt], [b1, zf], [b0, zf], [b0, zt], [b1, zt]]:
+			var a: float = q[0]
+			var z: float = q[1]
+			st.set_normal(-Vector3(cos(a), sin(a), 0.0))
+			st.set_uv(Vector2(a * r / (TUBE_R * TAU / 8.0), -z))
+			st.add_vertex(Vector3(cos(a) * r, sin(a) * r, z))
+	st.generate_tangents()
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = m_tubbing
+	_plug.add_child(mi)
+	var body := StaticBody3D.new()
+	_plug.add_child(body)
+	Geo.collider_box(body, Vector3(0.3, 4.0, JUNCTION_MAIN * 2.0), Vector3(side * (TUN_HW + 0.15), 2.0 - (TUBE_CY - FLOOR_Y), 0))
+
+
+## Потайная штольня есть или её нет.
+func set_hidden_open(open: bool) -> void:
+	hidden_open = open
+	if _plug == null:
+		return
+	_plug.visible = not open
+	for body in _plug.find_children("*", "StaticBody3D", true, false):
+		(body as StaticBody3D).collision_layer = 0 if open else 1
+
+
+## Ближайшая к точке тоннельная лампа гаснет на seconds (с щелчком). Возвращает, нашлась ли.
+func flicker_lamp_near(at: Vector3, seconds: float, max_dist := 12.0) -> bool:
+	var best := {}
+	var best_d := max_dist
+	for i in range(_static_lamps, lamps.size()):
+		var l: Dictionary = lamps[i]
+		if l["mode"] == "broken" or l.get("off", false):
+			continue
+		var d := (l["light"] as OmniLight3D).global_position.distance_to(at)
+		if d < best_d:
+			best_d = d
+			best = l
+	if best.is_empty():
+		return false
+	best["off"] = true
+	Game.play_at(Sfx.click(), (best["light"] as OmniLight3D).global_position, -6.0)
+	var lamp := best
+	get_tree().create_timer(seconds).timeout.connect(func():
+		if is_instance_valid(lamp["light"]):
+			lamp["off"] = false)
+	return true
 
 
 # --- Служебные комнаты ------------------------------------------------------
