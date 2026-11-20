@@ -129,6 +129,10 @@ voice/          озвучка диспетчера и Маши
 | Двойник | [Universal Base Characters](https://quaternius.com) (Standard) | Quaternius | CC0 |
 | Таблетки | [Pills 3D models](https://opengameart.org/content/pills-3d-models) | mxc2 | CC0 |
 
+**Текстуры [ambientCG](https://ambientcg.com)** (`assets/hope_light_assets_extra/textures/acg_*`) — кладка, бетон, ржавчина, грунт и скала,
+плитка, штукатурка, полы, ткань и декали, уменьшенные до 128 px и приведённые к палитре игры (`tools/textures/import_ambientcg.py`).
+Лицензия — [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
+
 **Присланные автором проекта** (лицензия — та, под которой их скачали; в архивах её не было):
 мусор — Trash and Debris (`models/trash/`), скамья, урна, схема, плакаты и вагон метро — Metro PSX
 (`models/metro_psx/`), паук-охотник — Huntsman Spider (`models/huntsman/`).

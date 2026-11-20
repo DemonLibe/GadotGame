@@ -1,0 +1,12 @@
+[gd_resource type="StandardMaterial3D" load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/hope_light_assets_extra/textures/acg_leaking002.png" id="1_a"]
+
+[resource]
+resource_name = "M_acg_leaking002"
+transparency = 1
+cull_mode = 2
+shading_mode = 1
+albedo_texture = ExtResource("1_a")
+roughness = 0.68
+texture_filter = 2
