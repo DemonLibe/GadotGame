@@ -134,7 +134,7 @@ voice/          озвучка диспетчера и Маши
 | Таблетки | [Pills 3D models](https://opengameart.org/content/pills-3d-models) | mxc2 | CC0 |
 
 **Текстуры [ambientCG](https://ambientcg.com)** (`assets/hope_light_assets_extra/textures/acg_*`) — кладка, бетон, ржавчина, грунт и скала,
-плитка, штукатурка, полы, ткань и декали, уменьшенные до 128 px и приведённые к палитре игры (`tools/textures/import_ambientcg.py`).
+плитка, штукатурка, полы, ткань, крашеный металл, дерево, пластик, бумага и декали, уменьшенные до 128 px и приведённые к палитре игры (`tools/textures/import_ambientcg.py`).
 Лицензия — [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
 
 **Присланные автором проекта** (лицензия — та, под которой их скачали; в архивах её не было):

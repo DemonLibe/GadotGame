@@ -13,8 +13,8 @@ var _door: Node3D
 
 func _ready() -> void:
 	add_to_group("hideouts")
-	var steel := ProcTex.flat(Color(0.3, 0.33, 0.3), 0.6, 0.6)
-	var dark := ProcTex.flat(Color(0.05, 0.05, 0.05), 1.0)
+	var steel := ProcTex.item("dark_steel", Color.WHITE, 1)
+	var dark := ProcTex.item("rubber", Color.WHITE, 1)
 	# Стенки по отдельности — изнутри шкаф тоже должен быть виден.
 	var two_sided := steel.duplicate() as StandardMaterial3D
 	two_sided.cull_mode = BaseMaterial3D.CULL_DISABLED

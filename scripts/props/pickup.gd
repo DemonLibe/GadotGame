@@ -13,9 +13,9 @@ func _ready() -> void:
 	add_to_group("day_objects")
 	match kind:
 		"pistol":
-			var case := ProcTex.flat(Color(0.22, 0.26, 0.2), 0.7, 0.3)
+			var case := ProcTex.item("paint_green", Color(0.55, 0.62, 0.55), 4)
 			Geo.box(self, Vector3(0, 0.05, 0), Vector3(0.4, 0.1, 0.26), case, false)
-			Geo.box(self, Vector3(0, 0.105, 0), Vector3(0.36, 0.01, 0.22), ProcTex.flat(Color(0.1, 0.1, 0.1), 1.0), false)
+			Geo.box(self, Vector3(0, 0.105, 0), Vector3(0.36, 0.01, 0.22), ProcTex.item("rubber", Color.WHITE, 4), false)
 			# В ящике лежит настоящий пистолет (Pistol, loafbrr_1, CC0) — на боку, стволом вдоль ящика.
 			var skin := ProcTex.model_skin("res://models/items/pistol_albedo.png", Color(0.7, 0.7, 0.74), 0.4, 0.7)
 			Geo.model_fit(self, "res://models/items/pistol.glb", skin, 0.22, Vector3(0, 0.11, 0), Basis(Vector3.RIGHT, -PI / 2))
@@ -25,41 +25,41 @@ func _ready() -> void:
 				# Армейская канистра из набора ассетов.
 				ProcTex.kit_model(self, "common/fuel_canister", Vector3.ZERO, 0.0, false)
 			else:
-				var red := ProcTex.flat(Color(0.6, 0.08, 0.06), 0.5, 0.3)
+				var red := ProcTex.item("paint_red", Color(0.80, 0.72, 0.72), 4)
 				Geo.box(self, Vector3(0, 0.22, 0), Vector3(0.18, 0.44, 0.34), red, false)
 				Geo.box(self, Vector3(0, 0.47, 0.06), Vector3(0.04, 0.05, 0.16), red, false)
-				Geo.cylinder(self, Vector3(0, 0.48, -0.12), 0.03, 0.08, ProcTex.flat(Color(0.2, 0.2, 0.2), 0.5, 0.8))
+				Geo.cylinder(self, Vector3(0, 0.48, -0.12), 0.03, 0.08, ProcTex.item("dark_steel", Color.WHITE, 4))
 			Geo.collider_box(self, Vector3(0.3, 0.55, 0.4), Vector3(0, 0.27, 0))
 		"bolts":
 			# Горсть болтов в жестяной коробке.
-			var tin := ProcTex.flat(Color(0.3, 0.3, 0.28), 0.6, 0.6)
+			var tin := ProcTex.item("dark_steel", Color.WHITE, 4)
 			Geo.box(self, Vector3(0, 0.03, 0), Vector3(0.18, 0.06, 0.12), tin, false)
-			var steel := ProcTex.flat(Color(0.45, 0.45, 0.47), 0.4, 0.8)
+			var steel := ProcTex.item("steel", Color.WHITE, 4)
 			for k in 4:
 				Geo.cylinder(self, Vector3(-0.05 + k * 0.035, 0.07, randf_range(-0.03, 0.03)), 0.01, 0.08, steel, Basis(Vector3.RIGHT, PI / 2 + randf_range(-0.4, 0.4)))
 			Geo.collider_box(self, Vector3(0.3, 0.2, 0.25), Vector3(0, 0.1, 0))
 		"fuse":
 			# Керамический предохранитель с медными колпачками.
-			Geo.cylinder(self, Vector3(0, 0.03, 0), 0.025, 0.12, ProcTex.flat(Color(0.85, 0.82, 0.75), 0.6), Basis(Vector3.FORWARD, PI / 2))
+			Geo.cylinder(self, Vector3(0, 0.03, 0), 0.025, 0.12, ProcTex.item("paint_white", Color(0.90, 0.90, 0.85), 4), Basis(Vector3.FORWARD, PI / 2))
 			for x in [-0.065, 0.065]:
-				Geo.cylinder(self, Vector3(x, 0.03, 0), 0.028, 0.02, ProcTex.flat(Color(0.7, 0.45, 0.2), 0.35, 0.9), Basis(Vector3.FORWARD, PI / 2))
+				Geo.cylinder(self, Vector3(x, 0.03, 0), 0.028, 0.02, ProcTex.item("brass", Color.WHITE, 4), Basis(Vector3.FORWARD, PI / 2))
 			Geo.collider_box(self, Vector3(0.25, 0.15, 0.2), Vector3(0, 0.07, 0))
 		"relays":
 			# Ящик с тремя ретрансляторами.
-			Geo.box(self, Vector3(0, 0.12, 0), Vector3(0.5, 0.24, 0.35), ProcTex.flat(Color(0.2, 0.26, 0.2), 0.7, 0.2), false)
+			Geo.box(self, Vector3(0, 0.12, 0), Vector3(0.5, 0.24, 0.35), ProcTex.item("paint_green", Color(0.55, 0.62, 0.55), 4), false)
 			Geo.label(self, Vector3(0, 0.12, 0.176), "РЕТР. ×3", 0, 26, Color(0.9, 0.88, 0.7), true, 0.002)
 			for k in 3:
-				Geo.cylinder(self, Vector3(-0.12 + k * 0.12, 0.33, 0.0), 0.006, 0.2, ProcTex.flat(Color(0.05, 0.05, 0.05), 0.5))
+				Geo.cylinder(self, Vector3(-0.12 + k * 0.12, 0.33, 0.0), 0.006, 0.2, ProcTex.item("rubber", Color.WHITE, 4))
 			Geo.collider_box(self, Vector3(0.55, 0.35, 0.4), Vector3(0, 0.17, 0))
 		"relic":
 			_relic_model()
 		"key":
 			# Старый ключ на кольце с жестяной биркой «С-N».
-			var iron := ProcTex.flat(Color(0.32, 0.26, 0.18), 0.6, 0.7)
+			var iron := ProcTex.item("iron", Color.WHITE, 4)
 			Geo.cylinder(self, Vector3(0, 0.01, 0), 0.035, 0.008, iron)
 			Geo.box(self, Vector3(0.08, 0.01, 0), Vector3(0.11, 0.012, 0.016), iron, false)
 			Geo.box(self, Vector3(0.13, 0.01, 0.015), Vector3(0.02, 0.012, 0.03), iron, false)
-			Geo.box(self, Vector3(-0.06, 0.006, 0.03), Vector3(0.05, 0.003, 0.035), ProcTex.flat(Color(0.75, 0.72, 0.6), 0.5, 0.6), false)
+			Geo.box(self, Vector3(-0.06, 0.006, 0.03), Vector3(0.05, 0.003, 0.035), ProcTex.item("steel_light", Color.WHITE, 4), false)
 			Geo.collider_box(self, Vector3(0.3, 0.12, 0.25), Vector3(0, 0.05, 0))
 		"medkit":
 			if ResourceLoader.exists(ProcTex.KIT + "models/01_duty_room/first_aid_box.glb"):
@@ -67,25 +67,25 @@ func _ready() -> void:
 				box.rotation.x = -PI / 2
 				box.position.y = 0.07
 			else:
-				Geo.box(self, Vector3(0, 0.07, 0), Vector3(0.35, 0.14, 0.3), ProcTex.flat(Color(0.85, 0.85, 0.8), 0.6), false)
+				Geo.box(self, Vector3(0, 0.07, 0), Vector3(0.35, 0.14, 0.3), ProcTex.item("firstaid", Color.WHITE, 3), false)
 			Geo.collider_box(self, Vector3(0.4, 0.2, 0.4), Vector3(0, 0.1, 0))
 		"battery":
 			Geo.model_fit(self, "res://models/items/battery.glb", ProcTex.model_skin("res://models/items/survival_palette.png", Color(0.85, 0.85, 0.85), 0.5, 0.2), 0.12, Vector3(0, 0.02, 0), Basis(Vector3.FORWARD, PI / 2))
 			Geo.collider_box(self, Vector3(0.25, 0.15, 0.25), Vector3(0, 0.06, 0))
 		"bag":
 			# Свой же вещмешок — там, где упал в прошлый раз.
-			var cloth := ProcTex.flat(Color(0.24, 0.24, 0.17), 0.95)
+			var cloth := ProcTex.item("canvas", Color(0.75, 0.75, 0.65), 4)
 			Geo.box(self, Vector3(0, 0.14, 0), Vector3(0.4, 0.28, 0.26), cloth, false)
 			Geo.box(self, Vector3(0, 0.3, 0), Vector3(0.3, 0.06, 0.2), cloth, false)
-			Geo.box(self, Vector3(0, 0.2, 0.135), Vector3(0.22, 0.12, 0.02), ProcTex.flat(Color(0.2, 0.19, 0.13), 0.95), false)
+			Geo.box(self, Vector3(0, 0.2, 0.135), Vector3(0.22, 0.12, 0.02), ProcTex.item("canvas", Color(0.45, 0.44, 0.35), 5), false)
 			Geo.collider_box(self, Vector3(0.45, 0.35, 0.3), Vector3(0, 0.17, 0))
 		"token":
-			var brass := ProcTex.flat(Color(0.7, 0.55, 0.25), 0.35, 0.9)
+			var brass := ProcTex.item("brass", Color.WHITE, 4)
 			Geo.cylinder(self, Vector3(0, 0.005, 0), 0.035, 0.006, brass)
-			Geo.box(self, Vector3(0.05, 0.003, 0), Vector3(0.06, 0.002, 0.004), ProcTex.flat(Color(0.3, 0.3, 0.3), 0.6, 0.8), false)
+			Geo.box(self, Vector3(0.05, 0.003, 0), Vector3(0.06, 0.002, 0.004), ProcTex.item("dark_steel", Color.WHITE, 4), false)
 			Geo.collider_box(self, Vector3(0.25, 0.1, 0.25), Vector3(0, 0.05, 0))
 		_:
-			var box := ProcTex.flat(Color(0.3, 0.35, 0.2), 0.8)
+			var box := ProcTex.item("paint_green", Color(0.55, 0.62, 0.55), 4)
 			Geo.box(self, Vector3(0, 0.05, 0), Vector3(0.16, 0.1, 0.1), box, false)
 			Geo.label(self, Vector3(0, 0.05, 0.051), "9×18", 0, 18, Color(0.9, 0.85, 0.6), true, 0.002)
 			Geo.collider_box(self, Vector3(0.3, 0.2, 0.3), Vector3(0, 0.1, 0))
@@ -93,14 +93,14 @@ func _ready() -> void:
 
 ## Находки старой линии: монета, подстаканник, фонарь, табличка — по названию.
 func _relic_model() -> void:
-	var brass := ProcTex.flat(Color(0.62, 0.48, 0.22), 0.35, 0.9)
-	var silver := ProcTex.flat(Color(0.7, 0.7, 0.72), 0.3, 0.9)
+	var brass := ProcTex.item("brass", Color.WHITE, 4)
+	var silver := ProcTex.item("steel_light", Color.WHITE, 4)
 	var glow := ProcTex.emissive(Color(1.0, 0.8, 0.4), 0.6)
 	if title.contains("ящик"):
 		# Красный ящик с инструментом, ручка сверху.
-		var red := ProcTex.flat(Color(0.5, 0.1, 0.07), 0.6, 0.3)
+		var red := ProcTex.item("paint_red", Color(0.80, 0.72, 0.72), 4)
 		Geo.box(self, Vector3(0, 0.09, 0), Vector3(0.45, 0.18, 0.2), red, false)
-		Geo.box(self, Vector3(0, 0.2, 0), Vector3(0.22, 0.03, 0.03), ProcTex.flat(Color(0.15, 0.15, 0.15), 0.5, 0.6), false)
+		Geo.box(self, Vector3(0, 0.2, 0), Vector3(0.22, 0.03, 0.03), ProcTex.item("dark_steel", Color.WHITE, 4), false)
 	elif title.contains("монет"):
 		for k in 3:
 			Geo.cylinder(self, Vector3(randf_range(-0.05, 0.05), 0.004 + k * 0.007, randf_range(-0.05, 0.05)), 0.03, 0.006, silver)
@@ -112,7 +112,7 @@ func _relic_model() -> void:
 		Geo.cylinder(self, Vector3(0, 0.12, 0), 0.045, 0.12, ProcTex.flat(Color(0.5, 0.45, 0.3), 0.2, 0.0))
 		Geo.box(self, Vector3(0, 0.25, 0), Vector3(0.02, 0.06, 0.02), brass, false)
 	elif title.contains("табличк"):
-		Geo.box(self, Vector3(0, 0.01, 0), Vector3(0.3, 0.012, 0.12), ProcTex.flat(Color(0.12, 0.2, 0.4), 0.6, 0.3), false)
+		Geo.box(self, Vector3(0, 0.01, 0), Vector3(0.3, 0.012, 0.12), ProcTex.item("paint_blue", Color(0.70, 0.72, 0.80), 4), false)
 		var plate := Geo.label(self, Vector3(0, 0.018, 0), "ТИХАЯ", 0, 24, Color(0.9, 0.88, 0.8), true, 0.002)
 		plate.rotation.x = -PI / 2
 	else:

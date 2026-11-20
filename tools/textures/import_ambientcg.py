@@ -34,6 +34,13 @@ THEMES = {
                  "DiamondPlate008C", "DiamondPlate006C", "MetalWalkway013", "MetalWalkway006"],
     "cloth":    ["Leather026", "Leather030", "Leather014", "Leather011", "Fabric026", "Fabric028", "Fabric030", "Fabric045", "Chainmail004", "Net004A"],
 }
+# предметы: металлы, крашеный металл, дерево, пластик, резина, бумага — для pickup, генератора, вентблоков, ящиков и т. п.
+ITEMS = ["Metal046A", "Metal046B", "Metal009", "Metal010", "Metal029", "Metal032", "Metal038", "Metal048B", "Metal047A", "Metal055A", "Metal049A", "Metal021",
+         "PaintedMetal001", "PaintedMetal004", "PaintedMetal006", "PaintedMetal016", "PaintedMetal002", "PaintedMetal012", "PaintedMetal017",
+         "PaintedMetal018", "PaintedMetal007", "PaintedMetal008",
+         "Wood051", "Wood027", "Wood028", "Wood060", "Wood062", "Wood066", "Planks037A", "Planks023A", "Planks014", "Planks020",
+         "Plastic006", "Plastic011", "Plastic003", "Plastic009", "Plastic007", "Rubber004", "Rubber001",
+         "Paper001", "Paper005", "Paper006", "Cardboard002", "Cardboard001"]
 DECALS = ["Leaking001", "Leaking002", "Leaking003", "Leaking004", "Leaking005", "Leaking006", "Leaking007", "Leaking008", "Leaking009", "Rust001", "Grate002"]
 UA = {"User-Agent": "Mozilla/5.0"}
 
@@ -135,6 +142,7 @@ def main():
     todo = []
     for theme, ids in THEMES.items():
         todo += [(i, False) for i in ids]
+    todo += [(i, False) for i in ITEMS]
     todo += [(i, True) for i in DECALS]
     seen = set()
     for i, dec in todo:
@@ -147,6 +155,7 @@ def main():
             print("%-22s ОШИБКА %s" % (i, e), flush=True)
     themes = {k: ["acg_" + i.lower() for i in v] for k, v in THEMES.items()}
     themes["decals"] = ["acg_" + i.lower() for i in DECALS]
+    themes["items"] = ["acg_" + i.lower() for i in ITEMS]
     json.dump(themes, open(os.path.join(KIT, "textures", "acg_themes.json"), "w"), indent=1)
 
 

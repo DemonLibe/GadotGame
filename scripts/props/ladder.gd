@@ -32,7 +32,7 @@ func setup(x: float, wall_z: float, side: float, bottom: float, top: float, exit
 func _ready() -> void:
 	collision_layer = 2
 	collision_mask = 0
-	var steel := ProcTex.flat(Color(0.3, 0.3, 0.32), 0.5, 0.8)
+	var steel := ProcTex.item("dark_steel", Color.WHITE, 2)
 	var rz := _wall_z + away * 0.15
 	var rung := BoxMesh.new()
 	rung.size = Vector3(0.5, 0.035, 0.035)

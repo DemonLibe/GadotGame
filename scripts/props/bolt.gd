@@ -15,7 +15,7 @@ func _ready() -> void:
 	mass = 0.3
 	contact_monitor = true
 	max_contacts_reported = 1
-	var steel := ProcTex.flat(Color(0.4, 0.4, 0.42), 0.45, 0.8)
+	var steel := ProcTex.item("steel", Color.WHITE, 8)
 	Geo.cylinder(self, Vector3.ZERO, 0.012, 0.09, steel)
 	Geo.cylinder(self, Vector3(0, 0.04, 0), 0.022, 0.015, steel)
 	var shape := CollisionShape3D.new()

@@ -13,7 +13,7 @@ func _ready() -> void:
 	var plate := ProcTex.plate()
 	Geo.box(self, Vector3(0, 0.03, Level.SHAFT_HALF), Vector3(1.86, 0.06, 1.86), plate, false)
 	# Ручка и петли.
-	var dark := ProcTex.flat(Color(0.15, 0.15, 0.16), 0.5, 0.8)
+	var dark := ProcTex.item("dark_steel", Color.WHITE, 2)
 	Geo.cylinder(self, Vector3(0, 0.09, 1.55), 0.02, 0.4, dark, Basis(Vector3.FORWARD, PI / 2))
 	Geo.box(self, Vector3(-0.6, 0.07, 0.05), Vector3(0.2, 0.05, 0.12), dark, false)
 	Geo.box(self, Vector3(0.6, 0.07, 0.05), Vector3(0.2, 0.05, 0.12), dark, false)

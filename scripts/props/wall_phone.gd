@@ -12,9 +12,9 @@ var _voice: AudioStreamPlayer
 
 
 func _ready() -> void:
-	var bakelite := ProcTex.flat(Color(0.08, 0.07, 0.06), 0.35, 0.1)
+	var bakelite := ProcTex.item("bakelite", Color.WHITE, 5)
 	Geo.box(self, Vector3(0, 0, 0.05), Vector3(0.2, 0.26, 0.1), bakelite, false)
-	Geo.cylinder(self, Vector3(0, 0.0, 0.105), 0.06, 0.01, ProcTex.flat(Color(0.8, 0.78, 0.7), 0.6), Basis(Vector3.RIGHT, PI / 2))
+	Geo.cylinder(self, Vector3(0, 0.0, 0.105), 0.06, 0.01, ProcTex.item("paint_white", Color(0.90, 0.90, 0.85), 5), Basis(Vector3.RIGHT, PI / 2))
 	Geo.capsule(self, Vector3(0, 0.17, 0.08), 0.03, 0.26, bakelite, Basis(Vector3.FORWARD, PI / 2))
 	Geo.cylinder(self, Vector3(0.08, -0.25, 0.04), 0.008, 0.3, bakelite)
 	Geo.collider_box(self, Vector3(0.3, 0.45, 0.2), Vector3(0, 0, 0.08))

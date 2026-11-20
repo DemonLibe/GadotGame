@@ -17,7 +17,7 @@ func _ready() -> void:
 		var door := ProcTex.kit_model(self, "06_old_line/iron_grate_door")
 		_gate = door.find_child("Gate", true, false) as Node3D
 	else:
-		var rust := ProcTex.flat(Color(0.3, 0.17, 0.1), 0.85, 0.5)
+		var rust := ProcTex.item("rust", Color.WHITE, 1.5)
 		_gate = Node3D.new()
 		_gate.position = Vector3(-0.75, 0, 0)
 		add_child(_gate)

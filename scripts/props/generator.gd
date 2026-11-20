@@ -27,9 +27,9 @@ var _body: Node3D
 
 func _ready() -> void:
 	add_to_group("generators")
-	var yellow := ProcTex.flat(Color(0.62, 0.48, 0.12), 0.6, 0.4)
-	var dark := ProcTex.flat(Color(0.08, 0.08, 0.08), 0.8)
-	var steel := ProcTex.flat(Color(0.3, 0.31, 0.3), 0.5, 0.7)
+	var yellow := ProcTex.item("paint_yellow", Color(0.56, 0.52, 0.38), 4.5)
+	var dark := ProcTex.item("rubber", Color.WHITE, 2)
+	var steel := ProcTex.item("dark_steel", Color.WHITE, 2)
 	# Рама на полозьях.
 	Geo.box(self, Vector3(-0.42, 0.04, 0), Vector3(0.08, 0.08, 1.1), steel, false)
 	Geo.box(self, Vector3(0.42, 0.04, 0), Vector3(0.08, 0.08, 1.1), steel, false)
@@ -43,11 +43,11 @@ func _ready() -> void:
 		Geo.box(_body, Vector3(0, 0.25 + i * 0.07, -0.41), Vector3(0.7, 0.025, 0.02), dark, false)
 	# Панель: стрелка топлива, лампа, ручка стартера.
 	Geo.box(_body, Vector3(0, 0.55, 0.505), Vector3(0.5, 0.3, 0.02), dark, false)
-	Geo.cylinder(_body, Vector3(-0.12, 0.58, 0.52), 0.07, 0.01, ProcTex.flat(Color(0.85, 0.82, 0.7), 0.6), Basis(Vector3.RIGHT, PI / 2))
+	Geo.cylinder(_body, Vector3(-0.12, 0.58, 0.52), 0.07, 0.01, ProcTex.item("paper", Color(0.85, 0.82, 0.70), 2), Basis(Vector3.RIGHT, PI / 2))
 	_gauge = Node3D.new()
 	_gauge.position = Vector3(-0.12, 0.58, 0.53)
 	_body.add_child(_gauge)
-	Geo.box(_gauge, Vector3(0, 0.03, 0), Vector3(0.008, 0.06, 0.004), ProcTex.flat(Color(0.7, 0.1, 0.05), 0.6), false)
+	Geo.box(_gauge, Vector3(0, 0.03, 0), Vector3(0.008, 0.06, 0.004), ProcTex.item("paint_red", Color(0.80, 0.72, 0.72), 2), false)
 	_lamp_mat = ProcTex.emissive(Color(1.0, 0.2, 0.1), 2.0)
 	Geo.sphere(_body, Vector3(0.12, 0.62, 0.52), 0.025, _lamp_mat)
 	Geo.box(_body, Vector3(0.12, 0.48, 0.53), Vector3(0.1, 0.03, 0.03), dark, false)

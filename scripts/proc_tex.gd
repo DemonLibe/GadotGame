@@ -55,6 +55,46 @@ static func flat(color: Color, roughness := 0.8, metallic := 0.0) -> StandardMat
 	return m
 
 
+## Материалы предметов: что вместо плоского цвета (ambientCG, набор в textures/acg_*).
+const ITEM_TEX := {
+	"steel": "acg_metal046a", "steel_light": "acg_metal009", "steel_brushed": "acg_metal010", "dark_steel": "acg_metal029",
+	"blue_steel": "acg_metal032", "worn_steel": "acg_metal021", "chrome": "acg_metal049a", "brass": "acg_metal048b",
+	"copper": "acg_metal047a", "iron": "acg_metal046b", "rust": "acg_rust002", "rust2": "acg_metal025",
+	"paint_yellow": "acg_paintedmetal001", "paint_red": "acg_paintedmetal004", "paint_green": "acg_paintedmetal006",
+	"paint_blue": "acg_paintedmetal002", "paint_white": "acg_paintedmetal012", "paint_orange": "acg_paintedmetal008",
+	"hazard": "acg_paintedmetal016", "danger": "acg_paintedmetal017", "firstaid": "acg_paintedmetal018",
+	"wood_dark": "acg_wood051", "wood_black": "acg_wood028", "wood_gray": "acg_wood062", "planks": "acg_planks037a", "planks_gray": "acg_planks023a",
+	"plastic_black": "acg_plastic006", "plastic_dark": "acg_plastic011", "bakelite": "acg_plastic003", "plastic_green": "acg_plastic009",
+	"plastic_red": "acg_plastic007", "rubber": "acg_rubber004",
+	"paper": "acg_paper001", "paper_old": "acg_paper005", "cardboard": "acg_cardboard002", "cardboard_worn": "acg_cardboard001",
+	"leather": "acg_leather030", "cloth": "acg_fabric030", "canvas": "acg_fabric028",
+}
+
+
+## Материал предмета: текстура с картой нормалей и шероховатостью, ложится на предмет «по объекту» (uv — тайлов на метр,
+## чем мельче предмет, тем больше). tint — подкрасить; rough / metal — если надо переопределить.
+static func item(kind: String, tint := Color.WHITE, uv := 3.0, rough := -1.0, metal := -1.0) -> StandardMaterial3D:
+	var key := "item_%s_%s_%.1f_%.2f_%.2f" % [kind, tint.to_html(), uv, rough, metal]
+	if _cache.has(key):
+		return _cache[key]
+	var path := KIT + "materials/M_%s.tres" % ITEM_TEX.get(kind, "")
+	var m: StandardMaterial3D
+	if ITEM_TEX.has(kind) and ResourceLoader.exists(path):
+		m = (load(path) as StandardMaterial3D).duplicate()
+		m.uv1_triplanar = true
+		m.uv1_world_triplanar = false
+		m.uv1_scale = Vector3.ONE * uv
+		m.albedo_color = tint
+		if rough >= 0.0:
+			m.roughness = rough
+		if metal >= 0.0:
+			m.metallic = metal
+	else:
+		m = flat(tint, maxf(rough, 0.8), maxf(metal, 0.0))
+	_cache[key] = m
+	return m
+
+
 static func emissive(color: Color, energy := 2.0) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color

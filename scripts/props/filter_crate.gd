@@ -9,16 +9,16 @@ var _battery_meshes: Array[Node3D] = []
 
 
 func _ready() -> void:
-	var wood := ProcTex.flat(Color(0.32, 0.23, 0.14), 0.9)
+	var wood := ProcTex.item("planks", Color.WHITE, 2.5)
 	Geo.box(self, Vector3(0, 0.05, 0), Vector3(0.7, 0.1, 0.5), wood, false)
 	Geo.box(self, Vector3(-0.335, 0.25, 0), Vector3(0.03, 0.5, 0.5), wood, false)
 	Geo.box(self, Vector3(0.335, 0.25, 0), Vector3(0.03, 0.5, 0.5), wood, false)
 	Geo.box(self, Vector3(0, 0.25, -0.235), Vector3(0.7, 0.5, 0.03), wood, false)
 	Geo.box(self, Vector3(0, 0.25, 0.235), Vector3(0.7, 0.5, 0.03), wood, false)
-	var white := ProcTex.flat(Color(0.88, 0.88, 0.82), 0.95)
+	var white := ProcTex.item("paper_old", Color(0.98, 0.98, 0.91), 2.5)
 	for i in 3:
 		_filter_meshes.append(Geo.box(self, Vector3(-0.22 + i * 0.16, 0.22, -0.05), Vector3(0.13, 0.24, 0.3), white, false))
-	var cell := ProcTex.flat(Color(0.15, 0.15, 0.15), 0.5, 0.3)
+	var cell := ProcTex.item("plastic_dark", Color.WHITE, 2.5)
 	for i in 2:
 		_battery_meshes.append(Geo.box(self, Vector3(0.24, 0.16, -0.12 + i * 0.12), Vector3(0.06, 0.12, 0.06), cell, false))
 	Geo.label(self, Vector3(0, 0.3, 0.252), "ЗАПАС", 0, 26, Color(0.9, 0.85, 0.7), true)

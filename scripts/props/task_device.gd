@@ -28,8 +28,8 @@ var _wheel: Node3D
 
 func _ready() -> void:
 	add_to_group("day_objects")
-	var dark := ProcTex.flat(Color(0.06, 0.06, 0.06), 0.8)
-	var steel := ProcTex.flat(Color(0.32, 0.33, 0.32), 0.5, 0.7)
+	var dark := ProcTex.item("rubber", Color.WHITE, 3)
+	var steel := ProcTex.item("dark_steel", Color.WHITE, 3)
 	_sound = AudioStreamPlayer3D.new()
 	_sound.unit_size = 3.0
 	add_child(_sound)
@@ -41,7 +41,7 @@ func _ready() -> void:
 			var cable := Geo.cylinder(self, Vector3(0.05, -0.35, 0.14), 0.02, 0.45, dark)
 			cable.rotation.z = 0.35
 			Geo.cylinder(self, Vector3(0.2, -0.62, 0.14), 0.02, 0.2, dark, Basis(Vector3.FORWARD, 1.2))
-			Geo.sphere(self, Vector3(0.12, -0.56, 0.14), 0.03, ProcTex.flat(Color(0.75, 0.45, 0.15), 0.4, 0.9))
+			Geo.sphere(self, Vector3(0.12, -0.56, 0.14), 0.03, ProcTex.item("brass", Color.WHITE, 3))
 			_sparks = CPUParticles3D.new()
 			_sparks.amount = 24
 			_sparks.lifetime = 0.5
@@ -67,15 +67,15 @@ func _ready() -> void:
 			_sound.stream = Sfx.sparks()
 			Geo.collider_box(self, Vector3(0.5, 0.9, 0.3), Vector3(0, -0.3, 0.1))
 		"sensor":
-			Geo.box(self, Vector3(0, 0, 0.05), Vector3(0.28, 0.36, 0.1), ProcTex.flat(Color(0.75, 0.73, 0.65), 0.6), false)
-			Geo.sphere(self, Vector3(0, 0.08, 0.1), 0.05, ProcTex.flat(Color(0.1, 0.1, 0.12), 0.2, 0.3))
+			Geo.box(self, Vector3(0, 0, 0.05), Vector3(0.28, 0.36, 0.1), ProcTex.item("paint_white", Color(0.90, 0.90, 0.85), 3), false)
+			Geo.sphere(self, Vector3(0, 0.08, 0.1), 0.05, ProcTex.item("bakelite", Color.WHITE, 3))
 			_led = ProcTex.emissive(Color(1.0, 0.15, 0.1), 3.0)
 			Geo.sphere(self, Vector3(0.09, -0.12, 0.1), 0.012, _led)
 			Geo.label(self, Vector3(0, 0.25, 0.101), "ДД-3  ПИКЕТ 3", 0, 18, Color(0.2, 0.2, 0.2), true, 0.0018)
 			_screen = Geo.label(self, Vector3(-0.03, -0.1, 0.101), "ОШИБКА", 0, 18, Color(1.0, 0.3, 0.2), false, 0.0018)
 			Geo.collider_box(self, Vector3(0.35, 0.45, 0.15), Vector3(0, 0, 0.07))
 		"pump":
-			var green := ProcTex.flat(Color(0.2, 0.32, 0.25), 0.6, 0.4)
+			var green := ProcTex.item("paint_green", Color(0.55, 0.62, 0.55), 3)
 			Geo.box(self, Vector3(0, 0.3, 0), Vector3(0.6, 0.6, 0.5), green, false)
 			Geo.cylinder(self, Vector3(0, 0.72, 0), 0.16, 0.25, steel)
 			Geo.cylinder(self, Vector3(0.35, 0.15, 0), 0.07, 0.3, dark, Basis(Vector3.FORWARD, PI / 2))
@@ -90,7 +90,7 @@ func _ready() -> void:
 		"fuse":
 			# Серый щиток с дверцей; красный огонёк — выбит.
 			Geo.box(self, Vector3(0, 0, 0.07), Vector3(0.4, 0.55, 0.14), steel, false)
-			Geo.box(self, Vector3(0, 0, 0.142), Vector3(0.36, 0.5, 0.005), ProcTex.flat(Color(0.4, 0.42, 0.4), 0.5, 0.6), false)
+			Geo.box(self, Vector3(0, 0, 0.142), Vector3(0.36, 0.5, 0.005), ProcTex.item("steel", Color.WHITE, 3), false)
 			Geo.label(self, Vector3(0, 0.18, 0.146), "ЩИТ ОСВ.", 0, 22, Color(0.9, 0.85, 0.2), true, 0.002)
 			Geo.box(self, Vector3(0, 0.06, 0.146), Vector3(0.3, 0.03, 0.002), ProcTex.hazard(), false)
 			_led = ProcTex.emissive(Color(1.0, 0.15, 0.1), 3.0)
@@ -100,12 +100,12 @@ func _ready() -> void:
 		"valve":
 			# Труба вдоль стены и задвижка с колесом. Номер — крупно, мелом.
 			add_to_group("valves")
-			Geo.cylinder(self, Vector3(0, 0, 0.12), 0.07, 1.2, ProcTex.flat(Color(0.3, 0.18, 0.12), 0.8, 0.4), Basis(Vector3.FORWARD, PI / 2))
+			Geo.cylinder(self, Vector3(0, 0, 0.12), 0.07, 1.2, ProcTex.item("rust", Color.WHITE, 3), Basis(Vector3.FORWARD, PI / 2))
 			Geo.box(self, Vector3(0, 0, 0.12), Vector3(0.2, 0.2, 0.18), steel, false)
 			_wheel = Node3D.new()
 			_wheel.position = Vector3(0, 0, 0.26)
 			add_child(_wheel)
-			var red := ProcTex.flat(Color(0.55, 0.08, 0.06), 0.6, 0.4)
+			var red := ProcTex.item("paint_red", Color(0.80, 0.72, 0.72), 3)
 			Geo.cylinder(_wheel, Vector3.ZERO, 0.16, 0.025, red, Basis(Vector3.RIGHT, PI / 2))
 			Geo.cylinder(_wheel, Vector3.ZERO, 0.02, 0.1, steel, Basis(Vector3.RIGHT, PI / 2))
 			Geo.label(self, Vector3(0, 0.38, 0.03), "З-%d" % index, 0, 64, Color(0.9, 0.88, 0.8), true, 0.0035)
@@ -247,8 +247,8 @@ func hold_interact(player, delta: float) -> float:
 		"relay":
 			player.relays -= 1
 			_led = ProcTex.emissive(Color(0.2, 1.0, 0.3), 3.0)
-			Geo.box(self, Vector3(0, -0.02, 0.09), Vector3(0.18, 0.13, 0.12), ProcTex.flat(Color(0.2, 0.25, 0.2), 0.6, 0.3), false)
-			Geo.cylinder(self, Vector3(0.06, 0.15, 0.09), 0.006, 0.22, ProcTex.flat(Color(0.05, 0.05, 0.05), 0.5))
+			Geo.box(self, Vector3(0, -0.02, 0.09), Vector3(0.18, 0.13, 0.12), ProcTex.item("paint_green", Color(0.55, 0.62, 0.55), 3), false)
+			Geo.cylinder(self, Vector3(0.06, 0.15, 0.09), 0.006, 0.22, ProcTex.item("rubber", Color.WHITE, 3))
 			Geo.sphere(self, Vector3(-0.05, 0.02, 0.152), 0.012, _led)
 			Game.play_at(Sfx.click(), global_position, -4.0)
 			Game.report("relay")

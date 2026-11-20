@@ -8,7 +8,7 @@ var main  # Main
 
 func _ready() -> void:
 	add_to_group("day_objects")
-	var rust := ProcTex.flat(Color(0.35, 0.2, 0.12), 0.8, 0.5)
+	var rust := ProcTex.item("rust", Color.WHITE, 3)
 	Geo.box(self, Vector3(0, 0, 0.04), Vector3(0.1, 0.3, 0.08), rust, false)
 	Geo.box(self, Vector3(-0.12, 0, 0.1), Vector3(0.3, 0.04, 0.04), rust, false)
 	Geo.box(self, Vector3(-0.25, -0.05, 0.1), Vector3(0.03, 0.1, 0.03), rust, false)

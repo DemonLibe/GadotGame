@@ -13,10 +13,10 @@ var _dust: CPUParticles3D
 
 
 func _ready() -> void:
-	Geo.box(self, Vector3(0, 0, 0.12), Vector3(0.9, 0.9, 0.24), ProcTex.flat(Color(0.28, 0.31, 0.3), 0.55, 0.6), false)
+	Geo.box(self, Vector3(0, 0, 0.12), Vector3(0.9, 0.9, 0.24), ProcTex.item("dark_steel", Color.WHITE, 2), false)
 	_filter_mat = ProcTex.flat(Color.WHITE, 0.95)
 	Geo.box(self, Vector3(0, 0, 0.245), Vector3(0.76, 0.76, 0.01), _filter_mat, false)
-	var slat := ProcTex.flat(Color(0.2, 0.21, 0.21), 0.5, 0.7)
+	var slat := ProcTex.item("dark_steel", Color.WHITE, 2)
 	for i in 7:
 		Geo.box(self, Vector3(0, -0.33 + i * 0.11, 0.265), Vector3(0.8, 0.035, 0.03), slat, false)
 	_lamp_mat = ProcTex.emissive(Color.RED, 2.0)

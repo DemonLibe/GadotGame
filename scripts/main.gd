@@ -1711,8 +1711,14 @@ func _setup_rooms(d: int) -> void:
 		var b: Basis = room["basis"]
 		var bones := Remains.new()
 		bones.pose = "sitting" if k % 2 == 0 else "lying"
-		bones.position = c + b * Vector3(0.6, 0, -1.0)
-		bones.basis = b * Basis(Vector3.UP, PI * 0.5 if bones.pose == "sitting" else 0.3)
+		if bones.pose == "sitting":
+			# Сидит спиной к задней стене, ноги — в комнату.
+			var depth := float((room.get("kind", {"d": 4.4}) as Dictionary)["d"])
+			bones.position = c + b * Vector3(0.5, 0, -depth / 2.0 + 0.36)
+			bones.basis = b
+		else:
+			bones.position = c + b * Vector3(0.6, 0, -1.0)
+			bones.basis = b * Basis(Vector3.UP, 0.3 + randf_range(-0.3, 0.3))
 		add_child(bones)
 		_spawn_note(entry[1], c + b * Vector3(-0.7, 0, 0.3))
 		# Догорающий фонарь — единственный свет в комнате.

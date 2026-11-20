@@ -4,13 +4,13 @@ extends StaticBody3D
 
 
 func _ready() -> void:
-	var wood := ProcTex.flat(Color(0.3, 0.22, 0.14), 0.85)
+	var wood := ProcTex.item("planks", Color.WHITE, 3)
 	Geo.box(self, Vector3(0, 0.78, 0), Vector3(1.2, 0.05, 0.6), wood, false)
 	for x in [-0.55, 0.55]:
 		for z in [-0.25, 0.25]:
 			Geo.box(self, Vector3(float(x), 0.38, float(z)), Vector3(0.05, 0.76, 0.05), wood, false)
-	Geo.box(self, Vector3(-0.1, 0.825, 0), Vector3(0.34, 0.04, 0.25), ProcTex.flat(Color(0.45, 0.08, 0.06), 0.7), false)
-	Geo.box(self, Vector3(0.4, 0.95, -0.15), Vector3(0.05, 0.3, 0.05), ProcTex.flat(Color(0.1, 0.3, 0.15), 0.5, 0.5), false)
+	Geo.box(self, Vector3(-0.1, 0.825, 0), Vector3(0.34, 0.04, 0.25), ProcTex.item("paint_red", Color(0.80, 0.72, 0.72), 3), false)
+	Geo.box(self, Vector3(0.4, 0.95, -0.15), Vector3(0.05, 0.3, 0.05), ProcTex.item("paint_green", Color(0.55, 0.62, 0.55), 3), false)
 	var lamp := OmniLight3D.new()
 	lamp.position = Vector3(0.35, 1.15, -0.05)
 	lamp.light_color = Color(1.0, 0.85, 0.55)

@@ -9,7 +9,7 @@ var _leaf: StaticBody3D
 
 
 func _ready() -> void:
-	var frame := ProcTex.flat(Color(0.2, 0.2, 0.21), 0.6, 0.7)
+	var frame := ProcTex.item("dark_steel", Color.WHITE, 1.5)
 	Geo.box(self, Vector3(-0.66, 1.1, 0), Vector3(0.06, 2.2, 0.12), frame, false)
 	Geo.box(self, Vector3(0.66, 1.1, 0), Vector3(0.06, 2.2, 0.12), frame, false)
 	Geo.box(self, Vector3(0, 2.17, 0), Vector3(1.38, 0.06, 0.12), frame, false)

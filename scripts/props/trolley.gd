@@ -21,9 +21,9 @@ var _roll: AudioStreamPlayer3D
 
 
 func _ready() -> void:
-	var steel := ProcTex.flat(Color(0.28, 0.27, 0.26), 0.6, 0.7)
-	var rust := ProcTex.flat(Color(0.36, 0.21, 0.13), 0.85, 0.4)
-	var wood := ProcTex.flat(Color(0.27, 0.2, 0.13), 0.9)
+	var steel := ProcTex.item("dark_steel", Color.WHITE, 1.5)
+	var rust := ProcTex.item("rust", Color.WHITE, 1.5)
+	var wood := ProcTex.item("planks", Color.WHITE, 1.5)
 	Geo.box(self, Vector3(0, 0.36, 0), Vector3(1.3, 0.1, 2.0), wood, false)
 	for sx in [-0.6, 0.6]:
 		Geo.box(self, Vector3(sx, 0.27, 0), Vector3(0.08, 0.12, 2.0), rust, false)

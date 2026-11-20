@@ -9,10 +9,10 @@ var _t := 0.0
 
 
 func _ready() -> void:
-	var body := ProcTex.flat(Color(0.16, 0.2, 0.15), 0.7, 0.2)
+	var body := ProcTex.item("paint_green", Color(0.55, 0.62, 0.55), 4)
 	Geo.box(self, Vector3(0, 0.085, 0), Vector3(0.08, 0.17, 0.04), body, false)
-	Geo.cylinder(self, Vector3(0.025, 0.23, 0.0), 0.006, 0.12, ProcTex.flat(Color(0.05, 0.05, 0.05), 0.5))
-	Geo.box(self, Vector3(0, 0.11, 0.021), Vector3(0.06, 0.06, 0.004), ProcTex.flat(Color(0.05, 0.05, 0.05), 0.9), false)
+	Geo.cylinder(self, Vector3(0.025, 0.23, 0.0), 0.006, 0.12, ProcTex.item("rubber", Color.WHITE, 4))
+	Geo.box(self, Vector3(0, 0.11, 0.021), Vector3(0.06, 0.06, 0.004), ProcTex.item("rubber", Color.WHITE, 4), false)
 	_led = ProcTex.emissive(Color(1.0, 0.2, 0.1), 3.0)
 	Geo.sphere(self, Vector3(-0.025, 0.155, 0.02), 0.007, _led)
 	Geo.collider_box(self, Vector3(0.14, 0.26, 0.1), Vector3(0, 0.13, 0))

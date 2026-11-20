@@ -1362,6 +1362,22 @@ func _chalk_at(tunnel: int, side: int, along: float, text: String) -> void:
 	l.basis = tr.basis
 
 
+## Останки в проходе: сидящий — спиной к стене по сторону side, лежащий — вдоль прохода у стены.
+func _remains(tunnel: int, along: float, side: int, pose: String) -> void:
+	var bones := Remains.new()
+	bones.pose = pose
+	var d := Vector3.FORWARD if tunnel < 0 else branch_dir(tunnel)
+	var r := _right_of(d)
+	if pose == "sitting":
+		var wall := r * float(side)
+		bones.position = floor_point(tunnel, along, side * 1.4)
+		bones.rotation.y = atan2(-wall.x, -wall.z)
+	else:
+		bones.position = floor_point(tunnel, along, side * 0.75)
+		bones.rotation.y = _yaw_to(d) + rng.randf_range(-0.35, 0.35) + (PI if rng.randf() < 0.5 else 0.0)
+	_into.add_child(bones)
+
+
 ## Декорация посередине прохода — то, ради чего стоит дойти: у стен, середина свободна.
 func _set_piece(tunnel: int, piece: String, along: float, theme: String) -> void:
 	var side := 1 if rng.randf() < 0.5 else -1
@@ -1399,11 +1415,7 @@ func _set_piece(tunnel: int, piece: String, along: float, theme: String) -> void
 			_prop("common/wooden_pallet", tunnel, along - dir * 2.8, -side * 1.2, rng.randf() * TAU)
 		"camp":  # лагерь тех, кто здесь остался: койка, останки, надпись мелом
 			_prop("01_duty_room/cot", tunnel, along, side * 1.15, cross_yaw(tunnel) + (PI / 2 if side > 0 else -PI / 2))
-			var bones := Remains.new()
-			bones.pose = "sitting" if rng.randf() < 0.5 else "lying"
-			bones.position = floor_point(tunnel, along + dir * 1.8, -side * 1.1)
-			bones.rotation.y = rng.randf() * TAU
-			_into.add_child(bones)
+			_remains(tunnel, along + dir * 1.8, -side, "sitting" if rng.randf() < 0.5 else "lying")
 			_prop("common/fire_extinguisher", tunnel, along - dir * 1.5, -side * 1.35, rng.randf() * TAU)
 			if CAMP_CHALK.has(theme):
 				_chalk_at(tunnel, -side if is_plain(tunnel, along, -side, 2.0) else side, along + dir * 1.0, str(CAMP_CHALK[theme]))

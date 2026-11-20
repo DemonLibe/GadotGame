@@ -11,7 +11,7 @@ var hud: Hud
 func _ready() -> void:
 	add_to_group("day_objects")
 	# Пожелтевшая, грязная бумага — не светится в луче, как новый лист.
-	var paper := ProcTex.flat(Color(0.46, 0.42, 0.33), 1.0)
+	var paper := ProcTex.item("paper_old", Color(0.51, 0.47, 0.37), 4)
 	var sheet := Geo.box(self, Vector3(0, 0.003, 0), Vector3(0.21, 0.005, 0.29), paper, false)
 	sheet.rotation.y = randf_range(-0.4, 0.4)
 	for i in 6:
