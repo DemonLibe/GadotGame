@@ -41,6 +41,47 @@ const GEN_KIND := {"theme": "genroom", "w": 4.4, "d": 4.0, "h": 3.0, "wall": "co
 ## map_z() переводит такую отметку в нынешнюю сеть — пропорционально до решётки, за ней — как есть.
 const OLD_TUN_Z1 := -372.5
 const OLD_GRATE_Z := -323.0
+## Темы проходов. У каждой штольни и у каждого участка основного тоннеля — свой характер: стены, пол, свет, звук,
+## потёки на стенах и своя «декорация» в середине. Текстуры — ambientCG (textures/acg_*).
+##   walls / floors — материалы набора (одну из стен и один пол выбирает сама штольня), tint — приглушить;
+##   lamp — цвет света, step — шаг ламп (м), broken / flicker — доля разбитых и мигающих;
+##   decals — потёки на стенах, every — через сколько метров; sound — петля в середине (stream, pitch, дБ);
+##   noise — во сколько раз громче шаги (по воде хлюпает); piece — декорация в середине.
+const THEMES := {
+	"tubbing": {"title": "", "walls": [], "floors": [], "tint": Color(1, 1, 1), "lamp": Color(1.0, 0.74, 0.45), "lamp_energy": 1.1,
+		"step": 12.0, "broken": 0.25, "flicker": 0.2, "decals": [], "every": 0.0, "sound": [], "noise": 1.0, "piece": ""},
+	"wet": {"title": "СЫРАЯ", "walls": ["acg_bricks075b", "acg_bricks076a", "acg_concrete026", "acg_bricks089"],
+		"floors": ["acg_ground001", "acg_gravel024"], "tint": Color(0.62, 0.66, 0.62), "lamp": Color(0.7, 0.95, 0.8), "lamp_energy": 0.9,
+		"step": 18.0, "broken": 0.35, "flicker": 0.2, "decals": ["acg_leaking001", "acg_leaking002", "acg_leaking003", "acg_leaking004", "acg_leaking005"],
+		"every": 14.0, "sound": ["drips", 1.0, -6.0], "noise": 1.5, "piece": "flood"},
+	"rust": {"title": "РЖАВАЯ", "walls": ["acg_metal022", "acg_metal025", "acg_metal026", "acg_metalplates013", "acg_metalplates010", "acg_metalplates011", "acg_rust002", "acg_rust005"],
+		"floors": ["acg_diamondplate001", "acg_metalwalkway013"], "tint": Color(0.7, 0.66, 0.62), "lamp": Color(1.0, 0.55, 0.25), "lamp_energy": 1.2,
+		"step": 10.0, "broken": 0.15, "flicker": 0.5, "decals": ["acg_rust001", "acg_leaking006"],
+		"every": 16.0, "sound": ["drone", 1.7, -12.0], "noise": 1.25, "piece": "pipes"},
+	"rock": {"title": "НЕОБЛИЦОВАННАЯ", "walls": ["acg_rock030", "acg_rock031", "acg_rock035", "acg_rock037", "acg_rock050", "acg_rocks011"],
+		"floors": ["acg_ground048", "acg_ground067", "acg_ground038"], "tint": Color(0.62, 0.62, 0.6), "lamp": Color(1.0, 0.7, 0.4), "lamp_energy": 0.9,
+		"step": 40.0, "broken": 0.7, "flicker": 0.2, "decals": ["acg_leaking007", "acg_leaking008", "acg_leaking009"],
+		"every": 20.0, "sound": ["wind", 0.8, -8.0], "noise": 1.0, "piece": "cave_in"},
+	"oldbrick": {"title": "СТАРАЯ КЛАДКА", "walls": ["acg_bricks003", "acg_bricks097", "acg_bricks085", "acg_bricks054", "acg_bricks056", "acg_bricks058", "acg_bricks023", "acg_bricks050"],
+		"floors": ["acg_gravel028", "acg_ground023"], "tint": Color(0.6, 0.56, 0.54), "lamp": Color(1.0, 0.78, 0.5), "lamp_energy": 0.9,
+		"step": 16.0, "broken": 0.3, "flicker": 0.25, "decals": ["acg_leaking006", "acg_leaking004"],
+		"every": 18.0, "sound": ["drone", 0.55, -10.0], "noise": 1.0, "piece": "camp"},
+	"bunker": {"title": "БУНКЕР", "walls": ["acg_concrete030", "acg_concrete031", "acg_concrete035", "acg_concrete042a", "acg_concrete042c", "acg_concrete044d", "acg_concrete033", "acg_concrete027"],
+		"floors": ["acg_terrazzo003", "acg_gravel024"], "tint": Color(0.9, 0.9, 0.9), "lamp": Color(0.85, 1.0, 0.9), "lamp_energy": 1.2,
+		"step": 9.0, "broken": 0.1, "flicker": 0.4, "decals": ["acg_leaking006", "acg_leaking005"],
+		"every": 20.0, "sound": ["drone", 1.0, -13.0], "noise": 1.0, "piece": "camp"},
+	"clinic": {"title": "КАФЕЛЬНАЯ", "walls": ["acg_tiles107", "acg_tiles036", "acg_tiles010", "acg_tiles054", "acg_tiles043", "acg_tiles032", "acg_tiles020"],
+		"floors": ["acg_terrazzo004", "acg_terrazzo005", "acg_tiles012"], "tint": Color(0.8, 0.82, 0.8), "lamp": Color(0.8, 0.95, 1.0), "lamp_energy": 1.3,
+		"step": 8.0, "broken": 0.15, "flicker": 0.6, "decals": ["acg_leaking006", "acg_rust001"],
+		"every": 22.0, "sound": ["drone", 2.0, -15.0], "noise": 1.0, "piece": "camp"},
+}
+## Надписи мелом у «лагеря» — по теме.
+const CAMP_CHALK := {
+	"oldbrick": "СЧЁТ ПОТЕРЯН", "bunker": "ДВЕРЬ ЗАКРЫЛИ\nСНАРУЖИ", "clinic": "НЕ СПАТЬ.\nИХ ЗДЕСЬ БОЛЬШЕ"}
+## Какие темы бывают у штолен и у участков основного тоннеля (участок дальше первых 200 м).
+const BRANCH_THEMES := ["wet", "rust", "rock", "oldbrick", "bunker", "clinic"]
+const TRUNK_THEMES := ["wet", "rust", "oldbrick", "bunker", "tubbing", "clinic"]
+
 ## Размер сети: основной тоннель до решётки, число штолен, их длина, ответвления.
 const TRUNK_LEN := Vector2(2250.0, 2600.0)
 const BRANCH_COUNT := Vector2i(10, 15)
@@ -87,6 +128,8 @@ var _segments: Array[Dictionary] = []  # оси проходов {a, b, dir} в 
 var _holes := {}                # участки проходов, построенные через CSG: tunnel → [[от, до, сторона]]
 var net: Node3D                 # вся сеть тоннелей (пересобирается каждую смену)
 var net_seed := 0
+var trunk_sections: Array[Dictionary] = []  # участки основного тоннеля: {z0 (ближе к станции), z1, theme, pick}
+var _decal_mats := {}
 var hidden_branch := -1         # потайная штольня (индекс в BRANCHES) или -1
 var hidden_open := false
 var _plug: Node3D               # тюбинг, которым она «заложена», пока её нет
@@ -150,6 +193,7 @@ func generate_network(seed_value: int) -> void:
 	gen_rooms.clear()
 	_segments.clear()
 	_holes.clear()
+	trunk_sections.clear()
 	_plug = null
 	hidden_open = false
 	_plan()
@@ -246,6 +290,7 @@ func _plan() -> void:
 		prim.append(b)
 		segs.append([Vector2(o.x, o.z), Vector2(o.x, o.z) + Vector2(d.x, d.z) * (blen + 9.0), -1])
 	prim.sort_custom(func(a, b): return float(a["z"]) > float(b["z"]))
+	_plan_trunk_themes()
 	# Одна штольня — «потайная»: её то нет (сплошной тюбинг), то она есть. Не из первых трёх, без комнаты.
 	hidden_branch = -1
 	var cand: Array = []
@@ -262,6 +307,8 @@ func _plan() -> void:
 			prim[i]["name"] = "ШТОЛЬНЯ %d" % number
 			number += 1
 		prim[i]["room"] = (i < 3 or rng.randf() < 0.45) and i != hidden_branch
+		prim[i]["theme"] = "bunker" if i == hidden_branch else _next_theme(BRANCH_THEMES, i, prim)
+		prim[i]["pick"] = rng.randi()
 		prim[i]["kind"] = ROOM_KINDS[3 + i] if i < 3 else ROOM_KINDS[rng.randi_range(0, ROOM_KINDS.size() - 1)]
 		BRANCHES.append(prim[i])
 	segs = [segs[0]]
@@ -299,11 +346,51 @@ func _plan() -> void:
 				continue
 			used.append(s)
 			var b := {"z": parent["z"], "side": side, "angle": angle, "length": slen, "parent": pi, "s": s, "origin": o, "dir": d,
+				"theme": _next_theme(BRANCH_THEMES, BRANCHES.size(), BRANCHES, str(parent["theme"])), "pick": rng.randi(),
 				"room": rng.randf() < 0.3, "name": "%s-%s" % [parent["name"], letters[count]],
 				"kind": ROOM_KINDS[rng.randi_range(0, ROOM_KINDS.size() - 1)]}
 			BRANCHES.append(b)
 			segs.append([Vector2(o.x, o.z), Vector2(o.x, o.z) + Vector2(d.x, d.z) * (slen + 9.0), BRANCHES.size() - 1])
 			count += 1
+
+
+## Тема, не совпадающая с соседними (предыдущая в списке и, если дана, родитель).
+func _next_theme(pool: Array, index: int, list: Array, avoid := "") -> String:
+	var prev := ""
+	if index > 0 and index - 1 < list.size():
+		prev = str(list[index - 1].get("theme", ""))
+	var opts: Array = pool.filter(func(t): return t != prev and t != avoid)
+	return opts[rng.randi_range(0, opts.size() - 1)]
+
+
+## Участки основного тоннеля: первые 200 м — тюбинги, как было; дальше участки по 220–420 м разных тем; за решёткой — скала.
+func _plan_trunk_themes() -> void:
+	var z := TUN_Z0
+	var first := true
+	var prev := "tubbing"
+	while z > GRATE_Z:
+		var len_s := 200.0 if first else rng.randf_range(220.0, 420.0)
+		var theme := "tubbing"
+		if not first:
+			var opts: Array = TRUNK_THEMES.filter(func(t): return t != prev)
+			theme = opts[rng.randi_range(0, opts.size() - 1)]
+		var z1 := maxf(z - len_s, GRATE_Z)
+		if z1 - GRATE_Z < 120.0:
+			z1 = GRATE_Z  # огрызок в конце сливаем с предыдущим участком
+		trunk_sections.append({"z0": z, "z1": z1, "theme": theme, "pick": rng.randi()})
+		prev = theme
+		z = z1
+		first = false
+	trunk_sections.append({"z0": GRATE_Z, "z1": METRO_Z1 - 1.0, "theme": "rock", "pick": rng.randi()})
+
+
+func _section_at(z: float) -> Dictionary:
+	for sec in trunk_sections:
+		if z <= float(sec["z0"]) and z > float(sec["z1"]):
+			return sec
+	if trunk_sections.is_empty():
+		return {"z0": TUN_Z0, "z1": GRATE_Z, "theme": "tubbing", "pick": 0}
+	return trunk_sections[0] if z > TUN_Z0 else trunk_sections[-1]
 
 
 func _trunk_free(used: Array, hi: float, lo: float) -> bool:
@@ -421,6 +508,55 @@ func _update_lightning(delta: float) -> void:
 			_lightning = randf_range(12.0, 30.0)
 			if is_inside_tree() and get_viewport().get_camera_3d() and get_viewport().get_camera_3d().global_position.y > ROOM_Y - 2.0:
 				Game.play_at(Sfx.rumble(), _window_light.global_position + Vector3(-6, 0, 0), -10.0)
+
+
+# --- Темы: материалы и запросы ---------------------------------------------------
+
+## Стены прохода по теме (одна из walls, по pick). tubbing — прежние чугунные тюбинги.
+func _theme_wall(theme: String, pick: int) -> Material:
+	var t: Dictionary = THEMES[theme]
+	var walls: Array = t["walls"]
+	if walls.is_empty():
+		return m_tubbing
+	var name: String = walls[pick % walls.size()]
+	return ProcTex.kit(name, t["tint"]) if ProcTex._kit_ok(name) else m_tubbing
+
+
+func _theme_floor(theme: String, pick: int) -> Material:
+	var t: Dictionary = THEMES[theme]
+	var floors: Array = t["floors"]
+	if floors.is_empty():
+		return m_floor
+	var name: String = floors[(pick >> 4) % floors.size()]
+	return ProcTex.kit(name, Color(0.75, 0.75, 0.75)) if ProcTex._kit_ok(name) else m_floor
+
+
+func _decal_mat(name: String) -> Material:
+	if not _decal_mats.has(name):
+		var path := ProcTex.KIT + "materials/M_%s.tres" % name
+		_decal_mats[name] = load(path) if ResourceLoader.exists(path) else null
+	return _decal_mats[name]
+
+
+## Тема точки: участок основного тоннеля или штольня.
+func theme_at(p: Vector3) -> String:
+	if lower.contains(p) or p.y > FLOOR_Y + 5.0 or p.z > TUN_Z0 or (BRANCHES.is_empty() and trunk_sections.is_empty()):
+		return ""
+	var seg := _segment_index(p)
+	if seg > 0 and seg <= BRANCHES.size():
+		return str(BRANCHES[seg - 1]["theme"])
+	return str(_section_at(p.z)["theme"])
+
+
+func theme_title_at(p: Vector3) -> String:
+	var th := theme_at(p)
+	return str(THEMES[th]["title"]) if THEMES.has(th) else ""
+
+
+## Во сколько раз шаги здесь громче обычного (по воде хлюпает).
+func noise_mult_at(p: Vector3) -> float:
+	var th := theme_at(p)
+	return float(THEMES[th]["noise"]) if THEMES.has(th) else 1.0
 
 
 # --- Запросы для других систем ------------------------------------------------
@@ -937,23 +1073,33 @@ func _build_main_tunnel() -> void:
 	Geo.box(_into, Vector3(TUN_CX, TUBE_CY, METRO_Z1 - 0.15), Vector3(TUBE_R * 2 + 0.4, TUBE_R * 2 + 0.4, 0.3), m_concrete)
 	_main_seg = _segments.size()
 	_segments.append({"a": Vector2(TUN_CX, TUN_Z0), "b": Vector2(TUN_CX, TUN_Z1), "dir": Vector3.FORWARD})
-	# Светильники в сетках на стене через 12 м, попеременно слева и справа. Часть разбита.
+	# Светильники в сетках на стене, попеременно слева и справа. Шаг, цвет и доля разбитых — по теме участка.
 	var i := 0
 	var z := TUN_Z0 - 5.0
 	while z > GRATE_Z + 2.0:
+		var th: String = _section_at(z)["theme"]
+		var T: Dictionary = THEMES[th]
 		var mode := "ok"
-		if i % 4 == 3:
-			mode = "broken"
-		elif i % 5 == 2:
-			mode = "flicker"
+		if th == "tubbing":
+			if i % 4 == 3:
+				mode = "broken"
+			elif i % 5 == 2:
+				mode = "flicker"
+		else:
+			mode = _lamp_mode(T)
 		var side := -1 if i % 2 == 0 else 1
 		if not is_plain(-1, z, side, 1.0):
 			side = -side  # не вешать светильник в проём
 		if is_plain(-1, z, side, 1.0):
 			var ly := FLOOR_Y + 2.45
-			_add_wall_lamp(Vector3(wall_x(side, ly, 0.12), ly, z), Vector3(-side, 0, 0), mode)
-		z -= 12.0
+			_add_wall_lamp(Vector3(wall_x(side, ly, 0.12), ly, z), Vector3(-side, 0, 0), mode, T["lamp"], float(T["lamp_energy"]))
+		z -= float(T["step"])
 		i += 1
+	# Потёки, декорации и звук по участкам.
+	for sec in trunk_sections:
+		var top := maxf(float(sec["z1"]), GRATE_Z)
+		_theme_dress(-1, str(sec["theme"]), float(sec["z0"]) - 12.0, top + 4.0, int(sec["pick"]))
+		_section_sign(sec)
 	# Пикеты.
 	var k := 1
 	while TUN_Z0 - PICKET_STEP * k > GRATE_Z + 2.0:
@@ -968,7 +1114,7 @@ func _build_main_tunnel() -> void:
 
 ## Общая «начинка» прямого куска трубы в локальных координатах (ось по -Z, пол на y = 0).
 ## Труба, бетонный лоток с водоотводом, невидимые стены, кабели на кронштейнах, труба на опорах.
-func _tube_piece(parent: Node3D, s0: float, s1: float, lowered := 0.0) -> void:
+func _tube_piece(parent: Node3D, s0: float, s1: float, lowered := 0.0, wall: Material = null, floor_mat: Material = null) -> void:
 	var length := s1 - s0
 	var mid := -(s0 + s1) / 2.0
 	# Сетка трубы — из кеша по длине и сдвигу текстуры (кусков в сети сотни, большинство одинаковые).
@@ -978,11 +1124,11 @@ func _tube_piece(parent: Node3D, s0: float, s1: float, lowered := 0.0) -> void:
 		_tube_cache[key] = Geo.tube_mesh(TUBE_R, -frac, -frac - length, 32, -0.6, TUBE_R * TAU / 8.0, 1.0)
 	var tube := MeshInstance3D.new()
 	tube.mesh = _tube_cache[key]
-	tube.material_override = m_tubbing
+	tube.material_override = wall if wall else m_tubbing
 	tube.position = Vector3(0, TUBE_CY - FLOOR_Y, -(s0 - frac))
 	parent.add_child(tube)
 	var chord := _tube_half(FLOOR_Y) * 2.0
-	Geo.box(parent, Vector3(0, -0.15 - lowered, mid), Vector3(chord, 0.3, length), m_floor)
+	Geo.box(parent, Vector3(0, -0.15 - lowered, mid), Vector3(chord, 0.3, length), floor_mat if floor_mat else m_floor)
 	Geo.box(parent, Vector3(-1.25, 0.003 - lowered, mid), Vector3(0.28, 0.01, length), ProcTex.flat(Color(0.06, 0.06, 0.07), 0.3), false)
 	Geo.solid(parent, Vector3(-TUN_HW - 0.15, 2.0, mid), Vector3(0.3, 4.0, length))
 	Geo.solid(parent, Vector3(TUN_HW + 0.15, 2.0, mid), Vector3(0.3, 4.0, length))
@@ -1022,7 +1168,8 @@ func _main_segment(z_a: float, z_b: float) -> void:
 		var piece := Node3D.new()
 		piece.position = Vector3(TUN_CX, FLOOR_Y, 0)
 		_into.add_child(piece)
-		_tube_piece(piece, -z, -z2)
+		var sec := _section_at((z + z2) / 2.0)
+		_tube_piece(piece, -z, -z2, 0.0, _theme_wall(str(sec["theme"]), int(sec["pick"])), _theme_floor(str(sec["theme"]), int(sec["pick"])))
 		z = z2
 
 
@@ -1069,7 +1216,8 @@ func _build_junction(index: int) -> void:
 	var tr := wall_mount(parent, -side, before, ly, 0.03)
 	var sign_board := Geo.box(_into, tr.origin, Vector3(1.4, 0.5, 0.03), ProcTex.flat(Color(0.12, 0.25, 0.45), 0.5), false, tr.basis)
 	sign_board.name = "Sign%d" % index
-	var l := Geo.label(_into, tr.origin + tr.basis.z * 0.02, "%s\n%s" % [b["name"], word], 0.0, 30 if parent < 0 else 26, Color(0.95, 0.95, 0.95), true)
+	var title := str(THEMES[str(b["theme"])]["title"])
+	var l := Geo.label(_into, tr.origin + tr.basis.z * 0.02, "%s\n%s%s" % [b["name"], word, " · " + title if title != "" else ""], 0.0, 30 if parent < 0 else 26, Color(0.95, 0.95, 0.95), true)
 	l.basis = tr.basis
 	_add_lamp(o + pd * 2.0 + Vector3(0, TUBE_CY - FLOOR_Y + TUBE_R - 0.25, 0), Color(1.0, 0.72, 0.42), 1.1, 9.0, "ok" if parent < 0 else "flicker", true)
 
@@ -1104,6 +1252,161 @@ func _build_plug(o: Vector3, pd: Vector3, side: int) -> void:
 	var body := StaticBody3D.new()
 	_plug.add_child(body)
 	Geo.collider_box(body, Vector3(0.3, 4.0, JUNCTION_MAIN * 2.0), Vector3(side * (TUN_HW + 0.15), 2.0 - (TUBE_CY - FLOOR_Y), 0))
+
+
+# --- Оформление по темам -----------------------------------------------------------
+
+## Потёки на стенах, декорация посередине и звук для отрезка прохода [from, to] (у основного тоннеля — z, у штольни — метры).
+func _theme_dress(tunnel: int, theme: String, from: float, to: float, pick: int) -> void:
+	var T: Dictionary = THEMES[theme]
+	var lo := minf(from, to)
+	var hi := maxf(from, to)
+	if hi - lo < 14.0:
+		return
+	var decals: Array = T["decals"]
+	var every := float(T["every"])
+	if not decals.is_empty() and every > 0.0:
+		var a := lo + rng.randf_range(2.0, every)
+		while a < hi - 2.0:
+			var side := 1 if rng.randf() < 0.5 else -1
+			var name: String = decals[rng.randi_range(0, decals.size() - 1)]
+			if is_plain(tunnel, a, side, 2.5):
+				_wall_decal(tunnel, side, a, name)
+			a += every * rng.randf_range(0.6, 1.4)
+	# Декорация и звук — в середине отрезка (в штольнях идёт от развилки, в тоннеле — по z).
+	var mid := (lo + hi) / 2.0
+	mid = plain_along(tunnel, mid, 0, 4.0)
+	var snd: Array = T["sound"]
+	if not snd.is_empty():
+		_theme_sound(tunnel, mid, str(snd[0]), float(snd[1]), float(snd[2]))
+	var piece := str(T["piece"])
+	if piece != "" and is_plain(tunnel, mid, 0, 4.0):
+		_set_piece(tunnel, piece, mid, theme)
+
+
+## Указатель на стыке участков: стена вдруг другая — табличка объясняет, где ты.
+func _section_sign(sec: Dictionary) -> void:
+	var title := str(THEMES[str(sec["theme"])]["title"])
+	var z := float(sec["z0"]) - 8.0
+	if title == "" or float(sec["z0"]) >= TUN_Z0 - 1.0 or float(sec["z0"]) <= GRATE_Z + 20.0:
+		return
+	for side in [-1, 1]:
+		if not is_plain(-1, z, side, 2.0):
+			continue
+		var ly := FLOOR_Y + 2.1
+		var tr := wall_mount(-1, side, z, ly, 0.03)
+		var board := Geo.box(_into, tr.origin, Vector3(1.5, 0.5, 0.03), ProcTex.flat(Color(0.35, 0.3, 0.1), 0.5), false, tr.basis)
+		board.name = "ZoneSign"
+		var l := Geo.label(_into, tr.origin + tr.basis.z * 0.02, "УЧАСТОК\n%s" % title, 0.0, 26, Color(0.95, 0.9, 0.7), true)
+		l.basis = tr.basis
+
+
+func _decal_size(name: String) -> Array:
+	# [ширина, высота, высота центра над полом]
+	match name:
+		"acg_leaking006":
+			return [0.9, 2.1, 1.5]
+		"acg_leaking007", "acg_leaking008", "acg_leaking009":
+			return [2.2, 0.9, 0.55]
+		"acg_rust001":
+			return [1.8, 1.8, 0.95]
+	return [2.4, 1.5, 1.9]
+
+
+## Декаль на стене трубы: наклонена вместе со стенкой (труба круглая, выше оси стена нависает).
+func _wall_decal(tunnel: int, side: int, along: float, name: String) -> void:
+	var mat := _decal_mat(name)
+	if mat == null:
+		return
+	var sz := _decal_size(name)
+	var h: float = sz[2]
+	var tr := wall_mount(tunnel, side, along, FLOOR_Y + h, 0.012)
+	var dy := FLOOR_Y + h - TUBE_CY
+	var phi := asin(clampf(dy / (TUBE_R - 0.02), -0.95, 0.95))
+	var q := QuadMesh.new()
+	q.size = Vector2(float(sz[0]), float(sz[1]))
+	var mi := MeshInstance3D.new()
+	mi.mesh = q
+	mi.material_override = mat
+	mi.transform = Transform3D(tr.basis * Basis(Vector3.RIGHT, phi), tr.origin)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_into.add_child(mi)
+
+
+func _theme_sound(tunnel: int, along: float, key: String, pitch: float, db: float) -> void:
+	var stream: AudioStream
+	match key:
+		"drips": stream = Sfx.drips()
+		"wind": stream = Sfx.wind()
+		_: stream = Sfx.drone()
+	var p := AudioStreamPlayer3D.new()
+	p.stream = stream
+	p.pitch_scale = pitch
+	p.volume_db = db
+	p.unit_size = 6.0
+	p.max_distance = 38.0
+	p.position = floor_point(tunnel, along) + Vector3(0, 1.6, 0)
+	p.autoplay = true
+	_into.add_child(p)
+
+
+func _prop(path: String, tunnel: int, along: float, lateral: float, yaw: float) -> Node3D:
+	if not ResourceLoader.exists(ProcTex.KIT + "models/%s.glb" % path):
+		return null
+	return ProcTex.kit_model(_into, path, floor_point(tunnel, along, lateral), yaw)
+
+
+func _chalk_at(tunnel: int, side: int, along: float, text: String) -> void:
+	var tr := wall_mount(tunnel, side, along, FLOOR_Y + 1.7)
+	var l := Geo.label(_into, tr.origin, text, 0.0, 72, Color(0.85, 0.83, 0.78, 0.85), true, 0.0035)
+	l.basis = tr.basis
+
+
+## Декорация посередине прохода — то, ради чего стоит дойти: у стен, середина свободна.
+func _set_piece(tunnel: int, piece: String, along: float, theme: String) -> void:
+	var side := 1 if rng.randf() < 0.5 else -1
+	var dir := 1.0 if tunnel >= 0 else -1.0   # «вглубь» по along
+	match piece:
+		"flood":  # лужи, бочка и тот, кому не повезло
+			for k in 3:
+				_prop("common/puddle_decal", tunnel, along + dir * (k * 2.2 - 2.0), side * rng.randf_range(0.2, 0.9), rng.randf() * TAU)
+			_prop("common/fuel_barrel", tunnel, along + dir * 2.5, side * 1.25, rng.randf() * TAU)
+			Remains.bone_pile(_into, floor_point(tunnel, along, side * 1.15) + Vector3(0, 0.02, 0), rng.randf() * TAU, 1.0)
+		"pipes":  # аварийный участок: бочки, барабан, табличка
+			for k in 3:
+				_prop("common/fuel_barrel", tunnel, along + dir * (k * 0.8 - 0.8), side * 1.25, rng.randf() * TAU)
+			_prop("common/cable_drum", tunnel, along + dir * 3.0, -side * 1.15, rng.randf() * TAU)
+			var tr := wall_mount(tunnel, side, along - dir * 2.0, FLOOR_Y + 1.5)
+			if ResourceLoader.exists(ProcTex.KIT + "models/common/danger_sign.glb"):
+				var board := ProcTex.kit_model(_into, "common/danger_sign", tr.origin, atan2(tr.basis.z.x, tr.basis.z.z))
+				board.name = "DangerSign"
+		"cave_in":  # осыпь грунта с одной стороны: пройти можно, но тесно
+			var rock := _theme_wall("rock", 0)
+			for k in 9:
+				var sz := rng.randf_range(0.45, 1.0)
+				var r := Geo.box(_into, floor_point(tunnel, along + dir * rng.randf_range(-1.8, 1.8), side * rng.randf_range(0.65, 1.4)) + Vector3(0, sz * 0.3, 0),
+					Vector3(sz, sz * 0.8, sz), rock, false, Basis.from_euler(Vector3(rng.randf() * TAU, rng.randf() * TAU, rng.randf() * TAU)))
+				r.name = "Rock%d" % k
+			var body := StaticBody3D.new()
+			body.collision_layer = ProcTex.PROP_LAYER
+			body.collision_mask = 0
+			_into.add_child(body)
+			var pc := floor_point(tunnel, along, side * 1.0) + Vector3(0, 0.45, 0)
+			var yaw := cross_yaw(tunnel)
+			body.transform = Transform3D(Basis(Vector3.UP, yaw), pc)
+			Geo.collider_box(body, Vector3(1.4, 0.9, 3.4))
+			Remains.bone_pile(_into, floor_point(tunnel, along + dir * 2.2, side * 0.8) + Vector3(0, 0.02, 0), rng.randf() * TAU, 0.9)
+			_prop("common/wooden_pallet", tunnel, along - dir * 2.8, -side * 1.2, rng.randf() * TAU)
+		"camp":  # лагерь тех, кто здесь остался: койка, останки, надпись мелом
+			_prop("01_duty_room/cot", tunnel, along, side * 1.15, cross_yaw(tunnel) + (PI / 2 if side > 0 else -PI / 2))
+			var bones := Remains.new()
+			bones.pose = "sitting" if rng.randf() < 0.5 else "lying"
+			bones.position = floor_point(tunnel, along + dir * 1.8, -side * 1.1)
+			bones.rotation.y = rng.randf() * TAU
+			_into.add_child(bones)
+			_prop("common/fire_extinguisher", tunnel, along - dir * 1.5, -side * 1.35, rng.randf() * TAU)
+			if CAMP_CHALK.has(theme):
+				_chalk_at(tunnel, -side if is_plain(tunnel, along, -side, 2.0) else side, along + dir * 1.0, str(CAMP_CHALK[theme]))
 
 
 ## Потайная штольня есть или её нет.
@@ -1318,7 +1621,7 @@ func _build_branch(index: int) -> void:
 			var piece := Node3D.new()
 			piece.transform = Transform3D(Basis(Vector3.UP, yaw), origin)
 			_into.add_child(piece)
-			_tube_piece(piece, s, s2, 0.005)
+			_tube_piece(piece, s, s2, 0.005, _theme_wall(str(b["theme"]), int(b["pick"])), _theme_floor(str(b["theme"]), int(b["pick"])))
 			s = s2
 		s = maxf(s, float(h[1]))
 	var end := origin + d * length
@@ -1333,16 +1636,19 @@ func _build_branch(index: int) -> void:
 		var rp := end - d * randf_range(0.6, 3.0) + r * (1.1 if k % 2 == 0 else -1.1) + Vector3(0, 0.15, 0)
 		var rock := Geo.box(_into, rp, Vector3.ONE * randf_range(0.25, 0.5), m_concrete, false)
 		rock.rotation = Vector3(randf() * TAU, randf() * TAU, randf() * TAU)
-	# В штольнях почти все светильники разбиты.
+	# Свет — по теме штольни (в необлицованных почти нет).
+	var T: Dictionary = THEMES[str(b["theme"])]
 	var ld := JUNCTION_BRANCH + 4.0
 	var n := 0
 	while ld < length - 3.0:
 		if is_plain(index, ld, -1, 1.0):
 			var ly := FLOOR_Y + 2.45
 			var tr := wall_mount(index, -1, ld, ly, 0.12)
-			_add_wall_lamp(tr.origin, tr.basis.z, "flicker" if n % 5 == 0 else "broken")
+			_add_wall_lamp(tr.origin, tr.basis.z, "flicker" if n == 0 else _lamp_mode(T, 0.3), T["lamp"], float(T["lamp_energy"]))
 			n += 1
-		ld += 14.0
+		ld += float(T["step"]) * 0.8
+	if not b.get("hidden", false):
+		_theme_dress(index, str(b["theme"]), JUNCTION_BRANCH + 6.0, length - (ROOM_SECTION + 4.0 if has_room else 6.0), int(b["pick"]))
 	_segments.append({"a": Vector2(origin.x, origin.z), "b": Vector2(end.x, end.z), "dir": d})
 
 
@@ -1468,14 +1774,24 @@ func dark_wave(from: Vector3, dir_z: float) -> Vector3:
 	return Vector3(TUN_CX, FLOOR_Y, last.z)
 
 
+## Состояние лампы по теме: доля разбитых и мигающих (extra — ещё сверху разбитых).
+func _lamp_mode(T: Dictionary, extra := 0.0) -> String:
+	var r := rng.randf()
+	if r < float(T["broken"]) + extra:
+		return "broken"
+	if r < float(T["broken"]) + extra + float(T["flicker"]):
+		return "flicker"
+	return "ok"
+
+
 ## Тоннельный светильник в сетке на стене. inward — куда смотрит (внутрь тоннеля).
-func _add_wall_lamp(pos: Vector3, inward: Vector3, mode: String) -> void:
+func _add_wall_lamp(pos: Vector3, inward: Vector3, mode: String, color := Color(1.0, 0.74, 0.45), energy := 1.1) -> void:
 	var basis := Basis(Vector3.UP, atan2(inward.x, inward.z))
 	Geo.box(_into, pos - inward * 0.05, Vector3(0.25, 0.3, 0.06), m_metal, false, basis)
 	var cage := ProcTex.flat(Color(0.15, 0.15, 0.15), 0.5, 0.8)
 	for k in 3:
 		Geo.box(_into, pos + inward * 0.06 + Vector3(0, -0.1 + k * 0.1, 0), Vector3(0.2, 0.012, 0.012), cage, false, basis)
-	_add_lamp(pos + inward * 0.04 + Vector3(0, 0.05, 0), Color(1.0, 0.74, 0.45), 1.1, 9.0, mode, true, false)
+	_add_lamp(pos + inward * 0.04 + Vector3(0, 0.05, 0), color, energy, 9.0, mode, true, false)
 
 
 func _add_lamp(pos: Vector3, color: Color, energy: float, light_range: float, mode: String, tunnel: bool, fixture := true) -> void:

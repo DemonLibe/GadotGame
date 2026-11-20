@@ -250,6 +250,7 @@ func _ready() -> void:
 	_net_fresh = true
 
 	player = Player.new()
+	player.world = level
 	add_child(player)
 	hud = Hud.new()
 	add_child(hud)
@@ -2016,11 +2017,13 @@ func _location_text() -> String:
 		return "ПРОЛОМ"
 	if p.z > Level.TUN_Z0:
 		return "СТАНЦИЯ «ТИХАЯ»"
+	var title := level.theme_title_at(p)
+	var suffix := " · " + title if title != "" else ""
 	var seg := level._segment_index(p)
 	if seg > 0 and seg <= Level.BRANCHES.size():
-		return str(Level.BRANCHES[seg - 1]["name"])
+		return str(Level.BRANCHES[seg - 1]["name"]) + suffix
 	var pk := int(round((Level.TUN_Z0 - p.z) / Level.PICKET_STEP))
-	return "ТОННЕЛЬ · ПК %d" % pk if pk > 0 else "ТОННЕЛЬ"
+	return ("ТОННЕЛЬ · ПК %d" % pk + suffix) if pk > 0 else "ТОННЕЛЬ"
 
 
 ## Воздух и свет от генератора. Работает — вентиляция гонит воздух в тоннель и горят лампы
@@ -2631,6 +2634,27 @@ func _smoke_test() -> void:
 			print("SMOKE FAIL: сеть %d — штолен %d, длина %d, сюжетных комнат %d, генераторных %d, вентблоков %d" % [k, prim, trunk,
 				stories.size(), level.gen_rooms.size(), VENT_SPOTS.size()])
 		net_ok = net_ok and good
+		# Темы: у каждого прохода своя, у участков тоннеля нет щелей, материалы и декали находятся.
+		var themes_ok := not level.trunk_sections.is_empty() and float(level.trunk_sections[0]["z0"]) == Level.TUN_Z0 \
+			and float(level.trunk_sections[-1]["z1"]) <= Level.METRO_Z1
+		for sec_i in range(1, level.trunk_sections.size()):
+			themes_ok = themes_ok and is_equal_approx(float(level.trunk_sections[sec_i]["z0"]), float(level.trunk_sections[sec_i - 1]["z1"]))
+		var used := {}
+		for bi in Level.BRANCHES.size():
+			var th := str(Level.BRANCHES[bi]["theme"])
+			themes_ok = themes_ok and Level.THEMES.has(th)
+			used[th] = true
+			var probe := level.floor_point(bi, 20.0)
+			themes_ok = themes_ok and level.theme_at(probe) == th
+		for th in Level.THEMES:
+			for wall_name in Level.THEMES[th]["walls"]:
+				themes_ok = themes_ok and ProcTex._kit_ok(str(wall_name))
+			for dec in Level.THEMES[th]["decals"]:
+				themes_ok = themes_ok and level._decal_mat(str(dec)) != null
+		themes_ok = themes_ok and used.size() >= 4 and level.noise_mult_at(level.floor_point(-1, Level.TUN_Z0 - 500.0)) > 0.0
+		if not themes_ok:
+			print("SMOKE FAIL: темы проходов, сеть %d — участков %d, использовано тем %d" % [k, level.trunk_sections.size(), used.size()])
+		net_ok = net_ok and themes_ok
 	var ok := Game.ended and retry_ok and hide_ok and shop_ok and low_ok and lis_ok and net_ok and not _smoke_bad
 	# Концовка 3: все записки, засов решётки изнутри.
 	start_day(5)

@@ -119,6 +119,7 @@ var _stamina_wait := 0.0
 
 var head: Node3D
 var body: PlayerBody   # тело от первого лица (видно, если посмотреть вниз)
+var world: Level       # мир: по нему узнаём, на каком покрытии идём (по воде шаги громче)
 var camera: Camera3D
 var flashlight: SpotLight3D
 
@@ -576,6 +577,8 @@ func _physics_process(delta: float) -> void:
 				noise *= 2.0  # по воде хлюпает
 			if Meta.level("boots") > 0:
 				noise *= 0.5  # тихие ботинки
+			if world != null:
+				noise *= world.noise_mult_at(global_position)  # сырые участки хлюпают, железные гремят
 			Game.make_noise(global_position, noise)
 	else:
 		_bob_amp = move_toward(_bob_amp, 0.0, delta * 4.0)
