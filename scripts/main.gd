@@ -539,8 +539,6 @@ func _furnish_room(room: Dictionary) -> void:
 	var back := -hd + 0.3     # у задней стены
 	var left := -hw + 0.45    # у левой
 	var right := hw - 0.45    # у правой
-	if kind["theme"] != "genroom":
-		put.call("05_service_room/remains_bedding", Vector3(0.6, 0.0, -1.1), 0.0)
 	match str(kind["theme"]):
 		"genroom":  # генераторная: дизель посередине (его ставит main), бочки, канистра, кабель, табличка
 			put.call("common/fuel_barrel", Vector3(left, 0.0, back + 0.2), 0.3)

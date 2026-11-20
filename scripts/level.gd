@@ -27,15 +27,15 @@ const ROOM_H := 2.6
 ## Сюжетные комнаты (0–2 — сбоку от тоннеля, 3–5 — в тупиках первых штолен):
 ## назначение, ширина, глубина, высота, стены, пол. Остальные комнаты берут отделку отсюда же наугад.
 const ROOM_KINDS := [
-	{"theme": "bytovka", "w": 5.0, "d": 4.4, "h": 2.8, "wall": "plaster_peeling", "floor": "linoleum"},
-	{"theme": "sklad", "w": 4.6, "d": 5.4, "h": 3.0, "wall": "concrete_wet", "floor": "concrete_floor_cracked"},
-	{"theme": "workshop", "w": 6.0, "d": 4.4, "h": 3.0, "wall": "brick_soot", "floor": "concrete_floor_cracked"},
-	{"theme": "medpunkt", "w": 4.4, "d": 5.0, "h": 2.7, "wall": "tile_green", "floor": "tile_white_clean"},
-	{"theme": "shield", "w": 5.2, "d": 4.6, "h": 3.0, "wall": "concrete", "floor": "rubber_mat"},
-	{"theme": "office", "w": 4.8, "d": 4.8, "h": 2.7, "wall": "wood_planks_dark", "floor": "linoleum"},
+	{"theme": "bytovka", "w": 5.0, "d": 4.4, "h": 2.8, "wall": "acg_plaster007", "floor": "acg_terrazzo003"},
+	{"theme": "sklad", "w": 4.6, "d": 5.4, "h": 3.0, "wall": "acg_concrete035", "floor": "acg_concrete012"},
+	{"theme": "workshop", "w": 6.0, "d": 4.4, "h": 3.0, "wall": "acg_bricks097", "floor": "acg_concrete031"},
+	{"theme": "medpunkt", "w": 4.4, "d": 5.0, "h": 2.7, "wall": "acg_tiles032", "floor": "acg_terrazzo004"},
+	{"theme": "shield", "w": 5.2, "d": 4.6, "h": 3.0, "wall": "acg_concrete030", "floor": "acg_diamondplate001"},
+	{"theme": "office", "w": 4.8, "d": 4.8, "h": 2.7, "wall": "acg_wallpaper002c", "floor": "acg_carpet012"},
 ]
 ## Генераторная: проём без двери, внутри резервный дизель.
-const GEN_KIND := {"theme": "genroom", "w": 4.4, "d": 4.0, "h": 3.0, "wall": "concrete", "floor": "rubber_mat"}
+const GEN_KIND := {"theme": "genroom", "w": 4.4, "d": 4.0, "h": 3.0, "wall": "acg_concrete042a", "floor": "acg_diamondplate008c"}
 
 ## Сеть по старой схеме (322 м до решётки): по ней размечены мел, гнездо, ограждения смен и прочее.
 ## map_z() переводит такую отметку в нынешнюю сеть — пропорционально до решётки, за ней — как есть.
@@ -158,8 +158,9 @@ func build() -> void:
 	m_tubbing = ProcTex.tubbing()
 	m_tubbing_tri = ProcTex.tubbing_triplanar()
 	m_room = ProcTex.paint(Color(0.5, 0.5, 0.46), "paint_room")
-	m_tiles = ProcTex.tiles()
-	m_granite = ProcTex.granite()
+	# Станция: белая глазурованная плитка и терраццо вместо процедурных «кирпичиков».
+	m_tiles = ProcTex.kit("acg_tiles036", Color(0.86, 0.88, 0.86)) if ProcTex._kit_ok("acg_tiles036") else ProcTex.tiles()
+	m_granite = ProcTex.kit("acg_terrazzo004", Color(0.78, 0.78, 0.76)) if ProcTex._kit_ok("acg_terrazzo004") else ProcTex.granite()
 	m_ballast = ProcTex.ballast()
 	m_concrete = ProcTex.concrete_rings()
 	m_floor = ProcTex.concrete(Color(0.3, 0.29, 0.27), 0.5)
@@ -1556,7 +1557,7 @@ func _build_end_room(index: int) -> void:
 
 
 static func _kit_or(name: String, fallback: Material) -> Material:
-	var tint := Color(0.6, 0.58, 0.55) if name == "plaster_peeling" else Color(0.78, 0.76, 0.72)
+	var tint := Color(0.78, 0.76, 0.72)
 	return ProcTex.kit(name, tint) if name != "" and ProcTex._kit_ok(name) else fallback
 
 

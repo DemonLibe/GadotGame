@@ -27,7 +27,7 @@ var _body: Node3D
 
 func _ready() -> void:
 	add_to_group("generators")
-	var yellow := ProcTex.item("paint_yellow", Color(0.56, 0.52, 0.38), 4.5)
+	var yellow := ProcTex.item("paint_yellow", Color(0.42, 0.38, 0.27), 5.0)
 	var dark := ProcTex.item("rubber", Color.WHITE, 2)
 	var steel := ProcTex.item("dark_steel", Color.WHITE, 2)
 	# Рама на полозьях.

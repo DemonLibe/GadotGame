@@ -49,15 +49,21 @@ var _st := {}                  # ключ материала → SurfaceTool т�
 var _body: StaticBody3D
 
 
+## Материал набора, если он есть, иначе запасной.
+static func _pick(name: String, tint: Color, fallback: Material) -> Material:
+	return ProcTex.kit(name, tint) if ProcTex._kit_ok(name) else fallback
+
+
 func _materials() -> void:
 	if not _m.is_empty():
 		return
 	# Кладка из набора ассетов: красный кирпич в коридорах, замшелый — в залах, закопчённый свод, земляной пол.
-	_m["brick"] = ProcTex.bricks()
-	_m["brick_hall"] = ProcTex.kit("brick_moss", ProcTex.BRICK_TINT) if ProcTex._kit_ok("brick_moss") else _m["brick"]
-	_m["floor"] = ProcTex.kit("dirt_floor", Color(0.8, 0.78, 0.75)) if ProcTex._kit_ok("dirt_floor") else ProcTex.concrete(Color(0.26, 0.24, 0.22), 0.5)
-	_m["ceiling"] = ProcTex.kit("brick_soot", Color(0.8, 0.76, 0.72)) if ProcTex._kit_ok("brick_soot") else _m["brick"]
-	_m["stone"] = ProcTex.kit("tile_white") if ProcTex._kit_ok("tile_white") else ProcTex.granite()
+	# Столетняя кладка: тёмный закопчённый кирпич вместо ярко-красного, в залах — замшелый камень, пол — утоптанная земля.
+	_m["brick"] = _pick("acg_bricks097", Color(0.58, 0.54, 0.5), ProcTex.bricks())
+	_m["brick_hall"] = _pick("acg_bricks075b", Color(0.72, 0.74, 0.68), _m["brick"])
+	_m["floor"] = _pick("acg_ground023", Color(0.82, 0.8, 0.76), ProcTex.concrete(Color(0.26, 0.24, 0.22), 0.5))
+	_m["ceiling"] = _pick("acg_bricks056", Color(0.7, 0.66, 0.62), _m["brick"])
+	_m["stone"] = _pick("acg_tiles098", Color(0.72, 0.7, 0.64), ProcTex.granite())
 	_m["rust"] = ProcTex.flat(Color(0.33, 0.19, 0.11), 0.85, 0.4)
 
 

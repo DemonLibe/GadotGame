@@ -74,12 +74,17 @@ const ITEM_TEX := {
 ## Материал предмета: текстура с картой нормалей и шероховатостью, ложится на предмет «по объекту» (uv — тайлов на метр,
 ## чем мельче предмет, тем больше). tint — подкрасить; rough / metal — если надо переопределить.
 static func item(kind: String, tint := Color.WHITE, uv := 3.0, rough := -1.0, metal := -1.0) -> StandardMaterial3D:
-	var key := "item_%s_%s_%.1f_%.2f_%.2f" % [kind, tint.to_html(), uv, rough, metal]
+	return surface(ITEM_TEX.get(kind, ""), tint, uv, rough, metal)
+
+
+## То же по имени текстуры набора (acg_…): материал с нормалью, «по объекту».
+static func surface(tex: String, tint := Color.WHITE, uv := 3.0, rough := -1.0, metal := -1.0) -> StandardMaterial3D:
+	var key := "surf_%s_%s_%.1f_%.2f_%.2f" % [tex, tint.to_html(), uv, rough, metal]
 	if _cache.has(key):
 		return _cache[key]
-	var path := KIT + "materials/M_%s.tres" % ITEM_TEX.get(kind, "")
+	var path := KIT + "materials/M_%s.tres" % tex
 	var m: StandardMaterial3D
-	if ITEM_TEX.has(kind) and ResourceLoader.exists(path):
+	if tex != "" and ResourceLoader.exists(path):
 		m = (load(path) as StandardMaterial3D).duplicate()
 		m.uv1_triplanar = true
 		m.uv1_world_triplanar = false
@@ -267,8 +272,34 @@ static func _kit_ok(name: String) -> bool:
 
 ## Модель набора как есть (со своими материалами и коллизиями): path — от models/, например "common/fuel_barrel".
 ## collide = false — без коллизий модели (для предметов, у которых своя форма, например подбираемых).
+## Материалы моделей набора (пиксельные 64 px) → ambientCG с нормалями: [вид из ITEM_TEX, подкраска, тайлов на метр].
+## Постеры, надписи, лужи, стекло и полосы остаются как есть — там картинка и есть содержание.
+const KIT_REMAP := {
+	"M_Steel": ["steel", Color(1, 1, 1), 3.0],
+	"M_PaintWhite": ["paint_white", Color(0.82, 0.8, 0.74), 3.0],
+	"M_PaintRed": ["paint_red", Color(0.78, 0.7, 0.68), 3.0],
+	"M_MetalGreen": ["paint_green", Color(0.62, 0.68, 0.62), 2.5],
+	"M_MetalDark": ["dark_steel", Color(1, 1, 1), 2.5],
+	"M_RustMetal": ["rust2", Color(0.9, 0.85, 0.8), 2.5],
+	"M_CastIron": ["iron", Color(1, 1, 1), 2.5],
+	"M_Wood": ["planks", Color(0.9, 0.85, 0.8), 2.5],
+	"M_WoodPlanksDark": ["planks_gray", Color(0.75, 0.7, 0.65), 2.5],
+	"M_Rubber": ["rubber", Color(1, 1, 1), 4.0],
+	"M_Cloth": ["canvas", Color(0.7, 0.7, 0.62), 3.0],
+}
+
+
 static func kit_model(parent: Node, path: String, pos := Vector3.ZERO, yaw := 0.0, collide := true) -> Node3D:
 	var m := (load(KIT + "models/%s.glb" % path) as PackedScene).instantiate() as Node3D
+	for node in m.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		for i in mi.mesh.get_surface_count():
+			var sm := mi.mesh.surface_get_material(i)
+			if sm != null and KIT_REMAP.has(sm.resource_name):
+				var r: Array = KIT_REMAP[sm.resource_name]
+				mi.set_surface_override_material(i, item(r[0], r[1], r[2]))
 	m.transform = Transform3D(Basis(Vector3.UP, yaw), pos)
 	for body in m.find_children("*", "CollisionObject3D", true, false):
 		if not collide:
