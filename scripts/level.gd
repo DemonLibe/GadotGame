@@ -128,6 +128,7 @@ var _segments: Array[Dictionary] = []  # оси проходов {a, b, dir} в 
 var _holes := {}                # участки проходов, построенные через CSG: tunnel → [[от, до, сторона]]
 var net: Node3D                 # вся сеть тоннелей (пересобирается каждую смену)
 var net_seed := 0
+var piece_log: Array[Dictionary] = []      # поставленные декорации: {tunnel, along, piece, theme} (для проверки и отладки)
 var trunk_sections: Array[Dictionary] = []  # участки основного тоннеля: {z0 (ближе к станции), z1, theme, pick}
 var _decal_mats := {}
 var hidden_branch := -1         # потайная штольня (индекс в BRANCHES) или -1
@@ -195,6 +196,7 @@ func generate_network(seed_value: int) -> void:
 	_segments.clear()
 	_holes.clear()
 	trunk_sections.clear()
+	piece_log.clear()
 	_plug = null
 	hidden_open = false
 	_plan()
@@ -1363,7 +1365,7 @@ func _chalk_at(tunnel: int, side: int, along: float, text: String) -> void:
 	l.basis = tr.basis
 
 
-## Останки в проходе: сидящий — спиной к стене по сторону side, лежащий — вдоль прохода у стены.
+## Останки в проходе: сидящий — спиной к стене по сторону side, лежащий — вдоль прохода у стены (в тоннеле — вне колеи).
 func _remains(tunnel: int, along: float, side: int, pose: String) -> void:
 	var bones := Remains.new()
 	bones.pose = pose
@@ -1374,52 +1376,83 @@ func _remains(tunnel: int, along: float, side: int, pose: String) -> void:
 		bones.position = floor_point(tunnel, along, side * 1.4)
 		bones.rotation.y = atan2(-wall.x, -wall.z)
 	else:
-		bones.position = floor_point(tunnel, along, side * 0.75)
-		bones.rotation.y = _yaw_to(d) + rng.randf_range(-0.35, 0.35) + (PI if rng.randf() < 0.5 else 0.0)
+		bones.position = floor_point(tunnel, along, side * (1.15 if tunnel < 0 else 0.75))
+		bones.rotation.y = _yaw_to(d) + rng.randf_range(-0.2, 0.2) + (PI if rng.randf() < 0.5 else 0.0)
 	_into.add_child(bones)
+
+
+## Габариты (м) для расстановки в основном тоннеле: колея занимает ±0,6 от оси, справа ещё контактный рельс под коробом (0,9–1,2),
+## стена у пола — на 1,7. Поэтому крупное ставим у ЛЕВОЙ стены, полоса 0,7–1,65. В штольнях рельсов нет — места везде.
+const TRUNK_SIDE := -1
+const LANE_IN := 0.72     # ближняя к оси граница свободной полосы
+const LANE_OUT := 1.62    # дальняя (у стены)
+
+
+## Центр предмета шириной width в свободной полосе у стены: не ближе LANE_IN к оси и не дальше LANE_OUT.
+static func lane(width: float, bias := 0.0) -> float:
+	return clampf((LANE_IN + LANE_OUT) / 2.0 + bias, LANE_IN + width / 2.0, LANE_OUT - width / 2.0)
+
+
+## Гранёная глыба: низкополигональная сфера, сплюснутая и повёрнутая — на куб не похожа.
+func _boulder(pos: Vector3, size: float, mat: Material) -> MeshInstance3D:
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.5
+	mesh.height = 1.0
+	mesh.radial_segments = 7
+	mesh.rings = 4
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.transform = Transform3D(Basis.from_euler(Vector3(rng.randf_range(-0.4, 0.4), rng.randf() * TAU, rng.randf_range(-0.4, 0.4)))
+		* Basis.from_scale(Vector3(size * rng.randf_range(0.9, 1.4), size * rng.randf_range(0.55, 0.9), size * rng.randf_range(0.9, 1.3))), pos)
+	_into.add_child(mi)
+	return mi
 
 
 ## Декорация посередине прохода — то, ради чего стоит дойти: у стен, середина свободна.
 func _set_piece(tunnel: int, piece: String, along: float, theme: String) -> void:
-	var side := 1 if rng.randf() < 0.5 else -1
+	piece_log.append({"tunnel": tunnel, "along": along, "piece": piece, "theme": theme})
+	var trunk := tunnel < 0
+	# В тоннеле всё у левой стены; в штольне сторона случайная, а «вторая сторона» — напротив.
+	var s := TRUNK_SIDE if trunk else (1 if rng.randf() < 0.5 else -1)
+	var other := s if trunk else -s
 	var dir := 1.0 if tunnel >= 0 else -1.0   # «вглубь» по along
+	var yaw_along := cross_yaw(tunnel)         # локальная Z модели — вдоль прохода
 	match piece:
-		"flood":  # лужи, бочка и тот, кому не повезло
+		"flood":  # лужи у стены (не на путях), бочка и тот, кому не повезло
 			for k in 3:
-				_prop("common/puddle_decal", tunnel, along + dir * (k * 2.2 - 2.0), side * rng.randf_range(0.2, 0.9), rng.randf() * TAU)
-			_prop("common/fuel_barrel", tunnel, along + dir * 2.5, side * 1.25, rng.randf() * TAU)
-			Remains.bone_pile(_into, floor_point(tunnel, along, side * 1.15) + Vector3(0, 0.02, 0), rng.randf() * TAU, 1.0)
-		"pipes":  # аварийный участок: бочки, барабан, табличка
+				_prop("common/puddle_decal", tunnel, along + dir * (k * 2.4 - 2.4), s * rng.randf_range(1.0, 1.35), rng.randf() * TAU)
+			_prop("common/fuel_barrel", tunnel, along + dir * 2.6, s * lane(0.61, 0.1), rng.randf() * TAU)
+			Remains.bone_pile(_into, floor_point(tunnel, along, s * 1.15) + Vector3(0, 0.02, 0), rng.randf() * TAU, 1.0)
+		"pipes":  # аварийный участок: бочки в ряд у стены, барабан, табличка
 			for k in 3:
-				_prop("common/fuel_barrel", tunnel, along + dir * (k * 0.8 - 0.8), side * 1.25, rng.randf() * TAU)
-			_prop("common/cable_drum", tunnel, along + dir * 3.0, -side * 1.15, rng.randf() * TAU)
-			var tr := wall_mount(tunnel, side, along - dir * 2.0, FLOOR_Y + 1.5)
+				_prop("common/fuel_barrel", tunnel, along + dir * (k * 0.75 - 0.75), s * lane(0.61, 0.1), rng.randf() * TAU)
+			_prop("common/cable_drum", tunnel, along + dir * 3.2, other * lane(0.82), yaw_along + rng.randf_range(-0.3, 0.3))
+			var tr := wall_mount(tunnel, s, along - dir * 2.0, FLOOR_Y + 1.5)
 			if ResourceLoader.exists(ProcTex.KIT + "models/common/danger_sign.glb"):
 				var board := ProcTex.kit_model(_into, "common/danger_sign", tr.origin, atan2(tr.basis.z.x, tr.basis.z.z))
 				board.name = "DangerSign"
-		"cave_in":  # осыпь грунта с одной стороны: пройти можно, но тесно
+		"cave_in":  # осыпь грунта у стены: колея свободна, но тесно
 			var rock := _theme_wall("rock", 0)
-			for k in 9:
-				var sz := rng.randf_range(0.45, 1.0)
-				var r := Geo.box(_into, floor_point(tunnel, along + dir * rng.randf_range(-1.8, 1.8), side * rng.randf_range(0.65, 1.4)) + Vector3(0, sz * 0.3, 0),
-					Vector3(sz, sz * 0.8, sz), rock, false, Basis.from_euler(Vector3(rng.randf() * TAU, rng.randf() * TAU, rng.randf() * TAU)))
-				r.name = "Rock%d" % k
+			for k in 11:
+				var sz := rng.randf_range(0.35, 0.8)
+				var lat := rng.randf_range(0.95, 1.5)
+				_boulder(floor_point(tunnel, along + dir * rng.randf_range(-1.8, 1.8), s * lat) + Vector3(0, sz * 0.22, 0), sz, rock).name = "Rock%d" % k
 			var body := StaticBody3D.new()
 			body.collision_layer = ProcTex.PROP_LAYER
 			body.collision_mask = 0
 			_into.add_child(body)
-			var pc := floor_point(tunnel, along, side * 1.0) + Vector3(0, 0.45, 0)
-			var yaw := cross_yaw(tunnel)
-			body.transform = Transform3D(Basis(Vector3.UP, yaw), pc)
-			Geo.collider_box(body, Vector3(1.4, 0.9, 3.4))
-			Remains.bone_pile(_into, floor_point(tunnel, along + dir * 2.2, side * 0.8) + Vector3(0, 0.02, 0), rng.randf() * TAU, 0.9)
-			_prop("common/wooden_pallet", tunnel, along - dir * 2.8, -side * 1.2, rng.randf() * TAU)
-		"camp":  # лагерь тех, кто здесь остался: койка, останки, надпись мелом
-			_prop("01_duty_room/cot", tunnel, along, side * 1.15, cross_yaw(tunnel) + (PI / 2 if side > 0 else -PI / 2))
-			_remains(tunnel, along + dir * 1.8, -side, "sitting" if rng.randf() < 0.5 else "lying")
-			_prop("common/fire_extinguisher", tunnel, along - dir * 1.5, -side * 1.35, rng.randf() * TAU)
+			body.transform = Transform3D(Basis(Vector3.UP, yaw_along), floor_point(tunnel, along, s * 1.25) + Vector3(0, 0.4, 0))
+			Geo.collider_box(body, Vector3(0.9, 0.8, 3.4))
+			Remains.bone_pile(_into, floor_point(tunnel, along + dir * 2.4, s * 1.2) + Vector3(0, 0.02, 0), rng.randf() * TAU, 0.9)
+			_prop("common/wooden_pallet", tunnel, along - dir * 3.0, other * lane(0.9), yaw_along + rng.randf_range(-0.15, 0.15))
+		"camp":  # лагерь тех, кто здесь остался: койка вдоль стены, останки, огнетушитель, надпись мелом
+			_prop("01_duty_room/cot", tunnel, along, s * lane(1.01), yaw_along + (PI if rng.randf() < 0.5 else 0.0))
+			_remains(tunnel, along + dir * 2.7, s, "sitting" if rng.randf() < 0.5 else "lying")
+			_prop("common/fire_extinguisher", tunnel, along - dir * 1.7, s * (LANE_OUT - 0.12), rng.randf() * TAU)
 			if CAMP_CHALK.has(theme):
-				_chalk_at(tunnel, -side if is_plain(tunnel, along, -side, 2.0) else side, along + dir * 1.0, str(CAMP_CHALK[theme]))
+				var wall_side := s if is_plain(tunnel, along, s, 1.0) else -s
+				_chalk_at(tunnel, wall_side, along + dir * 0.4, str(CAMP_CHALK[theme]))
 
 
 ## Потайная штольня есть или её нет.

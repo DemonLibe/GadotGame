@@ -117,8 +117,40 @@ static func model_skin(path: String, tint: Color, roughness := 0.85, metallic :=
 	var m := flat(tint, roughness, metallic)
 	m.albedo_texture = load(path)
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
+	_add_baked(m, path)
 	_cache[key] = m
 	return m
+
+
+## Если рядом с цветовой текстурой лежат запечённые карты (tools/textures/bake_maps.py) — подключить нормали и шероховатость.
+static func _add_baked(m: StandardMaterial3D, path: String) -> void:
+	var base := path.get_basename()
+	if ResourceLoader.exists(base + "_n.png"):
+		m.normal_enabled = true
+		m.normal_texture = load(base + "_n.png")
+		m.normal_scale = 0.9
+	if ResourceLoader.exists(base + "_r.png"):
+		m.roughness_texture = load(base + "_r.png")
+		m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
+		m.roughness = 1.0  # шероховатость целиком в карте
+
+
+## Модели с материалами из файла (мусор, метро): подключить запечённые карты к тем поверхностям, где они есть.
+static func add_baked_maps(root: Node) -> void:
+	for node in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		for i in mi.mesh.get_surface_count():
+			var sm := mi.mesh.surface_get_material(i) as StandardMaterial3D
+			if sm == null or sm.albedo_texture == null or sm.normal_enabled:
+				continue
+			var tp := sm.albedo_texture.resource_path
+			if tp == "" or not ResourceLoader.exists(tp.get_basename() + "_n.png"):
+				continue
+			var d := sm.duplicate() as StandardMaterial3D
+			_add_baked(d, tp)
+			mi.set_surface_override_material(i, d)
 
 ## Текстура паутины: радиальные нити + спираль. Несколько вариантов кешируются.
 static func web_texture(variant := 0) -> ImageTexture:

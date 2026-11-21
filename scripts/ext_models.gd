@@ -27,6 +27,7 @@ static func ok(path: String) -> bool:
 static func _template(path: String) -> Node:
 	if not _templates.has(path):
 		_templates[path] = (load(path) as PackedScene).instantiate()
+		ProcTex.add_baked_maps(_templates[path])
 	return _templates[path]
 
 
