@@ -305,6 +305,9 @@ func _ready() -> void:
 	add_child(menu)
 	menu.resume.connect(_on_resume)
 	menu.main_menu.connect(_on_main_menu)
+	var tester := TesterMenu.new()  # ВРЕМЕННО: меню тестировщика (F9)
+	tester.main = self
+	add_child(tester)
 
 	Game.end_day_requested.connect(end_day)
 	if OS.get_cmdline_user_args().has("--smoke"):

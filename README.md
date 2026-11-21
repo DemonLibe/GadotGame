@@ -164,3 +164,7 @@ voice/          озвучка диспетчера и Маши
 **Шрифты** (`assets/fonts/`, [SIL OFL 1.1](https://openfontlicense.org)): [Oswald](https://github.com/googlefonts/OswaldFont)
 (The Oswald Project Authors) — интерфейс, [PT Mono](https://www.paratype.com/public) (ParaType) — путевой лист и записки,
 [Caveat](https://github.com/googlefonts/caveat) (The Caveat Project Authors) — дневник.
+
+## Меню тестировщика (временное)
+
+В игре F9 открывает окно: выбор смены 1–7 (сверху или сразу внизу), запуск любой из концовок (обвал/газета, метро, решётка, «выбраться → смена 6»), телепорты, выдача вещей, бессмертие, все записки, закрытие заданий. Удалить перед релизом: `scripts/tester_menu.gd` и блок `TesterMenu` в `Main._ready`.
