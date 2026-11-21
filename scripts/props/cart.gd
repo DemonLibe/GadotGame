@@ -37,7 +37,7 @@ func hold_interact(_player, delta: float) -> float:
 		Game.make_noise(global_position, 14.0)
 	if position.z <= PUSH_TO + 0.01:
 		Game.report("cartpush")
-		Game.say("Докатил. Руки трясутся. Это было слышно, наверное, до самой решётки.", Game.THOUGHT, 4.0)
+		Game.say("Докатил. Руки трясутся. Слышно, наверное, было до самой решётки.", Game.THOUGHT, 4.0)
 		return -1.0
 	return (PUSH_FROM - position.z) / (PUSH_FROM - PUSH_TO)
 

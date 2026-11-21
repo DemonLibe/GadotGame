@@ -153,13 +153,13 @@ func interact(player) -> void:
 	if kind == "fuel":
 		player.canisters += 1
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
-		Game.say_once("fuel_pick", "Канистра солярки — для генератора на станции.", Game.SYSTEM, 3.0)
+		Game.say_once("fuel_pick", "Канистра солярки, для генератора на станции.", Game.SYSTEM, 3.0)
 		_gone()
 		return
 	if kind == "bolts":
 		var took := mini(amount, player.max_bolts() - player.bolts)
 		if took <= 0:
-			Game.say("Карман полон болтов.", Game.SYSTEM, 2.0)
+			Game.say("В карманы больше болтов не влезет.", Game.SYSTEM, 2.0)
 			return
 		player.bolts += took
 		amount -= took
@@ -171,24 +171,24 @@ func interact(player) -> void:
 	if kind == "fuse":
 		player.fuses += 1
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
-		Game.say("Предохранитель — к щитку.", Game.SYSTEM, 3.0)
+		Game.say("Предохранитель, это к щитку.", Game.SYSTEM, 3.0)
 		_gone()
 		return
 	if kind == "relays":
 		player.relays += amount
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
-		Game.say("Ретрансляторы ×3 — кронштейны по тоннелю, отмечены на карте.", Game.SYSTEM, 4.0)
+		Game.say("Ретрансляторы ×3. Кронштейны по тоннелю, на карте отмечены.", Game.SYSTEM, 4.0)
 		_gone()
 		return
 	if kind == "key":
 		player.keys[amount] = true
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
-		Game.say("Ключ с биркой «С-%d». Где-то здесь служебка с таким номером." % amount, Game.THOUGHT, 4.0)
+		Game.say("Ключ с биркой «С-%d». Где-то тут служебка с таким номером." % amount, Game.THOUGHT, 4.0)
 		_gone()
 		return
 	if kind == "medkit":
 		if player.health >= Player.HEALTH_MAX - 1.0:
-			Game.say("Здоровье полное — аптечка подождёт.", Game.SYSTEM, 2.0)
+			Game.say("Здоровье полное, аптечка подождёт.", Game.SYSTEM, 2.0)
 			return
 		player.health = minf(Player.HEALTH_MAX, player.health + 60.0)
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
@@ -197,7 +197,7 @@ func interact(player) -> void:
 		return
 	if kind == "battery":
 		if player.batteries >= player.max_batteries():
-			Game.say("Карманы полны — батарейка не влезет.", Game.SYSTEM, 2.0)
+			Game.say("Карманы полны, батарейка не влезет.", Game.SYSTEM, 2.0)
 			return
 		player.batteries += 1
 		Game.report("gear:battery")  # в шестую смену — в запас на седьмую
@@ -208,9 +208,9 @@ func interact(player) -> void:
 		player.add_loot(amount)
 		Game.play_at(Sfx.pickup(), global_position, -6.0)
 		if kind == "bag":
-			Game.say("Мой вещмешок. Всё на месте — кроме меня в прошлый раз.", Game.THOUGHT, 3.5)
+			Game.say("Мой вещмешок. Всё на месте. Кроме меня, в прошлый раз.", Game.THOUGHT, 3.5)
 		else:
-			Game.say_once("relic_pick", title.left(1).to_upper() + title.substr(1) + ". Наверху за такое заплатят — если вынесу.", Game.THOUGHT, 3.5)
+			Game.say_once("relic_pick", title.left(1).to_upper() + title.substr(1) + ". Наверху за такое заплатят, если вынесу.", Game.THOUGHT, 3.5)
 		_gone()
 		return
 	if kind == "token":
@@ -222,7 +222,7 @@ func interact(player) -> void:
 	if kind == "pistol":
 		player.has_pistol = true
 		Game.report("gear:pistol")
-		Game.say("Пистолет Макарова. Тяжёлый. Пусть так и останется в кобуре.", Game.THOUGHT, 4.0)
+		Game.say("Пистолет Макарова. Тяжёлый. Пусть лучше остаётся в кобуре.", Game.THOUGHT, 4.0)
 	else:
 		Game.report("gear:ammo")
 	player.ammo += amount

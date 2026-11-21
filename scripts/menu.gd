@@ -78,7 +78,7 @@ func show_main(saved_day: int) -> void:
 	visible = true
 	_bg.color.a = 0.35
 	_title.text = "HOPE LIGHT"
-	_sub.text = "Станция «Тихая». Пять смен под землёй.\nСложность одна — высокая."
+	_sub.text = "Станция «Тихая». Пять смен под землёй.\nЛегко не будет."
 	_show_box()
 	if saved_day > 1:
 		_button("Продолжить — смена %d" % saved_day, func(): continue_game.emit())

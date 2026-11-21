@@ -74,7 +74,7 @@ func interact(player) -> void:
 		return
 	player.riding = self
 	rider = player
-	Game.say_once("trolley", "Ручная дрезина. Быстрее, чем пешком, — и слышно её, наверное, до самой решётки.", Game.THOUGHT, 4.5)
+	Game.say_once("trolley", "Ручная дрезина. Быстрее, чем пешком, зато слышно её, наверное, до самой решётки.", Game.THOUGHT, 4.5)
 
 
 ## Сесть на место обходчика: пока он на площадке — рычаг его руками. push: +1 — по взгляду, -1 — назад.
@@ -110,7 +110,7 @@ func _physics_process(delta: float) -> void:
 			var dz := w.global_position.z - z
 			if absf(dz) < 2.2 and signf(dz) == signf(speed):
 				z = w.global_position.z - signf(speed) * 2.2
-				_stop("Паутина поперёк пути. Дрезина в неё не пойдёт — жечь.")
+				_stop("Паутина поперёк пути. Дрезина в неё не пойдёт, жечь надо.")
 	position.z = z
 	_phase += absf(speed) * delta * 1.6
 	_lever.rotation.x = sin(_phase) * 0.35

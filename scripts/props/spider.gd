@@ -101,7 +101,7 @@ func _process(delta: float) -> void:
 			if c and c.global_position.distance_to(global_position) < 15.0:
 				alarm(c.global_position)
 				if player and player.global_position.distance_to(global_position) < 10.0:
-					Game.say_once("spiders_run", "Пауки... разбегаются. Все разом. Что-то идёт.", Game.THOUGHT, 3.5)
+					Game.say_once("spiders_run", "Пауки разбегаются. Все сразу. Что-то идёт.", Game.THOUGHT, 3.5)
 				break
 	if _alarm > 0.0:
 		_alarm -= delta
@@ -119,7 +119,7 @@ func _process(delta: float) -> void:
 		_target = Vector3(wall_x, global_position.y, z)
 		_wait = 0.0
 		speed = 1.6
-		Game.say_once("spider_flee", "Боится огня. Хоть кто-то здесь боится меня.")
+		Game.say_once("spider_flee", "Боится огня. Хоть кто-то тут боится меня.")
 
 	var moving := false
 	if _wait > 0.0:

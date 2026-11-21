@@ -32,17 +32,17 @@ func get_prompt(_player) -> String:
 func interact(_player) -> void:
 	# После пятой смены докладывать некому: смену закрывает запись в журнале.
 	if Game.day == Game.LAST_DAY:
-		Game.say("Не до журнала — выбираться через тоннель, до конца.", Game.SYSTEM, 4.0)
+		Game.say("Не до журнала. Надо выбираться через тоннель, до конца.", Game.SYSTEM, 4.0)
 		return
 	if Game.day == Game.LAST_DAY - 1:
 		if Game.all_done():
 			Game.report("return")
-			Game.say("«Смена сдана. Восьмой». На этот раз — моей рукой.", Game.THOUGHT, 4.0)
+			Game.say("«Смена сдана. Восьмой». На этот раз моей рукой.", Game.THOUGHT, 4.0)
 			Game.end_day_requested.emit()
 		else:
 			Game.say("Ещё не всё собрано: " + Game.remaining_text() + ".", Game.SYSTEM, 5.0)
 		return
 	if Game.all_done():
-		Game.say("Всё сделано. Осталось доложить диспетчеру по рации (рацию в руки — ЛКМ).", Game.SYSTEM, 5.0)
+		Game.say("Всё сделано. Осталось доложить диспетчеру по рации (рацию в руку и ЛКМ).", Game.SYSTEM, 5.0)
 	else:
 		Game.say("Смена не закончена. Осталось: " + Game.remaining_text() + ".", Game.SYSTEM, 5.0)

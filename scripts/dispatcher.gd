@@ -75,11 +75,11 @@ func radio_pressed(day: int) -> void:
 		return
 	if player and lower and lower.contains(player.global_position):
 		_static.play()
-		Game.say("Рация: только шипение — под кирпичным сводом не берёт.", Game.SYSTEM, 3.5)
+		Game.say("Рация шипит и больше ничего: под кирпичным сводом связи нет.", Game.SYSTEM, 3.5)
 		return
 	if Game.has_open_task("relay") and player and player.global_position.z < Level.map_z(RELAY_DEEP_Z) and player.global_position.y < Level.FLOOR_Y + 5.0:
 		_static.play()
-		Game.say("Рация: только шипение — глубже нужны ретрансляторы.", Game.SYSTEM, 3.5)
+		Game.say("Рация шипит и больше ничего: дальше без ретрансляторов связи нет.", Game.SYSTEM, 3.5)
 		return
 	if Game.all_done() and Game.has_open_task("return"):
 		report_shift(day)
@@ -94,7 +94,7 @@ func hint(day: int) -> void:
 		var token := _token + 1
 		await speak([lies.pick_random()])
 		if token == _token:
-			Game.say("...Это был не его голос. Похож — но не его.", Game.THOUGHT, 3.5)
+			Game.say("...Это был не его голос. Похож, но не его.", Game.THOUGHT, 3.5)
 		return
 	var kind := Game.first_open_task()
 	var id: String = _hints.get(kind, _hints.get("unknown", ""))
@@ -146,7 +146,7 @@ func report_shift(day: int) -> void:
 
 func repeat_last() -> void:
 	if _last.is_empty():
-		Game.say("Рация молчит. Только шипение.", Game.SYSTEM, 2.5)
+		Game.say("Рация молчит. Одно шипение.", Game.SYSTEM, 2.5)
 		_static.play()
 		return
 	speak(_last)

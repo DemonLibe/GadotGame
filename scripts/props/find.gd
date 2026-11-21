@@ -61,12 +61,12 @@ func interact(player) -> void:
 			Game.say("Резиновая утка. Здесь. В затопленной штольне. Пищит.", Game.THOUGHT, 4.0)
 		"lens":
 			player.apply_upgrades()
-			Game.say("Рефлектор от шахтёрской лампы. Встал на фонарь как родной — луч стал длиннее.", Game.THOUGHT, 4.5)
+			Game.say("Рефлектор от шахтёрской лампы. Встал на фонарь как родной, луч стал длиннее.", Game.THOUGHT, 4.5)
 		"cell":
 			player.apply_upgrades()
-			Game.say("Аккумулятор повышенной ёмкости. Фонарь продержится дольше.", Game.THOUGHT, 4.0)
+			Game.say("Аккумулятор повышенной ёмкости. Фонарь теперь продержится дольше.", Game.THOUGHT, 4.0)
 		_:
 			Game.add_fear(-30.0)
-			Game.say("Успокоительное. Пара таблеток — и руки уже не так трясутся. (Предел страха выше.)", Game.THOUGHT, 4.5)
+			Game.say("Успокоительное. Пара таблеток, и руки уже не так трясутся. (Предел страха выше.)", Game.THOUGHT, 4.5)
 	Game.play_at(Sfx.pickup(), global_position, -6.0)
 	queue_free()

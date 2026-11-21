@@ -155,7 +155,7 @@ func _process(delta: float) -> void:
 					_draining = false
 					_sound.stop()
 					Game.report("water")
-					Game.say("Вода ушла. Под ногами — рельсы и... кости? Нет, просто ветки. Откуда здесь ветки?", Game.THOUGHT, 4.5)
+					Game.say("Вода ушла. Под ногами рельсы и... кости? Нет, просто ветки. Откуда тут ветки?", Game.THOUGHT, 4.5)
 
 
 func get_prompt(_player) -> String:
@@ -201,7 +201,7 @@ func hold_interact(player, delta: float) -> float:
 		player.take_damage(15.0)
 		player.flicker(0.6)
 		Game.play_at(Sfx.sparks(), global_position, 4.0)
-		Game.say("Ударило током — сначала заглушить генератор на станции.", Game.SYSTEM, 3.5)
+		Game.say("Ударило током. Сначала надо заглушить генератор на станции.", Game.SYSTEM, 3.5)
 		return -1.0
 	_progress += delta / float(HOLD[kind])
 	if _progress < 1.0:
@@ -211,7 +211,7 @@ func hold_interact(player, delta: float) -> float:
 		"cable":
 			Game.play_at(Sfx.click(), global_position, -4.0)
 			Game.report("cable")
-			Game.say("Кабель исправлен. Генератор можно запускать снова.", Game.SYSTEM, 3.5)
+			Game.say("Кабель починен. Генератор можно заводить снова.", Game.SYSTEM, 3.5)
 		"sensor":
 			_led.albedo_color = Color(0.2, 1.0, 0.3)
 			_led.emission = Color(0.2, 1.0, 0.3)
@@ -227,7 +227,7 @@ func hold_interact(player, delta: float) -> float:
 			_sound.play()
 			Game.play_at(Sfx.clank(), global_position, -2.0)
 			Game.report("fuse")
-			Game.say("Щёлк — и щиток загудел. Теперь отсюда — подальше.", Game.THOUGHT, 3.5)
+			Game.say("Щёлк, и щиток загудел. Теперь отсюда подальше.", Game.THOUGHT, 3.5)
 		"valve":
 			if Game.valve_order[Game.tasks_progress("valves")] != index:
 				# Не та — пар срывает все уже перекрытые задвижки.
@@ -239,7 +239,7 @@ func hold_interact(player, delta: float) -> float:
 				for n in get_tree().get_nodes_in_group("valves"):
 					(n as TaskDevice).reopen()
 				Game.reset_task("valves")
-				Game.say("Не та задвижка — пар сорвал все. Заново, по порядку из списка.", Game.SYSTEM, 4.5)
+				Game.say("Не та задвижка, пар сорвал все. Заново, по порядку из списка.", Game.SYSTEM, 4.5)
 				return -1.0
 			_wheel.rotation.z += PI
 			Game.play_at(Sfx.creak(), global_position, -4.0)

@@ -56,7 +56,7 @@ func get_prompt(_player) -> String:
 
 func interact(_player) -> void:
 	if not _ringing:
-		Game.say_once("phone_dead", "Гудка нет. Линию отключили, говорят, ещё в двухтысячном.", Game.THOUGHT, 3.5)
+		Game.say_once("phone_dead", "Гудка нет. Линию отключили ещё в двухтысячном, говорят.", Game.THOUGHT, 3.5)
 		return
 	_ringing = false
 	_ring.stop()

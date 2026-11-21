@@ -141,7 +141,7 @@ var _lower_t := 25.0
 ## Подражатель: зовёт знакомым голосом из тупика. Пошёл на голос — там ждут.
 const MIMIC_FROM := 4          # с какой смены
 const MIMIC_CALLS := 4         # сколько раз позовёт, прежде чем замолчать
-const MIMIC_VOICES := [["m_call", "…Папа?.. Папа, я здесь…", MASHA], ["b1_0", "«Обходчик, приём. Говорит диспетчер».", Dispatcher.COLOR]]
+const MIMIC_VOICES := [["m_call", "…Папа?.. Папа, ты где?…", MASHA], ["b1_0", "«Обходчик, приём. Это диспетчер. Слышно меня?»", Dispatcher.COLOR]]
 var _mimic := Vector2i(-1, -1)  # клетка-тупик, откуда зовёт
 var _mimic_calls := 0
 var _mimic_t := 0.0
@@ -180,7 +180,7 @@ func _lower_events(delta: float) -> void:
 			_echo_step()
 		_:
 			Game.play_ui(Sfx.rumble(), -16.0)
-			Game.say_once("lower_train", "...Поезд? Здесь? Рельсы сняли сто лет назад.", Game.WHISPER, 3.5)
+			Game.say_once("lower_train", "...Поезд? Здесь? Рельсы тут сто лет как сняли.", Game.WHISPER, 3.5)
 
 
 ## Обвал: выбрать проход рядом с обходчиком, у которого есть обход, — сначала пыль и треск, потом рушится.
@@ -210,7 +210,7 @@ func start_collapse() -> bool:
 	Game.play_at(Sfx.rumble(), at + Vector3(0, LowerLine.H, 0), -2.0)
 	player.flicker(0.3)
 	_dust(at)
-	Game.say_once("collapse_warn", "Свод трещит — прочь из-под него!", Game.SYSTEM, 3.0)
+	Game.say_once("collapse_warn", "Свод трещит, уходи из-под него!", Game.SYSTEM, 3.0)
 	get_tree().create_timer(COLLAPSE_WARN).timeout.connect(func(): _collapse_now(pick[0], pick[1]))
 	return true
 
@@ -233,9 +233,9 @@ func _collapse_now(a: Vector2i, b: Vector2i) -> void:
 		# Стоял под сводом — придавило и отбросило.
 		player.global_position = at + (flat.normalized() if flat.length() > 0.05 else Vector3.BACK) * 1.4 + Vector3(0, 0.1, 0)
 		player.take_damage(30.0)
-		Game.say("Кирпичом по плечу... Живой. Прохода больше нет.", Game.THOUGHT, 3.5)
+		Game.say("Кирпичом по плечу... Живой. Только прохода больше нет.", Game.THOUGHT, 3.5)
 	else:
-		Game.say_once("collapse_done", "Завалило. Назад этой дорогой не пройти — искать обход.", Game.THOUGHT, 4.0)
+		Game.say_once("collapse_done", "Завалило. Этой дорогой назад не пройти, придётся искать обход.", Game.THOUGHT, 4.0)
 
 
 ## Пыль и кирпичная крошка с потолка над проходом.
@@ -300,7 +300,7 @@ func lower_hunt() -> bool:
 	var pos := lower.center(cand.pick_random()) + Vector3(0, 0.05, 0)
 	_hunt_pending = true
 	Game.play_at(Sfx.stalker_growl(), pos + Vector3(0, 1.8, 0), 4.0)
-	Game.say_once("lower_hunt", "Это его голос... Он спустился сюда. За мной. Шкаф — в залах были старые шкафы.", Game.THOUGHT, 4.5)
+	Game.say_once("lower_hunt", "Это его голос... Он спустился сюда, за мной. В залах стояли старые шкафы, надо к ним.", Game.THOUGHT, 4.5)
 	get_tree().create_timer(4.0).timeout.connect(func(): _hunt_arrive(pos, int(LOWER_HUNT_DAY.get(Game.day, 5))))
 	return true
 
@@ -356,7 +356,7 @@ func _update_mimic(delta: float) -> void:
 	a.play()
 	Game.say(_mimic_voice[1], _mimic_voice[2], 3.5)
 	if _mimic_calls == 2:
-		Game.say_once("mimic_think", "Рация здесь не берёт. И Маша — дома. Кто тогда зовёт?", Game.THOUGHT, 4.0)
+		Game.say_once("mimic_think", "Рация тут не берёт. Маша дома. Тогда кто зовёт?", Game.THOUGHT, 4.0)
 
 
 ## Пришёл на голос: в тупике пусто — а потом из-под свода падает то, что звало.
@@ -371,7 +371,7 @@ func _mimic_ambush(c: Vector3) -> void:
 	cr.state = "chase"
 	cr._goal = player.global_position
 	Game.play_at(Sfx.hiss(), c + Vector3(0, 2.5, 0), 4.0)
-	Game.say("Пусто... Голос был отсюда. «Не иди на голос» — вот о чём писал Седьмой.", Game.THOUGHT, 4.0)
+	Game.say("Пусто... А голос шёл отсюда. «На голос не ходи», вот о чём писал Седьмой.", Game.THOUGHT, 4.0)
 
 
 ## Тревожная петля: тихо, когда пауки только побежали, громче, чем ближе он, во весь голос — когда гонится.
@@ -415,7 +415,7 @@ func _update_fear(delta: float) -> void:
 		# Шестая смена — тихая, страх копится как в первую.
 		var d := 1 if Game.day == Game.LAST_DAY - 1 else Game.day
 		Game.add_fear(delta * (3.5 + d * 1.2))
-		Game.say_once("dark", "Темно... Слишком темно. Нужен свет.")
+		Game.say_once("dark", "Темно. Слишком темно, нужен свет.")
 	if stalker.visible and stalker.global_position.distance_to(pos) < 12.0:
 		Game.add_fear(delta * 4.0)
 
@@ -442,30 +442,30 @@ func _story() -> void:
 	if player.climbing and d >= 2 and y > 20.0 and y < 60.0 and _once("shaft"):
 		Game.play_at(Sfx.rung(), player.global_position + Vector3(0, 9.0, 0), 4.0)
 		get_tree().create_timer(0.6).timeout.connect(func(): Game.play_at(Sfx.rung(), player.global_position + Vector3(0, 8.7, 0), 4.0))
-		Game.say("Сверху... ступеньки звенят. Кто-то спускается следом?", Game.THOUGHT, 5.0)
+		Game.say("Сверху ступеньки звенят. Кто-то спускается за мной?", Game.THOUGHT, 5.0)
 	if player.climbing and d >= 4 and y > -5.0 and y < 15.0 and _once("shaft_dark"):
 		player.flicker(1.5)
 		Game.play_at(Sfx.whisper(), player.global_position + Vector3(0, -6.0, 0), 0.0)
 		Game.say_once("shaft_whisper", "…ниже… ещё ниже…", Game.WHISPER)
 	if d == 1 and Game.all_done() and at_station and _once("rumble"):
 		Game.play_ui(Sfx.rumble(), -6.0)
-		Game.say("Что-то обрушилось в глубине тоннеля... Завтра проверю.", Game.THOUGHT, 5.0)
+		Game.say("Где-то в глубине тоннеля что-то обрушилось. Завтра проверю.", Game.THOUGHT, 5.0)
 	if d == 3 and at_station and z < -34.0 and _once("cart"):
-		Game.say("Где вагонетка?.. Она всегда стоит здесь. Всегда.", Game.THOUGHT, 5.0)
+		Game.say("Где вагонетка?.. Она всегда тут стояла. Всегда.", Game.THOUGHT, 5.0)
 	if d == 4 and Game.all_done() and at_station and z < -36.0 and _once("watch"):
 		var pos := Vector3(Level.TUN_CX, Level.FLOOR_Y, -64.0)
 		stalker.appear(pos, "watch", 15.0)
 		Game.play_at(Sfx.step(), pos, 2.0)
 	if y < Level.FLOOR_Y + 5.0 and Game.has_open_task("inspect:end") and z < main.day_limit() + 4.0:
 		Game.report("inspect:end")
-		Game.say("Ограждение. За ним завал... и в завале что-то шевелится. Хватит, назад.", Game.THOUGHT, 5.0)
+		Game.say("Ограждение. За ним завал, а в завале что-то шевелится. Нет, хватит, назад.", Game.THOUGHT, 5.0)
 	if y < Level.FLOOR_Y + 5.0 and z < Level.GRATE_Z + 4.0 and Game.has_open_task("inspect:grate"):
 		Game.report("inspect:grate")
 		if d == Game.FINAL_DAY:
-			Game.say("Решётка открыта. Замок сорван... изнутри.", Game.THOUGHT, 5.0)
+			Game.say("Решётка открыта. Замок сорван. Изнутри.", Game.THOUGHT, 5.0)
 			Game.add_task("inspect:nest", "Узнать, что за решёткой", 1)
 		else:
-			Game.say("Решётка заперта. За ней... каски? Чьи это каски?", Game.THOUGHT, 5.0)
+			Game.say("Решётка заперта. А за ней каски... Чьи это каски?", Game.THOUGHT, 5.0)
 	if d == Game.FINAL_DAY and y < Level.FLOOR_Y + 5.0 and z < Level.GRATE_Z - 25.0:
 		main.ending()
 	# Дошёл туда, откуда звала «Маша»: пусто — а за спиной хлопает дверь.
@@ -479,15 +479,15 @@ func _story() -> void:
 		if not slammed:
 			Game.play_at(Sfx.clank(), player.global_position - player.forward_flat() * 6.0 + Vector3(0, 1.0, 0), 4.0)
 		Game.add_fear(15.0)
-		Game.say("Пусто. Только на стене мелом — фонарик. Такой, как она нарисовала мне в письме.", Game.THOUGHT, 5.0)
+		Game.say("Пусто. Только на стене мелом фонарик. Такой же, как Маша нарисовала мне в письме.", Game.THOUGHT, 5.0)
 	# Пикет за спиной сменил номер — заметил, когда оглянулся.
 	if _picket and player.is_looking_at(_picket.global_position, 0.9) and player.global_position.distance_to(_picket.global_position) < 18.0:
 		Game.add_fear(10.0)
-		Game.say("ПК 8?.. Я только что прошёл мимо. Там был ПК %d." % int(_picket.get_meta("number")), Game.THOUGHT, 4.5)
+		Game.say("ПК 8?.. Я только что мимо проходил. Там был ПК %d." % int(_picket.get_meta("number")), Game.THOUGHT, 4.5)
 		_picket = null
 	if _chalk and player.is_lighting(_chalk.global_position):
 		Game.add_fear(12.0)
-		Game.say("«ВОСЬМОЙ». И время. Сейчас — ровно столько. Мел ещё сыпется.", Game.THOUGHT, 4.5)
+		Game.say("«ВОСЬМОЙ». И время. Ровно такое, как сейчас. Мел ещё сыплется.", Game.THOUGHT, 4.5)
 		_chalk = null
 
 
@@ -581,7 +581,7 @@ func _hunt() -> bool:
 		sp.flee_and_vanish(pos - Vector3(0, 0, dir_z * 3.0), randf_range(6.0, 9.0), randf_range(3.0, 4.2))
 	Game.play_at(Sfx.scuttle(), pos + Vector3(0, 2.0, 0), 4.0)
 	get_tree().create_timer(1.2).timeout.connect(func(): Game.play_at(Sfx.scuttle(), p.lerp(pos, 0.5) + Vector3(0, 2.0, 0), 2.0))
-	Game.say("Пауки... бегут. Все разом — оттуда. Он идёт. Нужен шкаф. Быстро.", Game.THOUGHT, 4.0)
+	Game.say("Пауки бегут. Все разом, оттуда. Он идёт. Быстро в шкаф.", Game.THOUGHT, 4.0)
 	var delay: float = [0.0, 0.0, 0.0, 7.0, 5.5, 4.0, 4.0, 3.0][clampi(Game.day, 0, Game.LAST_DAY)]
 	get_tree().create_timer(delay).timeout.connect(func(): _hunt_arrive(pos))
 	return true
@@ -601,7 +601,7 @@ func _on_caught() -> void:
 		return
 	player.input_locked = true
 	player.flicker(1.0)
-	get_tree().create_timer(0.8).timeout.connect(func(): main.fail_day("Он нашёл тебя."))
+	get_tree().create_timer(0.8).timeout.connect(func(): main.fail_day("Он нашёл тебя. Дверца даже не скрипнула."))
 
 
 ## Силуэт далеко впереди — на краю луча.
@@ -642,7 +642,7 @@ func _crawler() -> bool:
 			near_spider = true
 	Game.play_at(Sfx.scuttle(), p + (pos - p).normalized() * 5.0 + Vector3(0, 2.0, 0), -2.0)
 	if near_spider:
-		Game.say_once("spiders_run", "Пауки... разбегаются. Все разом. Что-то идёт.", Game.THOUGHT, 3.5)
+		Game.say_once("spiders_run", "Пауки разбегаются. Все сразу. Что-то идёт.", Game.THOUGHT, 3.5)
 	get_tree().create_timer(3.0).timeout.connect(func(): _crawler_arrive(pos))
 	return true
 
@@ -680,7 +680,7 @@ func _masha() -> bool:
 	a.finished.connect(a.queue_free)
 	a.play()
 	Game.say("…Папа?.. Папа, ты где?…", MASHA, 4.0)
-	get_tree().create_timer(4.5).timeout.connect(func(): Game.say_once("masha_heard", "Это... голос Маши? Здесь? Из штольни...", Game.THOUGHT, 4.0))
+	get_tree().create_timer(4.5).timeout.connect(func(): Game.say_once("masha_heard", "Это... Маша? Здесь? Из штольни?..", Game.THOUGHT, 4.0))
 	return true
 
 
@@ -707,7 +707,7 @@ func _double() -> bool:
 func _silence() -> bool:
 	var t := randf_range(6.0, 10.0)
 	main.ambience.silence(t)
-	Game.say_once("silence", "Тихо. Совсем тихо. Даже капель перестала.", Game.THOUGHT, 3.5)
+	Game.say_once("silence", "Тихо. Совсем тихо. Даже капать перестало.", Game.THOUGHT, 3.5)
 	get_tree().create_timer(t).timeout.connect(_after_silence)
 	return true
 
@@ -761,7 +761,7 @@ func _swarm() -> bool:
 	if not level.is_walkable(pos) or pos.z > Level.TUN_Z0 - 8.0:
 		return false
 	Game.play_at(Sfx.scuttle(), pos + Vector3(0, 1.0, 0), 4.0)
-	Game.say_once("swarm", "Пауки... на полу. Много. И они бегут не от меня — ко мне.", Game.THOUGHT, 4.0)
+	Game.say_once("swarm", "Пауки на полу. Много. И бегут не от меня, а ко мне.", Game.THOUGHT, 4.0)
 	for i in randi_range(3, 5):
 		main.spawn_biter(pos + axis * randf_range(-2.0, 2.0) + Vector3(randf_range(-0.8, 0.8), 0, randf_range(-0.8, 0.8)))
 	return true
@@ -782,7 +782,7 @@ func _interfere() -> bool:
 					player.battery -= 25.0
 					player.flicker(1.2)
 					Game.play_ui(Sfx.click(), -2.0)
-					Game.say_once("lamp_drained", "Щёлкнуло прямо над ухом — и фонарь почти сел. Будто кто-то выпил батарею.", Game.THOUGHT, 4.0)
+					Game.say_once("lamp_drained", "Щёлкнуло прямо над ухом, и фонарь почти сел. Как будто кто-то выпил батарею.", Game.THOUGHT, 4.0)
 					return true
 			"crate":
 				for c in main.crates:
@@ -792,7 +792,7 @@ func _interfere() -> bool:
 						cr.global_position += axis * randf_range(-2.0, 2.0)
 						cr.rotation.y += randf_range(-0.8, 0.8)
 						Game.play_at(Sfx.creak(), cr.global_position + Vector3(0, 0.3, 0), -2.0)
-						Game.say_once("crate_moved", "Скрежет... Будто волокли что-то тяжёлое по бетону.", Game.THOUGHT, 3.5)
+						Game.say_once("crate_moved", "Скрежет... Как будто что-то тяжёлое волокли по бетону.", Game.THOUGHT, 3.5)
 						return true
 			"door":
 				for d in main.doors:
@@ -824,7 +824,7 @@ func _darkwave() -> bool:
 		if not stalker.visible and level.is_walkable(at):
 			stalker.appear(at, "sighting", 5.0)
 			Game.add_fear(12.0))
-	Game.say_once("darkwave", "Лампы гасли одна за другой — по направлению ко мне. С щелчком. Как шаги.")
+	Game.say_once("darkwave", "Лампы гасли одна за другой, в мою сторону. С щелчком. Как шаги.")
 	return true
 
 
@@ -838,7 +838,7 @@ func _side() -> bool:
 		return false
 	stalker.appear(pos, "behind", 6.0)
 	Game.play_at(Sfx.sniff(), pos + Vector3(0, 1.6, 0), -6.0)
-	Game.say_once("side", "Краем глаза — фигура. Стоит сбоку и смотрит. Повернулся — никого.")
+	Game.say_once("side", "Краем глаза фигура. Стоит сбоку и смотрит. Повернулся — никого.")
 	return true
 
 
@@ -856,7 +856,7 @@ func _lamps_out() -> void:
 	level.tunnel_lights_off = true
 	player.flicker(0.8)
 	Game.play_at(Sfx.clank(), player.global_position + Vector3(0, 3, -8), -2.0)
-	Game.say_once("lamps", "Свет погас... весь сразу. Будто кто-то дёрнул рубильник.")
+	Game.say_once("lamps", "Свет погас весь сразу. Как будто кто-то рубильник дёрнул.")
 	get_tree().create_timer(20.0).timeout.connect(func(): level.tunnel_lights_off = false)
 
 
@@ -893,18 +893,18 @@ func _on_vanished(m: String, seen: bool) -> void:
 				Game.add_fear(20.0)
 				player.flicker(0.5)
 				Game.play_ui(Sfx.sting(), -10.0)
-				Game.say_once("saw", "Там... кто-то стоял. В самом конце луча.")
+				Game.say_once("saw", "Там кто-то стоял. В самом конце луча.")
 		"hunt":
 			_hunt_t = _next_hunt(Game.day)  # ушёл — на время
 			if LOWER_HUNT_EVERY.has(Game.day):
 				_lower_hunt_t = _next_lower_hunt()
 			if seen:
-				Game.say_once("hunt_light", "Ушёл из луча... Не убит — просто ушёл. Он вернётся.", Game.THOUGHT, 3.5)
+				Game.say_once("hunt_light", "Ушёл из луча... Не убил, просто прогнал. Вернётся.", Game.THOUGHT, 3.5)
 			elif stalker.player_hid_during_hunt():
-				Game.say_once("hunt_hid", "Постоял у шкафа — и ушёл. Пересидел. На время.", Game.THOUGHT, 4.0)
+				Game.say_once("hunt_hid", "Постоял у шкафа и ушёл. Пересидел. Пока.", Game.THOUGHT, 4.0)
 				Achievements.unlock("hid")
 			else:
-				Game.say_once("hunt_gone", "Тихо. Он ушёл... или ждёт.", Game.WHISPER, 3.0)
+				Game.say_once("hunt_gone", "Тихо. Ушёл... или ждёт.", Game.WHISPER, 3.0)
 		"behind":
 			if seen:
 				Game.add_fear(35.0)
@@ -912,4 +912,4 @@ func _on_vanished(m: String, seen: bool) -> void:
 				Game.play_ui(Sfx.sting(), -2.0)
 				Game.say_once("behind", "Он стоял прямо за мной. Прямо. За. Мной.")
 			else:
-				Game.say_once("behind_unseen", "…кажется, кто-то дышал мне в затылок.", Game.WHISPER)
+				Game.say_once("behind_unseen", "…кажется, мне в затылок кто-то дышал.", Game.WHISPER)

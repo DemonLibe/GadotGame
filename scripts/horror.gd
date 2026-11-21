@@ -15,12 +15,12 @@ var level: Level
 const FOREIGN := {3: 1, 4: 2, 5: 2, 6: 2, 7: 2}
 const FOREIGN_POOL := [
 	"Не оборачивайся.",
-	"Ты считаешь ступеньки. Я считаю тебя.",
-	"Маша спрашивала, когда ты придёшь. Я сказал — скоро.",
+	"Ты считаешь ступеньки. А я считаю тебя.",
+	"Маша спрашивала, когда ты придёшь. Я сказал: скоро.",
 	"Сегодня ты шёл быстрее. Я всё равно успел.",
-	"Седьмой тоже вёл дневник. Хочешь, покажу, чем он кончился?",
+	"Седьмой тоже вёл дневник. Хочешь, покажу, чем всё кончилось?",
 	"Ты пишешь «мне страшно». Правильно пишешь.",
-	"Я стоял у тебя за спиной, когда ты это писал.",
+	"Я стоял у тебя за спиной, пока ты это писал.",
 ]
 var _foreign_left := 0
 var _foreign_t := 0.0
@@ -82,7 +82,7 @@ func _check_photo() -> void:
 		4:
 			Game.say_once("photo4", "Фото Маши на шкафчике. Лицо зацарапано. Я этого не делал.")
 		5:
-			Game.say_once("photo5", "Под фотографией красным: «папа не придёт». Не её почерк. И не мой.")
+			Game.say_once("photo5", "Под фотографией красным: «папа не придёт». Почерк не её. И не мой.")
 		_:
 			Game.say_once("photo6", "Фотографии нет. На шкафчике мелом: «Она ждёт тебя внизу».")
 	Game.add_fear(6.0)
@@ -103,7 +103,7 @@ func _update_foreign(delta: float) -> void:
 	Game.add_fear(8.0)
 	Game.play_at(Sfx.breath(), player.global_position - player.forward_flat() * 1.2 + Vector3(0, 1.6, 0), -6.0)
 	get_tree().create_timer(4.0).timeout.connect(func(): Game.say_once("foreign_%d" % Game.day,
-		"В дневнике строчка, которую я не писал. Чужой почерк. Чернила ещё не высохли."))
+		"В дневнике строчка, которую я не писал. Чужой почерк. Чернила ещё мокрые."))
 
 
 ## Запись подстраивается под то, что делает игрок прямо сейчас.
@@ -114,17 +114,17 @@ func _foreign_text() -> String:
 	if player.loot > 0:
 		cand.append("Чужое не выносят. Положи, где взял.")
 	if not level.power_on:
-		cand.append("Тебе темно? Мне — нет.")
+		cand.append("Тебе темно? А мне нет.")
 	if lower.contains(p):
-		cand.append("Здесь я дома. А ты — в гостях.")
+		cand.append("Здесь я дома. А ты в гостях.")
 	if player.hiding:
-		cand.append("Шкаф тесный. Я помню каждый.")
+		cand.append("Шкаф тесный. Я их все помню.")
 	if not player.flashlight_on:
-		cand.append("Зачем ты погасил свет? Я же тебя всё равно вижу.")
+		cand.append("Зачем ты погасил свет? Я всё равно тебя вижу.")
 	if Game.day == Game.LAST_DAY - 1:
-		cand.append("Ты уже выбрался. Зачем вернулся, Восьмой?")
+		cand.append("Ты же выбрался. Зачем вернулся, Восьмой?")
 	if player.health < 60.0:
-		cand.append("Кровь пахнет. Я иду.")
+		cand.append("Кровью пахнет. Я иду.")
 	for t in cand:
 		if not _used.has(t):
 			_used[t] = true
@@ -148,14 +148,14 @@ func _update_dark(delta: float) -> void:
 	if _dark_t > 6.0 and _dark_t - delta <= 6.0:
 		Game.play_at(Sfx.breath(), behind, -2.0)
 		Game.add_fear(10.0)
-		Game.say_once("dark_breath", "Погасил фонарь — и сразу услышал дыхание. Рядом. Совсем рядом.")
+		Game.say_once("dark_breath", "Погасил фонарь и тут же услышал дыхание. Рядом. Совсем рядом.")
 	if _dark_t > 14.0:
 		_dark_t = 6.0
 		Game.play_at(Sfx.sniff(), behind, 0.0)
 		Game.play_ui(Sfx.sting(), -8.0)
 		player.take_damage(8.0)
 		Game.add_fear(14.0)
-		Game.say_once("dark_touch", "Что-то коснулось шеи. Холодное. Без света здесь нельзя.")
+		Game.say_once("dark_touch", "Что-то коснулось шеи. Холодное. Без света тут нельзя.")
 
 
 # --- Когти по дверце -----------------------------------------------------------------
@@ -173,7 +173,7 @@ func _update_hide(delta: float) -> void:
 		Game.play_at(Sfx.scrape(), front, 0.0)
 		get_tree().create_timer(1.4).timeout.connect(func(): Game.play_at(Sfx.sniff(), front, -2.0))
 		Game.add_fear(12.0)
-		Game.say_once("scratch", "Пока сидел в шкафу, по дверце медленно провели когтями. Сверху вниз. Потом — тишина.")
+		Game.say_once("scratch", "Пока сидел в шкафу, по дверце медленно провели когтями. Сверху вниз. И тишина.")
 
 
 # --- Стук в трубах --------------------------------------------------------------------
@@ -191,7 +191,7 @@ func _update_knocks(delta: float) -> void:
 		_knock_at = p.lerp(Vector3(_knock_at.x, p.y + 2.2, _knock_at.z), 0.3)
 		_knock_stage = 0
 		_knock_t = randf_range(80.0, 150.0)
-		get_tree().create_timer(2.5).timeout.connect(func(): Game.say_once("knocks", "В трубах стучат. Три раза. Через минуту — ещё три. Ближе."))
+		get_tree().create_timer(2.5).timeout.connect(func(): Game.say_once("knocks", "В трубах стучат. Три раза. Через минуту ещё три. Ближе."))
 	for i in 3:
 		var at := _knock_at
 		get_tree().create_timer(0.55 * i).timeout.connect(func(): Game.play_at(Sfx.knock(), at, -2.0))

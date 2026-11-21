@@ -107,10 +107,10 @@ func _process(delta: float) -> void:
 	if fuel <= 0.0:
 		stall()
 		if level and not level.power_on:
-			Game.say("Генератор заглох: кончилось топливо. Нет света и вентиляции.", Game.SYSTEM, 4.0)
+			Game.say("Генератор заглох: кончилось топливо. Ни света, ни вентиляции.", Game.SYSTEM, 4.0)
 	elif fuel < 15.0:
 		if not reserve:
-			Game.say_once("fuel_low", "Генератор чихает — топливо на исходе, нужна канистра. Или резервный — в генераторной.", Game.SYSTEM, 3.5)
+			Game.say_once("fuel_low", "Генератор чихает, топливо на исходе. Нужна канистра или резервный из генераторной.", Game.SYSTEM, 3.5)
 
 
 func _wanted(player) -> String:
@@ -150,10 +150,10 @@ func hold_interact(player, delta: float) -> float:
 			player.canisters -= 1
 			fuel = minf(100.0, fuel + 55.0)
 			Game.play_at(Sfx.pickup(), global_position, -6.0)
-			Game.say("Залил канистру. Бак: %d%%." % int(fuel), Game.SYSTEM, 2.5)
+			Game.say("Залил канистру. В баке %d%%." % int(fuel), Game.SYSTEM, 2.5)
 		"stop":
 			stall()
-			Game.say("Генератор заглушен. Тоннель обесточен.", Game.SYSTEM, 2.5)
+			Game.say("Генератор заглушен. Тоннель без света.", Game.SYSTEM, 2.5)
 		"start":
 			# Старый дизель заводится не с первого раза.
 			if _fails < 1 and Game.day >= 2 and randf() < 0.6:
@@ -165,10 +165,10 @@ func hold_interact(player, delta: float) -> float:
 			_set_running(true)
 			Game.make_noise(global_position, 25.0)
 			if reserve:
-				Game.say_once("gen_reserve", "Резервный дизель взялся. Свет и вентиляция — на весь тоннель, пока есть солярка.", Game.THOUGHT, 3.5)
+				Game.say_once("gen_reserve", "Резервный дизель взялся. Свет и воздух на весь тоннель, пока есть солярка.", Game.THOUGHT, 3.5)
 				return -1.0
 			Game.report("generator")
-			Game.say_once("gen_on", "Завёлся. Грохот на весь тоннель... зато есть свет, и вентиляция загудела.", Game.THOUGHT, 3.5)
+			Game.say_once("gen_on", "Завёлся. Грохот на весь тоннель... зато свет есть и вентиляция загудела.", Game.THOUGHT, 3.5)
 	return -1.0
 
 

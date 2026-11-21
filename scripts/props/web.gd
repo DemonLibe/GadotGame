@@ -106,4 +106,4 @@ func _process(delta: float) -> void:
 		var p := get_tree().get_first_node_in_group("player") as Node3D
 		if p and p.global_position.distance_to(global_position) < 6.0:
 			regrown = false
-			Game.say("Я же её сжигал... Я точно её сжигал.")
+			Game.say("Я же её сжигал... Точно сжигал.")

@@ -930,7 +930,7 @@ func _build_room() -> void:
 			Geo.box(_into, Vector3(shx - 0.45 + k * 0.17, y + float(sy) + 0.16, z0 + 0.16), Vector3(0.06, 0.3, 0.24), ProcTex.flat(col, 0.8), false)
 	var paper := ProcTex.flat(Color(0.86, 0.83, 0.72), 0.95)
 	Geo.box(_into, Vector3(x1 - 0.01, y + 1.9, SHAFT_Z + 1.6), Vector3(0.01, 0.7, 0.5), paper, false)
-	Geo.label(_into, Vector3(x1 - 0.02, y + 1.9, SHAFT_Z + 1.6), "ПАМЯТКА\nОБХОДЧИКА\n\nНе спускайся\nбез фонаря.\nСвет — твоя смена.\nДокладывай\nпо рации.", -90, 22, Color(0.15, 0.12, 0.1), true, 0.0022)
+	Geo.label(_into, Vector3(x1 - 0.02, y + 1.9, SHAFT_Z + 1.6), "ПАМЯТКА\nОБХОДЧИКУ\n\nБез фонаря\nне спускайся.\nНет света —\nнет смены.\nДокладывай\nпо рации.", -90, 22, Color(0.15, 0.12, 0.1), true, 0.0022)
 	Geo.box(_into, Vector3(x1 - 0.01, y + 1.7, SHAFT_Z - 0.4), Vector3(0.01, 0.45, 0.32), paper, false)
 	Geo.label(_into, Vector3(x1 - 0.02, y + 1.8, SHAFT_Z - 0.4), "ОКТЯБРЬ", -90, 22, Color(0.55, 0.1, 0.08), true, 0.0022)
 	var panel_x := SHAFT_X + 0.9

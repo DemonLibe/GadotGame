@@ -101,7 +101,7 @@ func _update_duty(delta: float) -> void:
 			var at := Vector3(Level.SHAFT_X + 3.45, Level.ROOM_Y + 1.45, Level.SHAFT_Z + 0.9)
 			for i in 4:
 				get_tree().create_timer(2.2 * i).timeout.connect(func(): Game.play_at(Sfx.phone(), at, 8.0))
-			Game.say_once("phone_above_%d" % d, "Наверху звонит телефон. Я уже на лестнице. Линия мёртвая. Он звонит.", Game.THOUGHT, 4.5)
+			Game.say_once("phone_above_%d" % d, "Наверху звонит телефон. А я уже на лестнице. Линия мёртвая. Но он звонит.", Game.THOUGHT, 4.5)
 		return
 	_duty_t += delta
 	var hatch := Vector3(Level.SHAFT_X, Level.ROOM_Y, Level.SHAFT_Z)
@@ -110,7 +110,7 @@ func _update_duty(delta: float) -> void:
 		for i in 3:
 			get_tree().create_timer(0.7 * i).timeout.connect(func(): play_earth(Sfx.knock(), hatch + Vector3(0, -1.5, 0), 8.0))
 		Game.add_fear(4.0)
-		Game.say_once("hatch_knock_%d" % d, "В крышку люка постучали. Снизу. Три раза. Я ещё не спускался.", Game.THOUGHT, 4.5)
+		Game.say_once("hatch_knock_%d" % d, "В крышку люка постучали. Снизу. Три раза. А я ещё не спускался.", Game.THOUGHT, 4.5)
 	if _duty_step == 1 and _duty_t > 17.0:
 		_duty_step = 2
 		if d >= 5 and not main.stalker.visible:
@@ -138,7 +138,7 @@ func _duty_prints() -> void:
 		m.add_to_group("day_objects")
 	get_tree().create_timer(12.0).timeout.connect(func():
 		if player.global_position.y > Level.ROOM_Y - 2.0:
-			Game.say_once("duty_prints", "На линолеуме мокрые следы. От люка — к шкафчику, где фото Маши. Люк был закрыт.", Game.THOUGHT, 5.0))
+			Game.say_once("duty_prints", "На линолеуме мокрые следы. От люка к шкафчику, где фото Маши. А люк был закрыт.", Game.THOUGHT, 5.0))
 
 
 func _set_phase(p: String, t: float) -> void:
@@ -211,7 +211,7 @@ func _update_curve(delta: float, in_old: bool) -> void:
 					_set_phase("relief", randf_range(12.0, 20.0))
 					get_tree().create_timer(6.0).timeout.connect(func():
 						if Game.day == d and not main.busy:
-							Game.say_once("false_build", "Ничего. Я ждал — и ничего. Это хуже, чем если бы вышло.", Game.THOUGHT, 4.0))
+							Game.say_once("false_build", "Ничего. Я ждал, а ничего не было. Хуже, чем если бы случилось.", Game.THOUGHT, 4.0))
 				else:
 					_set_phase("relief", randf_range(25.0, 40.0))
 		"relief":
@@ -254,7 +254,7 @@ func _sign(lv: int, in_old: bool) -> void:
 				get_tree().create_timer(0.55 * i).timeout.connect(func(): play_earth(Sfx.step(), at, 2.0))
 		"rail":
 			Game.play_at(Sfx.clank(), p + ahead * randf_range(30.0, 45.0) + Vector3(0, 0.3, 0), -8.0)
-			Game.say_once("rail", "Рельс звякнул — далеко впереди. Будто по нему ударили. Один раз.", Game.THOUGHT, 3.5)
+			Game.say_once("rail", "Далеко впереди звякнул рельс. Как будто по нему ударили. Один раз.", Game.THOUGHT, 3.5)
 		"pebbles":
 			var at := p + ahead * randf_range(6.0, 12.0)
 			if level.is_walkable(at):
@@ -271,17 +271,17 @@ func _sign(lv: int, in_old: bool) -> void:
 			for i in 3:
 				var at := p + right * side * lerpf(10.0, 2.0, i / 2.0) + Vector3(0, lerpf(-8.0, -3.0, i / 2.0), 0)
 				get_tree().create_timer(0.9 * i).timeout.connect(func(): play_earth(Sfx.knock(), at, 4.0))
-			Game.say_once("earth_knock", "Стучат снизу. Из-под шпал. Каждый удар — ближе.", Game.THOUGHT, 4.0)
+			Game.say_once("earth_knock", "Стучат снизу, из-под шпал. И каждый удар ближе.", Game.THOUGHT, 4.0)
 		"wall_steps":
 			# Кто-то идёт за стенкой трубы — в ногу с тобой.
 			_wall_steps = randi_range(6, 9)
 			_wall_side = side
 		"drag":
 			play_earth(Sfx.scrape(), p - ahead * 25.0 + Vector3(0, -2.0, 0), 2.0)
-			Game.say_once("drag", "Сзади, далеко, по железу что-то тащат. Медленно.", Game.WHISPER, 3.5)
+			Game.say_once("drag", "Далеко сзади по железу что-то тащат. Медленно.", Game.WHISPER, 3.5)
 		"lamp_behind":
 			if level.flicker_lamp_near(p - ahead * 14.0, randf_range(18.0, 30.0), 12.0):
-				Game.say_once("lamp_behind", "Лампа за спиной погасла. Та, под которой я только что прошёл.", Game.THOUGHT, 3.5)
+				Game.say_once("lamp_behind", "Лампа у меня за спиной погасла. Та, под которой я только что прошёл.", Game.THOUGHT, 3.5)
 		"prints":
 			_prints(p + ahead * randf_range(7.0, 11.0), ahead, right * side)
 		"wall_scratch":
@@ -309,7 +309,7 @@ func _prints(at: Vector3, ahead: Vector3, across: Vector3) -> void:
 		m.add_to_group("day_objects")
 	get_tree().create_timer(3.0).timeout.connect(func():
 		if player.global_position.distance_to(at) < 12.0:
-			Game.say_once("prints", "Мокрые следы. Босые. Поперёк тоннеля — из стены в стену.", Game.THOUGHT, 4.0))
+			Game.say_once("prints", "Мокрые следы. Босые. Через весь тоннель, из стены в стену.", Game.THOUGHT, 4.0))
 
 
 ## Звук сквозь грунт: глухой, без верхов.
@@ -343,7 +343,7 @@ func _on_step() -> void:
 		var w := p + right * _wall_side * 3.2 + Vector3(0, 0.2, 0)
 		get_tree().create_timer(0.12).timeout.connect(func(): play_earth(Sfx.step(), w, 3.0))
 		if _wall_steps == 0:
-			Game.say_once("wall_steps", "За стенкой трубы кто-то шёл. В ногу со мной. Там нет прохода.", Game.THOUGHT, 4.0)
+			Game.say_once("wall_steps", "За стенкой трубы кто-то шёл. В ногу со мной. А там нет прохода.", Game.THOUGHT, 4.0)
 
 
 ## Остановился — а шаги ещё один раз.
@@ -357,7 +357,7 @@ func _update_steps(delta: float) -> void:
 	var pos := player.global_position - player.forward_flat() * 5.0
 	Game.play_at(Sfx.step(), pos, 0.0)
 	Game.add_fear(8.0)
-	Game.say_once("extra_step", "Я остановился. Шаги — нет. Ещё один. За спиной.", Game.THOUGHT, 4.0)
+	Game.say_once("extra_step", "Я остановился, а шаги нет. Ещё один. У меня за спиной.", Game.THOUGHT, 4.0)
 
 
 # --- Мир врёт ------------------------------------------------------------------------
@@ -409,7 +409,7 @@ func _map_lie(d: int) -> void:
 	var p := player.global_position
 	if not _fake.is_empty():
 		if absf(p.z - float(_fake["z"])) < 4.0 and absf(p.x - Level.TUN_CX) < 3.0:
-			Game.say_once("map_lie", "По схеме здесь штольня. Здесь — тюбинг. Сплошной. Я трогал.", Game.THOUGHT, 4.5)
+			Game.say_once("map_lie", "На схеме тут штольня. А тут тюбинг, сплошной. Я потрогал.", Game.THOUGHT, 4.5)
 			Game.add_fear(5.0)
 			var gone := _fake
 			get_tree().create_timer(15.0).timeout.connect(func():
@@ -447,7 +447,7 @@ func _hidden_branch(d: int) -> void:
 	if not level.hidden_open:
 		if _flags.has("hidden_was") and dist < 14.0 and not unseen:
 			_flags.erase("hidden_was")
-			Game.say_once("hidden_gone", "Здесь была штольня. Я в неё заходил. Теперь — стена. Холодная.", Game.THOUGHT, 4.5)
+			Game.say_once("hidden_gone", "Тут была штольня. Я в неё заходил. А теперь стена. Холодная.", Game.THOUGHT, 4.5)
 			Game.add_fear(8.0)
 		if not main._reachable_root(i) or _flags.has("hidden_was"):
 			return
@@ -460,7 +460,7 @@ func _hidden_branch(d: int) -> void:
 	# Открыта. Увидел вблизи — запомнил.
 	if dist < 14.0 and not unseen and not _flags.has("hidden_seen"):
 		_flags["hidden_seen"] = true
-		Game.say_once("hidden_branch", "Штольня. Её здесь не было — я проходил тут, и тут был тюбинг. Сплошной.", Game.THOUGHT, 5.0)
+		Game.say_once("hidden_branch", "Штольня. Её тут не было: я шёл мимо, и стоял тюбинг, сплошной.", Game.THOUGHT, 5.0)
 		Game.add_fear(10.0)
 	# Ушёл далеко и не смотришь — её снова нет (но не пока ты внутри).
 	if _flags.has("hidden_seen") and dist > 40.0 and unseen and randf() < 0.05:

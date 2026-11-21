@@ -287,7 +287,7 @@ func _hunt_update(delta: float) -> void:
 				Game.add_fear(30.0)
 				Game.play_ui(Sfx.sting(), 0.0)
 				_say(Sfx.stalker_roar())
-				Game.say_once("he_found", "Он вырвал дверцу. Он знал, что я там. Шкаф больше не спасает — только если не дышать.", Game.THOUGHT, 5.0)
+				Game.say_once("he_found", "Он вырвал дверцу. Он знал, что я там. Шкаф больше не спасает. Разве что не дышать.", Game.THOUGHT, 5.0)
 				_chasing = true
 				_unseen = 0.0
 				_listen = 0.0
